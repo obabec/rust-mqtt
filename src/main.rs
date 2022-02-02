@@ -1,7 +1,7 @@
-use rust_mqtt::packet::mqttpacket::Packet;
+use rust_mqtt::packet::mqtt_packet::Packet;
+use rust_mqtt::packet::packet_type::PacketType;
 
 fn main() {
-    
     env_logger::builder()
     .filter_level(log::LevelFilter::Info)
     .format_timestamp_nanos()
@@ -11,10 +11,13 @@ fn main() {
     let y: u32 = 2;
     let z: u16 = 3;
     let p: u32 = 4;
-    let text: &'a [u8] = "abcde";
-    let payld: &'a [u8] = "This is payload";
 
-    let x = Packet::new( l, y, z, p, text, payld );
+    let mut txt = *b"abcde";
+    let mut payld = *b"xxxxx";
+    let f = PacketType::Reserved;
+    let o: u8 = f.into();
+    log::info!("Enum val: {}", o);
+    let x = Packet::new( l, y, z, p, &mut txt, &mut payld );
     log::info!("Hello world");
     x.encode();
     x.get_reason_code();

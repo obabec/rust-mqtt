@@ -15,8 +15,9 @@ pub struct Packet<'a> {
     payload: &'a mut [u8]
 }
 
-impl<'a> Packet {
-    pub fn new(header_control: u8, remain_len: u32, packet_identifier: u16, property_len: u32, properties: &'a mut [u8], payload: &'a mut [u8]) -> Self {
+impl<'a> Packet<'a> {
+    pub fn new(header_control: u8, remain_len: u32, packet_identifier: u16, property_len: u32, 
+                properties: &'a mut [u8], payload: &'a mut [u8]) -> Self {
         Self { header_control, remain_len, packet_identifier, property_len , properties, payload}
     }
 
