@@ -4,6 +4,7 @@
 #![allow(dead_code)]
 
 pub mod packet;
+pub mod encoding;
 
 #[allow(unused_variables)]
 pub fn print_stack(file: &'static str, line: u32) {
