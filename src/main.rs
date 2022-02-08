@@ -1,5 +1,6 @@
 use rust_mqtt::packet::mqtt_packet::Packet;
 use rust_mqtt::packet::packet_type::PacketType;
+use rust_mqtt::packet::packet_builder::PacketBuilder;
 use rust_mqtt::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use rust_mqtt::encoding::variable_byte_integer::VariableByteIntegerDecoder;
 
@@ -16,7 +17,12 @@ fn main() {
 
     let mut txt = *b"abcde";
     let mut payld = *b"xxxxx";
+    let packet = Packet::clean(&mut txt, &mut payld);
+    let mut packet_builder = PacketBuilder::new(packet);
+    packet_builder.addPacketType(PacketType::Publish);
 
+    /*let s: str = "AAAAAA";
+    test(&s);*/
 
     let f = PacketType::from(0xA0);
     let o: u8 = f.into();
@@ -28,10 +34,15 @@ fn main() {
     log::info!("{:02X?}", r);
     let d = VariableByteIntegerDecoder::decode(r);
     log::info!("Enum val: {}", o);
-    let x = Packet::new( l, y, z, p, &mut txt, &mut payld );
+    let x = Packet::new( l, 0, z, 0, &mut txt, &mut payld );
     
     log::info!("Hello world");
     x.encode();
     x.get_reason_code();
 
 }
+
+/*fn test(tst: &str) {
+    log::info!("xx");
+    log::info!("Prvni: {}", )
+}*/

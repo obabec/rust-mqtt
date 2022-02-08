@@ -1,24 +1,28 @@
 pub struct Packet<'a> {
     // 7 - 4 mqtt control packet type, 3-0 flagy
-    header_control: u8,
-    // 1 - 4 B
-    remain_len: u32,
+    pub header_control: u8,
+    // 1 - 4 B lenght of variable header + len of payload
+    pub remain_len: u32,
 
     // variable header
-    //optional
-    packet_identifier: u16,
+    //optional  prida se pouze u packetu ve kterych ma co delat 
+    pub packet_identifier: u16,
     // property len
-    property_len: u32,
+    pub property_len: u32,
     // properties
-    properties: &'a mut [u8],
+    pub properties: &'a mut [u8],
     // Payload of message
-    payload: &'a mut [u8]
+    pub payload: &'a mut [u8]
 }
 
 impl<'a> Packet<'a> {
     pub fn new(header_control: u8, remain_len: u32, packet_identifier: u16, property_len: u32, 
                 properties: &'a mut [u8], payload: &'a mut [u8]) -> Self {
-        Self { header_control, remain_len, packet_identifier, property_len , properties, payload}
+        Self { header_control, remain_len, packet_identifier, property_len, properties, payload }
+    }
+
+    pub fn clean(properties: &'a mut [u8], payload: &'a mut [u8]) -> Self {
+        Self{ header_control: 0, remain_len: 0, packet_identifier: 0, property_len: 0, properties, payload }
     }
 
     pub fn encode(&self) {

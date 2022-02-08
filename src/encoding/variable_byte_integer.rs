@@ -14,14 +14,14 @@ pub enum VariableByteIntegerError {
     DecodingError
 }
 
-
+pub type VariableByteInteger = [u8; 4];
 
 impl VariableByteIntegerEncoder {
     /// Encode function takes as parameter integer as u32 type and encodes
     /// this integer into maximal 4 Bytes. MSb of each Byte is controll bit.
     /// This bit is saying if there is continuing Byte in stream or not, this way
     /// we can effectively use 1 to 4 Bytes based in integer len.
-    pub fn encode(mut target: u32) -> Result<[u8; 4], VariableByteIntegerError> {
+    pub fn encode(mut target: u32) -> Result<VariableByteInteger, VariableByteIntegerError> {
         // General known informations from OASIS
         const MAX_ENCODABLE: u32 = 268435455;
         const MOD: u32 = 128;
@@ -59,7 +59,7 @@ impl VariableByteIntegerDecoder {
     /// Decode function takes as paramater encoded integer represented
     /// as array of 4 unsigned numbers of exactly 1 Byte each -> 4 Bytes maximal
     /// same as maximal amount of bytes for variable byte encoding in MQTT.
-    pub fn decode(encoded: [u8; 4]) -> Result<u32, VariableByteIntegerError> {
+    pub fn decode(encoded: VariableByteInteger) -> Result<u32, VariableByteIntegerError> {
         let mut multiplier: u32 = 1;
         let mut ret: u32 = 0;
 
