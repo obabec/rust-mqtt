@@ -5,6 +5,7 @@
 
 pub mod packet;
 pub mod encoding;
+pub mod utils;
 
 #[allow(unused_variables)]
 pub fn print_stack(file: &'static str, line: u32) {
