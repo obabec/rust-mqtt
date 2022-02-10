@@ -8,7 +8,7 @@ use crate::utils::buffer_reader::*;
 // metody packet buildery budou prijimat jako parametr buff reader, z ktereho bude postupne parsovat 
 
 pub struct PacketBuilder<'a> {
-    currentPacket: Packet<'a>,
+    pub currentPacket: Packet<'a>,
 }
 
 impl<'a> PacketBuilder<'a>  {
@@ -58,6 +58,8 @@ impl<'a> PacketBuilder<'a>  {
 
     pub fn decode_packet(& mut self, buff_reader: & mut BuffReader<'a>) {
         self.decodeFixedHeader(buff_reader);
+        let y: u8 = self.currentPacket.fixed_header & 0xF0;
+        let z: u8 = (PacketType::Connect).into();
         if self.currentPacket.fixed_header & 0xF0 == (PacketType::Connect).into() {
             self.decodeControllPacket(buff_reader);
         }
@@ -70,6 +72,29 @@ impl<'a> PacketBuilder<'a>  {
         return PacketType::from(self.currentPacket.fixed_header);
     }
 
+    pub fn decode_properties(& mut self, buff_reader: & mut BuffReader<'a>) {
+        self.currentPacket.property_len = buff_reader.readVariableByteInt().unwrap();
+        let mut x: u32 = 0;
+        let mut prop: Result<Property, ParseError>;
+        loop {
+            let mut res: Property;
+            prop = Property::decode(buff_reader);
+            if let Ok(res) = prop {
+                log::info!("Parsed property {:?}", res);
+                x = x + res.len() as u32 + 1;
+                self.currentPacket.properties.push(res);
+            } else {
+                // error handlo
+                log::error!("Problem during property decoding");
+            }
+
+            
+            if x == self.currentPacket.property_len {
+                break;
+            }
+        }
+    }
+
     pub fn decodeControllPacket(& mut self, buff_reader: & mut BuffReader<'a>) {
         self.currentPacket.packet_identifier = 0;
         self.currentPacket.protocol_name_len = buff_reader.readU16().unwrap();
@@ -77,27 +102,6 @@ impl<'a> PacketBuilder<'a>  {
         self.currentPacket.protocol_version = buff_reader.readU8().unwrap();
         self.currentPacket.connect_flags = buff_reader.readU8().unwrap();
         self.currentPacket.keep_alive = buff_reader.readU16().unwrap();
-        self.currentPacket.property_len = buff_reader.readVariableByteInt().unwrap();
-        let mut x: u32 = 0;
-        let mut prop: Result<Property, ProperyParseError>;
-        let mut res: Property;
-        loop {
-            prop = Property::decode(buff_reader);
-            if let Ok(res) = prop {
-                x = x + res.len() as u32 + 1;
-                self.currentPacket.properties.push(res);
-            }
-            
-            /*if prop.is_ok() {
-            
-            } else {
-                log::error!("Decoding property did not went well!");
-            }*/
-
-            
-            if x == self.currentPacket.property_len {
-                break;
-            }
-        }
+        self.decode_properties(buff_reader);
     }
 }

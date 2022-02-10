@@ -1,4 +1,6 @@
 #![crate_name = "doc"]
+
+use crate::utils::buffer_reader::ParseError;
 /// VariableByteIntegerEncoder and VariableByteIntegerDecoder are implemented based on 
 /// pseudo code which is introduced in MQTT version 5.0 OASIS standard accesible from
 /// https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901107
@@ -9,12 +11,6 @@
 pub struct VariableByteIntegerEncoder;
 /// Variable byte integers error enumeration is used by both encoder and decoder for
 /// error notification.
-#[derive(core::fmt::Debug)]
-#[derive(Clone)]
-pub enum VariableByteIntegerError {
-    EncodingError,
-    DecodingError
-}
 
 pub type VariableByteInteger = [u8; 4];
 
@@ -23,13 +19,13 @@ impl VariableByteIntegerEncoder {
     /// this integer into maximal 4 Bytes. MSb of each Byte is controll bit.
     /// This bit is saying if there is continuing Byte in stream or not, this way
     /// we can effectively use 1 to 4 Bytes based in integer len.
-    pub fn encode(mut target: u32) -> Result<VariableByteInteger, VariableByteIntegerError> {
+    pub fn encode(mut target: u32) -> Result<VariableByteInteger, ParseError> {
         // General known informations from OASIS
         const MAX_ENCODABLE: u32 = 268435455;
         const MOD: u32 = 128;
         if target > MAX_ENCODABLE {
             log::error!("Maximal value of integer for encoding was exceeded");
-            return Err(VariableByteIntegerError::EncodingError);
+            return Err(ParseError::EncodingError);
         }
 
         let mut res: [u8; 4] = [0; 4];
@@ -61,7 +57,7 @@ impl VariableByteIntegerDecoder {
     /// Decode function takes as paramater encoded integer represented
     /// as array of 4 unsigned numbers of exactly 1 Byte each -> 4 Bytes maximal
     /// same as maximal amount of bytes for variable byte encoding in MQTT.
-    pub fn decode(encoded: VariableByteInteger) -> Result<u32, VariableByteIntegerError> {
+    pub fn decode(encoded: VariableByteInteger) -> Result<u32, ParseError> {
         let mut multiplier: u32 = 1;
         let mut ret: u32 = 0;
 
@@ -73,7 +69,7 @@ impl VariableByteIntegerDecoder {
             i = i + 1;
             ret = ret + ((encoded_byte & 127) as u32 * multiplier) as u32;
             if multiplier > 128 * 128 * 128 {
-                return Err(VariableByteIntegerError::DecodingError);
+                return Err(ParseError::DecodingError);
             }
             multiplier = multiplier * 128;
             if (encoded_byte & 128) == 0 {

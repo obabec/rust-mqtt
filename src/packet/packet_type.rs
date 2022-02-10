@@ -48,9 +48,8 @@ impl From<u8> for PacketType {
 impl Into<u8> for PacketType {
     fn into(self) -> u8 {
         match self {
-            PacketType::Connect => return 0x00,
-            PacketType::Connack => return 0x10,
-            PacketType::Reserved => return 0x20,
+            PacketType::Connect => return 0x10,
+            PacketType::Connack => return 0x20,
             PacketType::Publish => return 0x30,
             PacketType::Puback => return 0x40,
             PacketType::Pubrec => return 0x50,
