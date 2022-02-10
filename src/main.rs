@@ -1,8 +1,10 @@
-use rust_mqtt::packet::mqtt_packet::Packet;
+use rust_mqtt::packet::mqtt_packet::*;
 use rust_mqtt::packet::packet_type::PacketType;
 use rust_mqtt::packet::packet_builder::PacketBuilder;
 use rust_mqtt::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use rust_mqtt::encoding::variable_byte_integer::VariableByteIntegerDecoder;
+use rust_mqtt::packet::property::*;
+use heapless::Vec;
 
 fn main() {
     env_logger::builder()
@@ -15,9 +17,9 @@ fn main() {
     let z: u16 = 3;
     let p: u32 = 4;
 
-    let mut txt = *b"abcde";
+    let mut txt = Vec::new();
     let mut payld = *b"xxxxx";
-    let packet = Packet::clean(&mut txt, &mut payld);
+    let packet = Packet::clean(txt, &mut payld);
     let mut packet_builder = PacketBuilder::new(packet);
     packet_builder.addPacketType(PacketType::Publish);
 
@@ -34,11 +36,8 @@ fn main() {
     log::info!("{:02X?}", r);
     let d = VariableByteIntegerDecoder::decode(r);
     log::info!("Enum val: {}", o);
-    let x = Packet::new( l, 0, z, 0, &mut txt, &mut payld );
     
     log::info!("Hello world");
-    x.encode();
-    x.get_reason_code();
 
 }
 

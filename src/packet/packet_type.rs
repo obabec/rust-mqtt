@@ -1,6 +1,6 @@
 // x x x x - - - -
 
-
+#[derive(PartialEq)]
 pub enum PacketType {
     Reserved,
     Connect,
@@ -22,7 +22,8 @@ pub enum PacketType {
 
 impl From<u8> for PacketType {
     fn from(orig: u8) -> Self {
-        match orig {
+        let packet_type: u8 = orig & 0xF0;
+        match packet_type {
             0x10 => return PacketType::Connect,
             0x20 => return PacketType::Connack,
             0x00 => return PacketType::Reserved,

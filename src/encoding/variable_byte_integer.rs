@@ -9,6 +9,8 @@
 pub struct VariableByteIntegerEncoder;
 /// Variable byte integers error enumeration is used by both encoder and decoder for
 /// error notification.
+#[derive(core::fmt::Debug)]
+#[derive(Clone)]
 pub enum VariableByteIntegerError {
     EncodingError,
     DecodingError

@@ -3,15 +3,9 @@ use crate::utils::buffer_reader::StringPair;
 use crate::utils::buffer_reader::EncodedString;
 use crate::utils::buffer_reader::BinaryData;
 use crate::encoding::variable_byte_integer::VariableByteIntegerError;
-/*use crate::encoding::variable_byte_integer::VariableByteIntegerDecoder;
-use crate::encoding::variable_byte_integer::VariableByteIntegerError;
-use core::str;
+use crate::utils::buffer_reader::BuffReader;
 
-
-pub trait Decode<'a> {
-    fn decode(input: &'a [u8], offset: &'a mut usize) -> Result<Self, ProperyParseError> where Self: Sized;
-}
-*/
+#[derive(Clone)]
 pub enum Property<'a> {
     PayloadFormat(Result<u8, ProperyParseError>),
     MessageExpiryInterval(Result<u32, ProperyParseError>),
@@ -42,40 +36,70 @@ pub enum Property<'a> {
     SharedSubscriptionAvailable(Result<u8, ProperyParseError>)
 }
 
-/*
-impl<'a> Decode<'a> for Property<'a> {
-    fn decode(input: &'a [u8], offset: &'a mut usize) -> Result<Self, ProperyParseError> {
-        let propertyIdentifier = parseU8(input, offset); 
+impl<'a> Property<'a> {
+    pub fn len(mut self) -> u16 {
+        match self {
+            Property::PayloadFormat(u) => return 1,
+            Property::MessageExpiryInterval(u) => return 4,
+            Property::ContentType(u) => return u.unwrap().len(),
+            Property::ResponseTopic(u) => return u.unwrap().len(),
+            Property::CorrelationData(u) => return u.unwrap().len(),
+            Property::SubscriptionIdentifier(u) => return 4,
+            Property::AssignedClientIdentifier(u) => return u.unwrap().len(),
+            Property::ServerKeepAlive(u) => return 2,
+            Property::AuthenticationMethod(u) => return u.unwrap().len(),
+            Property::AuthenticationData(u) => return u.unwrap().len(),
+            Property::RequestProblemInformation(u) => return 1,
+            Property::WillDelayInterval(u) => return 4,
+            Property::RequestResponseInformation(u) => return 1,
+            Property::ResponseInformation(u) => return u.unwrap().len(),
+            Property::ServerReference(u) => return u.unwrap().len(),
+            Property::ReasonString(u) => return u.unwrap().len(),
+            Property::ReceiveMaximum(u) => return 2,
+            Property::TopicAliasMaximum(u) => return 2,
+            Property::TopicAlias(u) => return 2,
+            Property::MaximumQoS(u) => return 1,
+            Property::RetainAvailable(u) => return 1,
+            Property::UserProperty(u) => return u.unwrap().len(),
+            Property::MaximumPacketSize(u) => return 4,
+            Property::WildcardSubscriptionAvailable(u) => return 1,
+            Property::SubscriptionIdentifierAvailable(u) => return 1,
+            Property::SharedSubscriptionAvailable(u) => return 1,
+            _ => return 0
+        }
+    }
+
+    pub fn decode(buff_reader: &'a mut BuffReader) -> Result<Property<'a>, ProperyParseError> {
+        let propertyIdentifier = buff_reader.readU8(); 
         match propertyIdentifier {
-            Ok(0x01) => return Ok(Property::PayloadFormat(parseU8(input, offset))),
-            Ok(0x02) => return Ok(Property::MessageExpiryInterval(parseU32(input, offset))),
-            Ok(0x03) => return Ok(Property::ContentType(parseString(input, offset))),
-            Ok(0x08) => return Ok(Property::ResponseTopic(parseString(input, offset))),
-            Ok(0x09) => return Ok(Property::CorrelationData(parseBinary(input, offset))),
-            Ok(0x0B) => return Ok(Property::SubscriptionIdentifier(parseVariableByteInt(input, offset))),
-            Ok(0x11) => return Ok(Property::SessionExpiryInterval(parseU32(input, offset))),
-            Ok(0x12) => return Ok(Property::AssignedClientIdentifier(parseString(input, offset))),
-            Ok(0x13) => return Ok(Property::ServerKeepAlive(parseU16(input, offset))),
-            Ok(0x15) => return Ok(Property::AuthenticationMethod(parseString(input, offset))),
-            Ok(0x16) => return Ok(Property::AuthenticationData(parseBinary(input, offset))),
-            Ok(0x17) => return Ok(Property::RequestProblemInformation(parseU8(input, offset))),
-            Ok(0x18) => return Ok(Property::WillDelayInterval(parseU32(input, offset))),
-            Ok(0x19) => return Ok(Property::RequestResponseInformation(parseU8(input, offset))),
-            Ok(0x1A) => return Ok(Property::ResponseInformation(parseString(input, offset))),
-            Ok(0x1C) => return Ok(Property::ServerReference(parseString(input, offset))),
-            Ok(0x1F) => return Ok(Property::ReasonString(parseString(input, offset))),
-            Ok(0x21) => return Ok(Property::ReceiveMaximum(parseU16(input, offset))),
-            Ok(0x22) => return Ok(Property::TopicAliasMaximum(parseU16(input, offset))),
-            Ok(0x23) => return Ok(Property::TopicAlias(parseU16(input, offset))),
-            Ok(0x24) => return Ok(Property::MaximumQoS(parseU8(input, offset))),
-            Ok(0x25) => return Ok(Property::RetainAvailable(parseU8(input, offset))),
-            Ok(0x26) => return Ok(Property::UserProperty(parseStringPair(input, offset))),
-            Ok(0x28) => return Ok(Property::WildcardSubscriptionAvailable(parseU8(input, offset))),
-            Ok(0x29) => return Ok(Property::SubscriptionIdentifierAvailable(parseU8(input, offset))),
-            Ok(0x2A) => return Ok(Property::SharedSubscriptionAvailable(parseU8(input, offset))),
+            Ok(0x01) => return Ok(Property::PayloadFormat(buff_reader.readU8())),
+            Ok(0x02) => return Ok(Property::MessageExpiryInterval(buff_reader.readU32())),
+            Ok(0x03) => return Ok(Property::ContentType(buff_reader.readString())),
+            Ok(0x08) => return Ok(Property::ResponseTopic(buff_reader.readString())),
+            Ok(0x09) => return Ok(Property::CorrelationData(buff_reader.readBinary())),
+            Ok(0x0B) => return Ok(Property::SubscriptionIdentifier(buff_reader.readVariableByteInt())),
+            Ok(0x11) => return Ok(Property::SessionExpiryInterval(buff_reader.readU32())),
+            Ok(0x12) => return Ok(Property::AssignedClientIdentifier(buff_reader.readString())),
+            Ok(0x13) => return Ok(Property::ServerKeepAlive(buff_reader.readU16())),
+            Ok(0x15) => return Ok(Property::AuthenticationMethod(buff_reader.readString())),
+            Ok(0x16) => return Ok(Property::AuthenticationData(buff_reader.readBinary())),
+            Ok(0x17) => return Ok(Property::RequestProblemInformation(buff_reader.readU8())),
+            Ok(0x18) => return Ok(Property::WillDelayInterval(buff_reader.readU32())),
+            Ok(0x19) => return Ok(Property::RequestResponseInformation(buff_reader.readU8())),
+            Ok(0x1A) => return Ok(Property::ResponseInformation(buff_reader.readString())),
+            Ok(0x1C) => return Ok(Property::ServerReference(buff_reader.readString())),
+            Ok(0x1F) => return Ok(Property::ReasonString(buff_reader.readString())),
+            Ok(0x21) => return Ok(Property::ReceiveMaximum(buff_reader.readU16())),
+            Ok(0x22) => return Ok(Property::TopicAliasMaximum(buff_reader.readU16())),
+            Ok(0x23) => return Ok(Property::TopicAlias(buff_reader.readU16())),
+            Ok(0x24) => return Ok(Property::MaximumQoS(buff_reader.readU8())),
+            Ok(0x25) => return Ok(Property::RetainAvailable(buff_reader.readU8())),
+            Ok(0x26) => return Ok(Property::UserProperty(buff_reader.readStringPair())),
+            Ok(0x28) => return Ok(Property::WildcardSubscriptionAvailable(buff_reader.readU8())),
+            Ok(0x29) => return Ok(Property::SubscriptionIdentifierAvailable(buff_reader.readU8())),
+            Ok(0x2A) => return Ok(Property::SharedSubscriptionAvailable(buff_reader.readU8())),
             Err(err) => return Err(err),
             _ => return Err(ProperyParseError::IdNotFound)
         }
     }
-}*/
-
+}

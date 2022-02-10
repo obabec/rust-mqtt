@@ -3,22 +3,45 @@ use crate::encoding::variable_byte_integer::VariableByteIntegerError;
 use core::str;
 use core::mem;
 
+#[derive(Clone)]
 pub struct EncodedString<'a> {
     pub string: &'a str,
     pub len: u16
 }
 
+impl EncodedString<'_> {
+    pub fn len(&self) -> u16 {
+        return self.len + 2;
+    }
+}
+
+#[derive(Clone)]
 pub struct BinaryData<'a> {
     pub bin: &'a [u8],
     pub len: u16
 }
 
+impl BinaryData<'_> {
+    pub fn len(&self) -> u16 {
+        return self.len + 2;
+    }
+}
+
+#[derive(Clone)]
 pub struct StringPair<'a> {
     pub name: EncodedString<'a>,
     pub value: EncodedString<'a>
 }
 
+impl StringPair<'_> {
+    pub fn len(&self) -> u16 {
+        let ln = self.name.len() + self.value.len();
+        return ln;
+    }
+}
+
 #[derive(core::fmt::Debug)]
+#[derive(Clone)]
 pub enum ProperyParseError {
     Utf8Error,
     IndexOutOfBounce,
