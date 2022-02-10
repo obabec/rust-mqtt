@@ -659,6 +659,7 @@ dependencies = [
  "drogue-device",
  "embassy",
  "env_logger",
+ "heapless",
  "log",
 ]
 

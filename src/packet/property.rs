@@ -37,7 +37,7 @@ pub enum Property<'a> {
 }
 
 impl<'a> Property<'a> {
-    pub fn len(mut self) -> u16 {
+    pub fn len(self) -> u16 {
         match self {
             Property::PayloadFormat(u) => return 1,
             Property::MessageExpiryInterval(u) => return 4,
@@ -69,7 +69,7 @@ impl<'a> Property<'a> {
         }
     }
 
-    pub fn decode(buff_reader: &'a mut BuffReader) -> Result<Property<'a>, ProperyParseError> {
+    pub fn decode(buff_reader: & mut BuffReader<'a>) -> Result<Property<'a>, ProperyParseError> {
         let propertyIdentifier = buff_reader.readU8(); 
         match propertyIdentifier {
             Ok(0x01) => return Ok(Property::PayloadFormat(buff_reader.readU8())),

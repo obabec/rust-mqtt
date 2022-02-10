@@ -56,7 +56,7 @@ impl<'a> PacketBuilder<'a>  {
         // Tutaj se cely packet dokonci - spocita se remaining len co chybi v hlavicce atd...
     }
 
-    pub fn decode_packet(& mut self, buff_reader: &'a mut BuffReader) {
+    pub fn decode_packet(& mut self, buff_reader: & mut BuffReader<'a>) {
         self.decodeFixedHeader(buff_reader);
         if self.currentPacket.fixed_header & 0xF0 == (PacketType::Connect).into() {
             self.decodeControllPacket(buff_reader);
@@ -70,7 +70,7 @@ impl<'a> PacketBuilder<'a>  {
         return PacketType::from(self.currentPacket.fixed_header);
     }
 
-    pub fn decodeControllPacket(& mut self, buff_reader: &'a mut BuffReader) {
+    pub fn decodeControllPacket(& mut self, buff_reader: & mut BuffReader<'a>) {
         self.currentPacket.packet_identifier = 0;
         self.currentPacket.protocol_name_len = buff_reader.readU16().unwrap();
         self.currentPacket.protocol_name = buff_reader.readU32().unwrap();
@@ -80,17 +80,21 @@ impl<'a> PacketBuilder<'a>  {
         self.currentPacket.property_len = buff_reader.readVariableByteInt().unwrap();
         let mut x: u32 = 0;
         let mut prop: Result<Property, ProperyParseError>;
-        let mut res;
+        let mut res: Property;
         loop {
             prop = Property::decode(buff_reader);
-            if prop.is_ok() {
-                res = prop.unwrap();
+            if let Ok(res) = prop {
+                x = x + res.len() as u32 + 1;
                 self.currentPacket.properties.push(res);
+            }
+            
+            /*if prop.is_ok() {
+            
             } else {
                 log::error!("Decoding property did not went well!");
-            }
+            }*/
 
-            x = x + res.len() as u32 + 1;
+            
             if x == self.currentPacket.property_len {
                 break;
             }
