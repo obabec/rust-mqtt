@@ -5,10 +5,14 @@ use core::mem;
 #[derive(Debug)]
 pub struct EncodedString<'a> {
     pub string: &'a str,
-    pub len: u16
+    pub len: u16,
 }
 
 impl EncodedString<'_> {
+    pub fn new() -> Self {
+        Self { string: "", len: 0 }
+    }
+
     pub fn len(&self) -> u16 {
         return self.len + 2;
     }
@@ -21,6 +25,10 @@ pub struct BinaryData<'a> {
 }
 
 impl BinaryData<'_> {
+    pub fn new() -> Self {
+        Self { bin: &[0], len: 0 }
+    }
+
     pub fn len(&self) -> u16 {
         return self.len + 2;
     }
@@ -36,6 +44,23 @@ impl StringPair<'_> {
     pub fn len(&self) -> u16 {
         let ln = self.name.len() + self.value.len();
         return ln;
+    }
+}
+
+#[derive(Debug)]
+pub struct TopicFilter<'a> {
+    pub len: u16,
+    pub filter: EncodedString<'a>,
+    pub sub_options: u8,
+}
+
+impl TopicFilter<'_> {
+    pub fn new() -> Self {
+        Self { len: 0, filter: EncodedString::new(), sub_options: 0 }
+    }
+
+    pub fn len(&self) -> u16 {
+        return self.len + 2;
     }
 }
 
@@ -141,5 +166,9 @@ impl<'a> BuffReader<'a> {
             _ => log::debug!("[String pair] value not parsed")
         }
         return Ok(StringPair { name: name.unwrap(), value: value.unwrap() });
+    }
+
+    pub fn readMessage(& mut self) -> &'a [u8] {
+        return &self.buffer[self.position..];
     }
 }

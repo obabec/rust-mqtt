@@ -1,6 +1,5 @@
 use rust_mqtt::packet::mqtt_packet::*;
 use rust_mqtt::packet::packet_type::PacketType;
-use rust_mqtt::packet::packet_builder::PacketBuilder;
 use rust_mqtt::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use rust_mqtt::encoding::variable_byte_integer::VariableByteIntegerDecoder;
 use rust_mqtt::packet::property::*;
@@ -22,18 +21,17 @@ fn main() {
     f.read(&mut buffer).expect("buffer overflow");
 
 
-    let mut txt = Vec::new();
+    //let mut txt = Vec::new();
     let mut payld = *b"xxxxx";
-    let packet = Packet::clean(txt, &mut payld);
-    let mut packet_builder = PacketBuilder::new(packet);
-    let mut buffer_reader = BuffReader::new(&buffer);
+    //let packet = Packet::clean(txt, &mut payld);
+    /*let mut buffer_reader = BuffReader::new(&buffer);
     packet_builder.decode_packet(& mut buffer_reader);
 
     
     let bytes: [u8; 4] = packet_builder.currentPacket.protocol_name.to_be_bytes();
 
     let prot = std::str::from_utf8(&bytes).unwrap();
-    log::info!("Protocol name: {}", prot)
+    log::info!("Protocol name: {}", prot)*/
 }
 
 /*fn test(tst: &str) {
