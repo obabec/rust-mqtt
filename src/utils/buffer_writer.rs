@@ -1,4 +1,4 @@
-use crate::utils::buffer_reader::{BinaryData, EncodedString, StringPair};
+use crate::utils::buffer_reader::{BinaryData, EncodedString, StringPair, TopicFilter};
 use core::str;
 use heapless::Vec;
 use crate::encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerEncoder};
@@ -112,6 +112,24 @@ impl<'a> BuffWriter<'a> {
             self.encode_property(prop);
             i = i + 1;
             if i == LEN {
+                break;
+            }
+        }
+    }
+
+    fn encode_topic_filter_ref(& mut self,  sub: bool, topic_filter: & TopicFilter<'a>) {
+        self.write_string_ref(&topic_filter.filter);
+        if sub {
+            self.write_u8(topic_filter.sub_options)
+        }
+    }
+
+    pub fn encode_topic_filters_ref<const MAX: usize>(& mut self, sub: bool, len: usize, filters: & Vec<TopicFilter<'a>, MAX>) {
+        let mut i = 0;
+        loop {
+            let topic_filter: & TopicFilter<'a> = filters.get(i).unwrap();
+            self.encode_topic_filter_ref(sub, topic_filter);
+            if i == len {
                 break;
             }
         }

@@ -58,13 +58,11 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTI
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
         rm_ln = rm_ln + property_len_len as u32;
         rm_ln = rm_ln + 1;
-        let rm_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(rm_ln).unwrap();
-        let rm_len_len = VariableByteIntegerEncoder::len(rm_len_enc);
 
         buff_writer.write_u8(self.fixed_header);
-        buff_writer.insert_ref(rm_len_len, &rm_len_enc);
+        buff_writer.write_variable_byte_int(rm_ln);
         buff_writer.write_u8(self.auth_reason);
-        buff_writer.insert_ref(property_len_len, &property_len_enc);
+        buff_writer.write_variable_byte_int(self.property_len);
         buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties);
     }
 

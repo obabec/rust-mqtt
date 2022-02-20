@@ -1,5 +1,6 @@
 use crate::packet::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
+use crate::utils::buffer_writer::BuffWriter;
 
 use super::packet_type::PacketType;
 use super::property::Property;
@@ -16,7 +17,11 @@ pub struct PingreqPacket {
 impl PingreqPacket {}
 
 impl<'a> Packet<'a> for PingreqPacket {
-    fn encode(&mut self, buffer: &mut [u8]) {}
+    fn encode(&mut self, buffer: &mut [u8]) {
+        let mut buff_writer = BuffWriter::new(buffer);
+        buff_writer.write_u8(self.fixed_header);
+        buff_writer.write_variable_byte_int(0 as u32);
+    }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
         log::error!("PingreqPacket packet does not support decode funtion on client!");

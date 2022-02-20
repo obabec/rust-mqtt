@@ -1,5 +1,6 @@
 use crate::packet::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
+use crate::utils::buffer_writer::BuffWriter;
 
 use super::packet_type::PacketType;
 use super::property::Property;
@@ -21,7 +22,11 @@ impl<'a> PingrespPacket {
 }
 
 impl<'a> Packet<'a> for PingrespPacket {
-    fn encode(&mut self, buffer: &mut [u8]) {}
+    fn encode(&mut self, buffer: &mut [u8]) {
+        let mut buff_writer = BuffWriter::new(buffer);
+        buff_writer.write_u8(self.fixed_header);
+        buff_writer.write_variable_byte_int(0 as u32);
+    }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
         self.decode_pingresp_packet(buff_reader);

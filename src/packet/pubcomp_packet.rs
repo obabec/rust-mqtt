@@ -1,7 +1,9 @@
 use heapless::Vec;
+use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 
 use crate::packet::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
+use crate::utils::buffer_writer::BuffWriter;
 
 use super::packet_type::PacketType;
 use super::property::Property;
@@ -37,7 +39,21 @@ impl<'a> PubcompPacket<'a> {
 }
 
 impl<'a> Packet<'a> for PubcompPacket<'a> {
-    fn encode(&mut self, buffer: &mut [u8]) {}
+    fn encode(&mut self, buffer: &mut [u8]) {
+        let mut buff_writer = BuffWriter::new(buffer);
+
+        let mut rm_ln = self.property_len;
+        let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len).unwrap();
+        let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
+        rm_ln = rm_ln + property_len_len as u32 + 3;
+
+        buff_writer.write_u8(self.fixed_header);
+        buff_writer.write_variable_byte_int(rm_ln);
+        buff_writer.write_u16(self.packet_identifier);
+        buff_writer.write_u8(self.reason_code);
+        buff_writer.write_variable_byte_int(self.property_len);
+        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties);
+    }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
         self.decode_puback_packet(buff_reader);

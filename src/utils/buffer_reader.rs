@@ -50,7 +50,6 @@ impl StringPair<'_> {
 
 #[derive(Debug)]
 pub struct TopicFilter<'a> {
-    pub len: u16,
     pub filter: EncodedString<'a>,
     pub sub_options: u8,
 }
@@ -58,14 +57,13 @@ pub struct TopicFilter<'a> {
 impl TopicFilter<'_> {
     pub fn new() -> Self {
         Self {
-            len: 0,
             filter: EncodedString::new(),
             sub_options: 0,
         }
     }
 
     pub fn len(&self) -> u16 {
-        return self.len + 2;
+        return self.filter.len + 3;
     }
 }
 

@@ -1,7 +1,9 @@
 use heapless::Vec;
+use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 
 use crate::packet::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
+use crate::utils::buffer_writer::BuffWriter;
 
 use super::packet_type::PacketType;
 use super::property::Property;
@@ -49,7 +51,9 @@ impl<'a, const MAX_REASONS: usize> SubackPacket<'a, MAX_REASONS> {
 }
 
 impl<'a, const MAX_REASONS: usize> Packet<'a> for SubackPacket<'a, MAX_REASONS> {
-    fn encode(&mut self, buffer: &mut [u8]) {}
+    fn encode(&mut self, buffer: &mut [u8]) {
+        log::error!("SUBACK packet does not support encoding!");
+    }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
         self.decode_suback_packet(buff_reader);
