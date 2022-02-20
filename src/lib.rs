@@ -1,10 +1,10 @@
-
+#![feature(in_band_lifetimes)]
 #![macro_use]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code)]
 
-pub mod packet;
 pub mod encoding;
+pub mod packet;
 pub mod utils;
 
 #[allow(unused_variables)]

@@ -1,18 +1,15 @@
-use super::property::Property;
-use super::packet_type::PacketType;
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::buffer_reader::EncodedString;
-use crate::utils::buffer_reader::BinaryData;
-use crate::utils::buffer_reader::ParseError;
-use crate::packet::mqtt_packet::Packet;
-use crate::utils::buffer_reader::TopicFilter;
 use heapless::Vec;
 
+use crate::packet::mqtt_packet::Packet;
+use crate::utils::buffer_reader::BuffReader;
+use crate::utils::buffer_reader::TopicFilter;
+
+use super::packet_type::PacketType;
+use super::property::Property;
 
 pub const MAX_PROPERTIES: usize = 2;
 
 pub struct SubscriptionPacket<'a, const MAX_FILTERS: usize> {
-    pub maximal_filters: u8,
     // 7 - 4 mqtt control packet type, 3-0 flagy
     pub fixed_header: u8,
     // 1 - 4 B lenght of variable header + len of payload
@@ -32,19 +29,35 @@ pub struct SubscriptionPacket<'a, const MAX_FILTERS: usize> {
     pub topic_filters: Vec<TopicFilter<'a>, MAX_FILTERS>,
 }
 
-
 impl<'a, const MAX_FILTERS: usize> SubscriptionPacket<'a, MAX_FILTERS> {
     /*pub fn new() -> Self {
-        
+
     }*/
-}  
+}
 
 impl<'a, const MAX_FILTERS: usize> Packet<'a> for SubscriptionPacket<'a, MAX_FILTERS> {
-    fn decode(& mut self, buff_reader: & mut BuffReader<'a>) {
+    fn encode(&mut self, buffer: &mut [u8]) {}
+
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
         log::error!("Subscribe packet does not support decode funtion on client!");
     }
+    fn set_property_len(&mut self, value: u32) {
+        self.property_len = value;
+    }
 
-    fn encode(& mut self, buffer: & mut [u8]) {
+    fn get_property_len(&mut self) -> u32 {
+        return self.property_len;
+    }
 
+    fn push_to_properties(&mut self, property: Property<'a>) {
+        self.properties.push(property);
+    }
+
+    fn set_fixed_header(& mut self, header: u8) {
+        self.fixed_header = header;
+    }
+
+    fn set_remaining_len(& mut self, remaining_len: u32) {
+        self.remain_len = remaining_len;
     }
 }

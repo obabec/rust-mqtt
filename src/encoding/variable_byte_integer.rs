@@ -1,7 +1,8 @@
 #![crate_name = "doc"]
 
 use crate::utils::buffer_reader::ParseError;
-/// VariableByteIntegerEncoder and VariableByteIntegerDecoder are implemented based on 
+
+/// VariableByteIntegerEncoder and VariableByteIntegerDecoder are implemented based on
 /// pseudo code which is introduced in MQTT version 5.0 OASIS standard accesible from
 /// https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901107
 
@@ -9,6 +10,7 @@ use crate::utils::buffer_reader::ParseError;
 /// encode integer into MQTT variable byte integer format. This format is mainly used to encode
 /// lenghts stored in a packet.
 pub struct VariableByteIntegerEncoder;
+
 /// Variable byte integers error enumeration is used by both encoder and decoder for
 /// error notification.
 
@@ -44,14 +46,27 @@ impl VariableByteIntegerEncoder {
                 break;
             }
         }
-        return Ok(res); 
+        return Ok(res);
+    }
+
+    pub fn len(var_int: VariableByteInteger) -> usize {
+        let mut i: usize = 0;
+        loop {
+            let mut encoded_byte: u8;
+            encoded_byte = var_int[i];
+
+            if (encoded_byte & 128) == 0 {
+                break;
+            }
+            i = i + 1;
+        }
+        return i;
     }
 }
 
 /// Variable byte integer decoder structure is help structure which implements function used to
 /// decode message lenghts in MQTT packet and other parts encoded into variable byte integer.
 pub struct VariableByteIntegerDecoder;
-
 
 impl VariableByteIntegerDecoder {
     /// Decode function takes as paramater encoded integer represented
@@ -63,7 +78,7 @@ impl VariableByteIntegerDecoder {
 
         let mut encoded_byte: u8;
         let mut i: usize = 0;
-        
+
         loop {
             encoded_byte = encoded[i];
             i = i + 1;

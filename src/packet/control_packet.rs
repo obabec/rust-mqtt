@@ -1,11 +1,13 @@
-use super::property::Property;
-use super::packet_type::PacketType;
+use heapless::Vec;
+
+use crate::packet::mqtt_packet::Packet;
+use crate::utils::buffer_reader::BinaryData;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_reader::EncodedString;
-use crate::utils::buffer_reader::BinaryData;
 use crate::utils::buffer_reader::ParseError;
-use crate::packet::mqtt_packet::Packet;
-use heapless::Vec;
+
+use super::packet_type::PacketType;
+use super::property::Property;
 
 pub const MAX_PROPERTIES: usize = 18;
 pub const MAX_WILL_PROPERTIES: usize = 7;
@@ -17,7 +19,7 @@ pub struct ControlPacket<'a> {
     pub remain_len: u32,
 
     // variable header
-    //optional  prida se pouze u packetu ve kterych ma co delat 
+    //optional  prida se pouze u packetu ve kterych ma co delat
     pub packet_identifier: u16,
     pub protocol_name_len: u16,
     pub protocol_name: u32,
@@ -38,26 +40,45 @@ pub struct ControlPacket<'a> {
     pub will_topic: EncodedString<'a>,
     pub will_payload: BinaryData<'a>,
     pub username: EncodedString<'a>,
-    pub password: BinaryData<'a>
+    pub password: BinaryData<'a>,
 }
 
 impl<'a> ControlPacket<'a> {
-    pub fn clean(properties: Vec<Property<'a>, MAX_PROPERTIES>, will_properties: Vec<Property<'a>, MAX_WILL_PROPERTIES> ) -> Self {
-        Self{ fixed_header: 0x00, remain_len: 0, packet_identifier: 0, protocol_name_len: 0, protocol_name: 0, protocol_version: 5, connect_flags: 0, 
-            keep_alive: 0, property_len: 0, properties, client_id: EncodedString::new(), will_property_len: 0, will_properties, will_topic: EncodedString::new(), 
-            will_payload: BinaryData::new(), username: EncodedString::new(), password: BinaryData::new() }
+    pub fn clean(
+        properties: Vec<Property<'a>, MAX_PROPERTIES>,
+        will_properties: Vec<Property<'a>, MAX_WILL_PROPERTIES>,
+    ) -> Self {
+        Self {
+            fixed_header: 0x00,
+            remain_len: 0,
+            packet_identifier: 0,
+            protocol_name_len: 0,
+            protocol_name: 0,
+            protocol_version: 5,
+            connect_flags: 0,
+            keep_alive: 0,
+            property_len: 0,
+            properties,
+            client_id: EncodedString::new(),
+            will_property_len: 0,
+            will_properties,
+            will_topic: EncodedString::new(),
+            will_payload: BinaryData::new(),
+            username: EncodedString::new(),
+            password: BinaryData::new(),
+        }
     }
 
     pub fn get_reason_code(&self) {
         log::info!("Getting reason code!");
     }
 
-    pub fn addPacketType(& mut self, new_packet_type: PacketType) {
+    pub fn add_packet_type(&mut self, new_packet_type: PacketType) {
         self.fixed_header = self.fixed_header & 0x0F;
         self.fixed_header = self.fixed_header | <PacketType as Into<u8>>::into(new_packet_type);
     }
 
-    pub fn addFlags(& mut self, dup: bool, qos: u8, retain: bool) {
+    pub fn add_flags(&mut self, dup: bool, qos: u8, retain: bool) {
         let cur_type: u8 = self.fixed_header & 0xF0;
         if cur_type != 0x30 {
             log::error!("Cannot add flags into packet with other than PUBLISH type");
@@ -79,39 +100,9 @@ impl<'a> ControlPacket<'a> {
         self.fixed_header = cur_type | flags;
     }
 
-    pub fn decode_fixed_header(& mut self, buff_reader: & mut BuffReader) -> PacketType {
-        let first_byte: u8 = buff_reader.readU8().unwrap();
-        self.fixed_header = first_byte;
-        self.remain_len = buff_reader.readVariableByteInt().unwrap();
-        return PacketType::from(self.fixed_header);
-    }
-
-    pub fn decode_properties(& mut self, buff_reader: & mut BuffReader<'a>) {
-
-        self.property_len = buff_reader.readVariableByteInt().unwrap();
-        let mut x: u32 = 0;
-        let mut prop: Result<Property, ParseError>;
-        loop {
-            let mut res: Property;
-            prop = Property::decode(buff_reader);
-            if let Ok(res) = prop {
-                log::info!("Parsed property {:?}", res);
-                x = x + res.len() as u32 + 1;
-                self.properties.push(res);
-            } else {
-                // error handlo
-                log::error!("Problem during property decoding");
-            }
-            
-            if x == self.property_len {
-                break;
-            }
-        }
-    }
-
-    pub fn decode_will_properties(& mut self, buff_reader: & mut BuffReader<'a>) {
+    pub fn decode_will_properties(&mut self, buff_reader: &mut BuffReader<'a>) {
         //todo: need to check if we are parsing only will properties
-        let will_property_len = buff_reader.readVariableByteInt().unwrap();
+        let will_property_len = buff_reader.read_variable_byte_int().unwrap();
         let mut x: u32 = 0;
         let mut prop: Result<Property, ParseError>;
         loop {
@@ -125,51 +116,91 @@ impl<'a> ControlPacket<'a> {
                 // error handlo
                 log::error!("Problem during property decoding");
             }
-            
+
             if x == will_property_len {
                 break;
             }
         }
     }
 
-    pub fn decode_payload(& mut self, buff_reader: & mut BuffReader<'a>) {
-        self.client_id = buff_reader.readString().unwrap();
+    pub fn decode_payload(&mut self, buff_reader: &mut BuffReader<'a>) {
+        self.client_id = buff_reader.read_string().unwrap();
         if self.connect_flags & (1 << 2) == 1 {
             self.decode_will_properties(buff_reader);
-            self.will_topic = buff_reader.readString().unwrap();
-            self.will_payload = buff_reader.readBinary().unwrap();
+            self.will_topic = buff_reader.read_string().unwrap();
+            self.will_payload = buff_reader.read_binary().unwrap();
         }
-        
+
         if self.connect_flags & (1 << 7) == 1 {
-            self.username = buff_reader.readString().unwrap();
+            self.username = buff_reader.read_string().unwrap();
         }
         if self.connect_flags & (1 << 6) == 1 {
-            self.password = buff_reader.readBinary().unwrap();
+            self.password = buff_reader.read_binary().unwrap();
         }
     }
 
-    pub fn decode_control_packet(& mut self, buff_reader: & mut BuffReader<'a>) {
+    pub fn decode_control_packet(&mut self, buff_reader: &mut BuffReader<'a>) {
         if self.decode_fixed_header(buff_reader) != (PacketType::Connect).into() {
             log::error!("Packet you are trying to decode is not CONNECT packet!");
         }
         self.packet_identifier = 0;
-        self.protocol_name_len = buff_reader.readU16().unwrap();
-        self.protocol_name = buff_reader.readU32().unwrap();
-        self.protocol_version = buff_reader.readU8().unwrap();
-        self.connect_flags = buff_reader.readU8().unwrap();
-        self.keep_alive = buff_reader.readU16().unwrap();
+        self.protocol_name_len = buff_reader.read_u16().unwrap();
+        self.protocol_name = buff_reader.read_u32().unwrap();
+        self.protocol_version = buff_reader.read_u8().unwrap();
+        self.connect_flags = buff_reader.read_u8().unwrap();
+        self.keep_alive = buff_reader.read_u16().unwrap();
         self.decode_properties(buff_reader);
         self.decode_payload(buff_reader);
     }
 }
 
 impl<'a> Packet<'a> for ControlPacket<'a> {
-    fn decode(& mut self, buff_reader: & mut BuffReader<'a>) {
+    fn encode(&mut self, buffer: &mut [u8]) {}
+
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
         log::error!("Decode function is not available for control packet!")
         //self.decode_control_packet(buff_reader);
     }
 
-    fn encode(& mut self, buffer: & mut [u8]) {
+    fn set_property_len(&mut self, value: u32) {
+        self.property_len = value;
+    }
 
+    fn get_property_len(&mut self) -> u32 {
+        return self.property_len;
+    }
+
+    fn push_to_properties(&mut self, property: Property<'a>) {
+        self.properties.push(property);
+    }
+
+    fn set_fixed_header(& mut self, header: u8) {
+        self.fixed_header = header;
+    }
+
+    fn set_remaining_len(& mut self, remaining_len: u32) {
+        self.remain_len = remaining_len;
+    }
+
+    fn decode_properties(&mut self, buff_reader: &mut BuffReader<'a>) {
+        self.property_len = buff_reader.read_variable_byte_int().unwrap();
+        let mut x: u32 = 0;
+        let mut prop: Result<Property, ParseError>;
+        loop {
+            let mut res: Property;
+            prop = Property::decode(buff_reader);
+            if let Ok(res) = prop {
+                log::info!("Parsed property {:?}", res);
+                x = x + res.len() as u32 + 1;
+                self.properties.push(res);
+            } else {
+                // error handlo
+                log::error!("Problem during property decoding");
+            }
+
+            if x == self.property_len {
+                break;
+            }
+        }
     }
 }

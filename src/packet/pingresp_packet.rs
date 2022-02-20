@@ -1,12 +1,8 @@
-use super::property::Property;
-use super::packet_type::PacketType;
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::buffer_reader::EncodedString;
-use crate::utils::buffer_reader::BinaryData;
-use crate::utils::buffer_reader::ParseError;
 use crate::packet::mqtt_packet::Packet;
-use heapless::Vec;
+use crate::utils::buffer_reader::BuffReader;
 
+use super::packet_type::PacketType;
+use super::property::Property;
 
 pub struct PingrespPacket {
     // 7 - 4 mqtt control packet type, 3-0 flagy
@@ -15,29 +11,40 @@ pub struct PingrespPacket {
     pub remain_len: u32,
 }
 
-
 impl<'a> PingrespPacket {
-    pub fn decode_fixed_header(& mut self, buff_reader: & mut BuffReader<'a>) -> PacketType {
-        let first_byte: u8 = buff_reader.readU8().unwrap();
-        self.fixed_header = first_byte;
-        self.remain_len = buff_reader.readVariableByteInt().unwrap();
-        return PacketType::from(self.fixed_header);
-    }
-
-    pub fn decode_pingresp_packet(& mut self, buff_reader: & mut BuffReader<'a>) {
+    pub fn decode_pingresp_packet(&mut self, buff_reader: &mut BuffReader<'a>) {
         if self.decode_fixed_header(buff_reader) != (PacketType::Pingresp).into() {
             log::error!("Packet you are trying to decode is not PUBACK packet!");
             return;
         }
     }
-}  
+}
 
 impl<'a> Packet<'a> for PingrespPacket {
-    fn decode(& mut self, buff_reader: & mut BuffReader<'a>) {
+    fn encode(&mut self, buffer: &mut [u8]) {}
+
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
         self.decode_pingresp_packet(buff_reader);
     }
 
-    fn encode(& mut self, buffer: & mut [u8]) {
+    fn set_property_len(&mut self, value: u32) {
+        log::error!("PINGRESP packet does not contain any properties!");
+    }
 
+    fn get_property_len(&mut self) -> u32 {
+        log::error!("PINGRESP packet does not contain any properties!");
+        return 0;
+    }
+
+    fn push_to_properties(&mut self, property: Property<'a>) {
+        log::error!("PINGRESP packet does not contain any properties!");
+    }
+
+    fn set_fixed_header(& mut self, header: u8) {
+        self.fixed_header = header;
+    }
+
+    fn set_remaining_len(& mut self, remaining_len: u32) {
+        self.remain_len = remaining_len;
     }
 }
