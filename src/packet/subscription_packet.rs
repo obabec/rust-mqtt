@@ -32,9 +32,15 @@ pub struct SubscriptionPacket<'a, const MAX_FILTERS: usize> {
 }
 
 impl<'a, const MAX_FILTERS: usize> SubscriptionPacket<'a, MAX_FILTERS> {
-    /*pub fn new() -> Self {
-
-    }*/
+    pub fn new() -> Self {
+        let mut x = Self { fixed_header: PacketType::Subscribe.into(), remain_len: 0, packet_identifier: 1,
+            property_len: 0, properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(), topic_filter_len: 1, topic_filters: Vec::<TopicFilter<'a>, MAX_FILTERS>::new() };
+        let mut p = TopicFilter::new();
+        p.filter.len = 6;
+        p.filter.string = "test/#";
+        x.topic_filters.push(p);
+        return x;
+    }
 }
 
 impl<'a, const MAX_FILTERS: usize> Packet<'a> for SubscriptionPacket<'a, MAX_FILTERS> {
@@ -44,14 +50,23 @@ impl<'a, const MAX_FILTERS: usize> Packet<'a> for SubscriptionPacket<'a, MAX_FIL
         let mut rm_ln = self.property_len;
         let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len).unwrap();
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
-        rm_ln = rm_ln + property_len_len as u32 + 4 + self.topic_filter_len as u32;
+
+        let mut lt = 0;
+        let mut filters_len = 0;
+        loop {
+            filters_len = filters_len + self.topic_filters.get(lt).unwrap().filter.len + 3;
+            lt = lt + 1;
+            if lt == self.topic_filter_len as usize {
+                break;
+            }
+        }
+        rm_ln = rm_ln + property_len_len as u32 + 2 + filters_len as u32;
 
         buff_writer.write_u8(self.fixed_header);
         buff_writer.write_variable_byte_int(rm_ln);
         buff_writer.write_u16(self.packet_identifier);
         buff_writer.write_variable_byte_int(self.property_len);
         buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties);
-        buff_writer.write_u16(self.topic_filter_len);
         buff_writer.encode_topic_filters_ref(false, self.topic_filter_len as usize, & self.topic_filters);
     }
 

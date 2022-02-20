@@ -55,7 +55,7 @@ impl Into<u8> for PacketType {
             PacketType::Pubrec => 0x50,
             PacketType::Pubrel => 0x60,
             PacketType::Pubcomp => 0x70,
-            PacketType::Subscribe => 0x80,
+            PacketType::Subscribe => 0x82,
             PacketType::Suback => 0x90,
             PacketType::Unsubscribe => 0xA0,
             PacketType::Unsuback => 0xB0,

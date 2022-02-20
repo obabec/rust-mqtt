@@ -107,12 +107,14 @@ impl<'a> BuffWriter<'a> {
 
     pub fn encode_properties<const LEN: usize>(& mut self, properties: & Vec<Property<'a>, LEN>) {
         let mut i = 0;
-        loop {
-            let prop: &Property = properties.get(i).unwrap();
-            self.encode_property(prop);
-            i = i + 1;
-            if i == LEN {
-                break;
+        if properties.len() != 0 {
+            loop {
+                let prop: &Property = properties.get(i).unwrap();
+                self.encode_property(prop);
+                i = i + 1;
+                if i == LEN {
+                    break;
+                }
             }
         }
     }
@@ -129,6 +131,7 @@ impl<'a> BuffWriter<'a> {
         loop {
             let topic_filter: & TopicFilter<'a> = filters.get(i).unwrap();
             self.encode_topic_filter_ref(sub, topic_filter);
+            i = i + 1;
             if i == len {
                 break;
             }

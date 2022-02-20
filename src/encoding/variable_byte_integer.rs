@@ -54,11 +54,11 @@ impl VariableByteIntegerEncoder {
         loop {
             let mut encoded_byte: u8;
             encoded_byte = var_int[i];
-
+            i = i + 1;
             if (encoded_byte & 128) == 0 {
                 break;
             }
-            i = i + 1;
+
         }
         return i;
     }
