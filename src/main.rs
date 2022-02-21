@@ -15,13 +15,13 @@ fn main() {
         .format_timestamp_nanos()
         .init();
 
-    let mut pckt: SubscriptionPacket<1> = SubscriptionPacket::new();
+    let mut pckt: SubscriptionPacket<1, 0> = SubscriptionPacket::new();
     let mut res = vec![0; 140];
     let lnsub = pckt.encode(&mut res);
     println!("{:02X?}", &res[0..lnsub]);
     let mut res2 = vec![0; 260];
     let mut x = b"hello world";
-    let mut pblsh: PublishPacket = PublishPacket::new(x);
+    let mut pblsh = PublishPacket::<0>::new(x);
     let lnpblsh = pblsh.encode(&mut res2);
     println!("{:02X?}", &res2[0..lnpblsh]);
     log::info!("xxx");
@@ -51,8 +51,3 @@ fn main() {
     let prot = std::str::from_utf8(&bytes).unwrap();
     log::info!("Protocol name: {}", prot)*/
 }
-
-/*fn test(tst: &str) {
-    log::info!("xx");
-    log::info!("Prvni: {}", )
-}*/

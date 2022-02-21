@@ -10,20 +10,6 @@ pub struct BuffWriter<'a> {
 }
 
 impl<'a> BuffWriter<'a> {
-    pub fn insert<const LEN: usize>(&mut self, array: [u8; LEN]) {
-        let mut x: usize = 0;
-        if LEN != 0 {
-            loop {
-                self.buffer[self.position] = array[x];
-                self.increment_position(1);
-                x = x + 1;
-                if x == LEN {
-                    break;
-                }
-            }
-        }
-    }
-
     pub fn insert_ref(&mut self, len: usize, array: &[u8]) {
         let mut x: usize = 0;
         if len != 0 {
@@ -56,12 +42,12 @@ impl<'a> BuffWriter<'a> {
 
     pub fn write_u16(&mut self, two_bytes: u16) {
         let bytes: [u8; 2] = two_bytes.to_be_bytes();
-        self.insert::<2>(bytes);
+        self.insert_ref(2, &bytes);
     }
 
     pub fn write_u32(&mut self, four_bytes: u32) {
         let bytes: [u8; 4] = four_bytes.to_be_bytes();
-        self.insert::<4>(bytes);
+        self.insert_ref(4,&bytes);
     }
 
     pub fn write_string_ref(&mut self, str: &EncodedString<'a>) {
