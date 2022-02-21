@@ -13,24 +13,28 @@ impl<'a> BuffWriter<'a> {
 
     pub fn insert<const LEN: usize>(& mut self, array: [u8; LEN]) {
         let mut x: usize = 0;
-        loop {
-            self.buffer[self.position] = array[x];
-            self.increment_position(1);
-            x = x + 1;
-            if x == LEN {
-                break;
+        if LEN != 0 {
+            loop {
+                self.buffer[self.position] = array[x];
+                self.increment_position(1);
+                x = x + 1;
+                if x == LEN {
+                    break;
+                }
             }
         }
     }
 
     pub fn insert_ref(& mut self, len: usize, array: &[u8]) {
         let mut x: usize = 0;
-        loop {
-            self.buffer[self.position] = array[x];
-            self.increment_position(1);
-            x = x + 1;
-            if x == len {
-                break;
+        if len != 0 {
+            loop {
+                self.buffer[self.position] = array[x];
+                self.increment_position(1);
+                x = x + 1;
+                if x == len {
+                    break;
+                }
             }
         }
     }
@@ -107,12 +111,13 @@ impl<'a> BuffWriter<'a> {
 
     pub fn encode_properties<const LEN: usize>(& mut self, properties: & Vec<Property<'a>, LEN>) {
         let mut i = 0;
-        if properties.len() != 0 {
+        let len = properties.len();
+        if len != 0 {
             loop {
                 let prop: &Property = properties.get(i).unwrap();
                 self.encode_property(prop);
                 i = i + 1;
-                if i == LEN {
+                if i == len {
                     break;
                 }
             }

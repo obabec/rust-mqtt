@@ -22,10 +22,11 @@ impl<'a> PingrespPacket {
 }
 
 impl<'a> Packet<'a> for PingrespPacket {
-    fn encode(&mut self, buffer: &mut [u8]) {
+    fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
         buff_writer.write_u8(self.fixed_header);
         buff_writer.write_variable_byte_int(0 as u32);
+        return buff_writer.position;
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {

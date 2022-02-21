@@ -50,7 +50,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTI
         return AuthPacket { fixed_header: PacketType::Auth.into(), remain_len: 0, auth_reason: 0, property_len: 0, properties: Vec::<Property<'a>, MAX_PROPERTIES>::new() }
     }*/
     
-    fn encode(&mut self, buffer: & mut [u8]) {
+    fn encode(&mut self, buffer: & mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
 
         let mut rm_ln = self.property_len;
@@ -64,6 +64,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTI
         buff_writer.write_u8(self.auth_reason);
         buff_writer.write_variable_byte_int(self.property_len);
         buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties);
+        return buff_writer.position;
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {

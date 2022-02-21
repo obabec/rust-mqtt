@@ -39,7 +39,7 @@ impl<'a> PubcompPacket<'a> {
 }
 
 impl<'a> Packet<'a> for PubcompPacket<'a> {
-    fn encode(&mut self, buffer: &mut [u8]) {
+    fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
 
         let mut rm_ln = self.property_len;
@@ -53,6 +53,7 @@ impl<'a> Packet<'a> for PubcompPacket<'a> {
         buff_writer.write_u8(self.reason_code);
         buff_writer.write_variable_byte_int(self.property_len);
         buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties);
+        return buff_writer.position;
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {

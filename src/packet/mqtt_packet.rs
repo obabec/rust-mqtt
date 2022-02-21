@@ -7,7 +7,7 @@ use super::property::Property;
 pub trait Packet<'a> {
     //fn new() -> dyn Packet<'a> where Self: Sized;
 
-    fn encode(&mut self, buffer: &mut [u8]);
+    fn encode(&mut self, buffer: &mut [u8]) -> usize;
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>);
 
     // properties

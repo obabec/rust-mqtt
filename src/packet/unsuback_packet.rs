@@ -49,8 +49,9 @@ impl<'a, const MAX_REASONS: usize> UnsubackPacket<'a, MAX_REASONS> {
 }
 
 impl<'a, const MAX_REASONS: usize> Packet<'a> for UnsubackPacket<'a, MAX_REASONS> {
-    fn encode(&mut self, buffer: &mut [u8]) {
+    fn encode(&mut self, buffer: &mut [u8]) -> usize {
         log::error!("UNSUBACK packet does not support encoding!");
+        return 0;
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {

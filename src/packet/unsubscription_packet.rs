@@ -38,7 +38,7 @@ impl<'a, const MAX_FILTERS: usize> UnsubscriptionPacket<'a, MAX_FILTERS> {
 }
 
 impl<'a, const MAX_FILTERS: usize> Packet<'a> for UnsubscriptionPacket<'a, MAX_FILTERS> {
-    fn encode(&mut self, buffer: &mut [u8]) {
+    fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
 
         let mut rm_ln = self.property_len;
@@ -53,6 +53,7 @@ impl<'a, const MAX_FILTERS: usize> Packet<'a> for UnsubscriptionPacket<'a, MAX_F
         buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties);
         buff_writer.write_u16(self.topic_filter_len);
         buff_writer.encode_topic_filters_ref(false, self.topic_filter_len as usize, & self.topic_filters);
+        return buff_writer.position;
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
