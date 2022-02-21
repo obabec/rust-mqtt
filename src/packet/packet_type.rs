@@ -64,6 +64,6 @@ impl Into<u8> for PacketType {
             PacketType::Disconnect => 0xE0,
             PacketType::Auth => 0xF0,
             PacketType::Reserved => 0x00,
-        }
+        };
     }
 }

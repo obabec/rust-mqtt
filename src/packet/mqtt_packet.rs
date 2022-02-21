@@ -16,10 +16,10 @@ pub trait Packet<'a> {
     fn push_to_properties(&mut self, property: Property<'a>);
 
     // header
-    fn set_fixed_header(& mut self, header: u8);
-    fn set_remaining_len(& mut self, remaining_len: u32);
+    fn set_fixed_header(&mut self, header: u8);
+    fn set_remaining_len(&mut self, remaining_len: u32);
 
-    fn decode_properties(&mut self, buff_reader: & mut BuffReader<'a>) {
+    fn decode_properties(&mut self, buff_reader: &mut BuffReader<'a>) {
         self.set_property_len(buff_reader.read_variable_byte_int().unwrap());
         let mut x: u32 = 0;
         let mut prop: Result<Property, ParseError>;

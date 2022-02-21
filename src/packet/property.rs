@@ -39,15 +39,14 @@ pub enum Property<'a> {
 }
 
 impl<'a> Property<'a> {
-
-    pub fn auth_property(& self) -> bool {
+    pub fn auth_property(&self) -> bool {
         return match self {
             Property::AuthenticationMethod(_u) => true,
             Property::AuthenticationData(_u) => true,
             Property::ReasonString(_u) => true,
             Property::UserProperty(_u) => true,
-            _ => false
-        }
+            _ => false,
+        };
     }
 
     pub fn len(&self) -> u16 {
@@ -80,10 +79,10 @@ impl<'a> Property<'a> {
             Property::SubscriptionIdentifierAvailable(_u) => 1,
             Property::SharedSubscriptionAvailable(_u) => 1,
             _ => 0,
-        }
+        };
     }
 
-    pub fn encode(&self, buff_writer: & mut BuffWriter<'a>) {
+    pub fn encode(&self, buff_writer: &mut BuffWriter<'a>) {
         return match self {
             Property::PayloadFormat(u) => buff_writer.write_u8(*u),
             Property::MessageExpiryInterval(u) => buff_writer.write_u32(*u),
@@ -113,10 +112,10 @@ impl<'a> Property<'a> {
             Property::SubscriptionIdentifierAvailable(u) => buff_writer.write_u8(*u),
             Property::SharedSubscriptionAvailable(u) => buff_writer.write_u8(*u),
             _ => (),
-        }
+        };
     }
 
-    pub fn decode(buff_reader: & mut BuffReader<'a>) -> Result<Property<'a>, ParseError> {
+    pub fn decode(buff_reader: &mut BuffReader<'a>) -> Result<Property<'a>, ParseError> {
         let property_identifier = buff_reader.read_u8();
         return match property_identifier {
             Ok(0x01) => Ok(Property::PayloadFormat(buff_reader.read_u8()?)),
@@ -124,17 +123,13 @@ impl<'a> Property<'a> {
             Ok(0x03) => Ok(Property::ContentType(buff_reader.read_string()?)),
             Ok(0x08) => Ok(Property::ResponseTopic(buff_reader.read_string()?)),
             Ok(0x09) => Ok(Property::CorrelationData(buff_reader.read_binary()?)),
-            Ok(0x0B) => {
-                Ok(Property::SubscriptionIdentifier(
-                    buff_reader.read_variable_byte_int()?,
-                ))
-            }
+            Ok(0x0B) => Ok(Property::SubscriptionIdentifier(
+                buff_reader.read_variable_byte_int()?,
+            )),
             Ok(0x11) => Ok(Property::SessionExpiryInterval(buff_reader.read_u32()?)),
-            Ok(0x12) => {
-                Ok(Property::AssignedClientIdentifier(
-                    buff_reader.read_string()?,
-                ))
-            }
+            Ok(0x12) => Ok(Property::AssignedClientIdentifier(
+                buff_reader.read_string()?,
+            )),
             Ok(0x13) => Ok(Property::ServerKeepAlive(buff_reader.read_u16()?)),
             Ok(0x15) => Ok(Property::AuthenticationMethod(buff_reader.read_string()?)),
             Ok(0x16) => Ok(Property::AuthenticationData(buff_reader.read_binary()?)),
@@ -150,28 +145,22 @@ impl<'a> Property<'a> {
             Ok(0x24) => Ok(Property::MaximumQoS(buff_reader.read_u8()?)),
             Ok(0x25) => Ok(Property::RetainAvailable(buff_reader.read_u8()?)),
             Ok(0x26) => Ok(Property::UserProperty(buff_reader.read_string_pair()?)),
-            Ok(0x28) => {
-                Ok(Property::WildcardSubscriptionAvailable(
-                    buff_reader.read_u8()?,
-                ))
-            }
-            Ok(0x29) => {
-                Ok(Property::SubscriptionIdentifierAvailable(
-                    buff_reader.read_u8()?,
-                ))
-            }
-            Ok(0x2A) => {
-                Ok(Property::SharedSubscriptionAvailable(
-                    buff_reader.read_u8()?,
-                ))
-            }
+            Ok(0x28) => Ok(Property::WildcardSubscriptionAvailable(
+                buff_reader.read_u8()?,
+            )),
+            Ok(0x29) => Ok(Property::SubscriptionIdentifierAvailable(
+                buff_reader.read_u8()?,
+            )),
+            Ok(0x2A) => Ok(Property::SharedSubscriptionAvailable(
+                buff_reader.read_u8()?,
+            )),
             Err(err) => Err(err),
             _ => Err(ParseError::IdNotFound),
-        }
+        };
     }
 }
 
-impl Into<u8> for & Property<'a> {
+impl Into<u8> for &Property<'a> {
     fn into(self) -> u8 {
         return match &*self {
             Property::PayloadFormat(_u) => 0x01,
@@ -201,8 +190,8 @@ impl Into<u8> for & Property<'a> {
             Property::WildcardSubscriptionAvailable(_u) => 0x28,
             Property::SubscriptionIdentifierAvailable(_u) => 0x29,
             Property::SharedSubscriptionAvailable(_u) => 0x2A,
-            _ => 0x00
-        }
+            _ => 0x00,
+        };
     }
 }
 

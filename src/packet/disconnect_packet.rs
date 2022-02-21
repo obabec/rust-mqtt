@@ -1,5 +1,5 @@
-use heapless::Vec;
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
+use heapless::Vec;
 
 use crate::packet::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
@@ -63,11 +63,11 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for DisconnectPacket<'a, MAX_PR
         self.properties.push(property);
     }
 
-    fn set_fixed_header(& mut self, header: u8) {
+    fn set_fixed_header(&mut self, header: u8) {
         self.fixed_header = header;
     }
 
-    fn set_remaining_len(& mut self, remaining_len: u32) {
+    fn set_remaining_len(&mut self, remaining_len: u32) {
         self.remain_len = remaining_len;
     }
 }

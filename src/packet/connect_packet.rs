@@ -1,5 +1,5 @@
-use heapless::Vec;
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
+use heapless::Vec;
 
 use crate::packet::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BinaryData;
@@ -38,7 +38,9 @@ pub struct ConnectPacket<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERT
     pub password: BinaryData<'a>,
 }
 
-impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> ConnectPacket<'a, MAX_PROPERTIES, MAX_WILL_PROPERTIES> {
+impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize>
+    ConnectPacket<'a, MAX_PROPERTIES, MAX_WILL_PROPERTIES>
+{
     pub fn clean() -> Self {
         let mut x = Self {
             fixed_header: PacketType::Connect.into(),
@@ -96,20 +98,28 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> ConnectP
         self.fixed_header = cur_type | flags;
     }
 }
-impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'a> for ConnectPacket<'a, MAX_PROPERTIES, MAX_WILL_PROPERTIES> {
+impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'a>
+    for ConnectPacket<'a, MAX_PROPERTIES, MAX_WILL_PROPERTIES>
+{
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
 
         let mut rm_ln = self.property_len;
-        let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len).unwrap();
+        let property_len_enc: [u8; 4] =
+            VariableByteIntegerEncoder::encode(self.property_len).unwrap();
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
         // 12 = protocol_name_len + protocol_name + protocol_version + connect_flags + keep_alive + client_id_len
         rm_ln = rm_ln + property_len_len as u32 + 12;
 
         if self.connect_flags & 0x04 == 1 {
-            let wil_prop_len_enc = VariableByteIntegerEncoder::encode(self.will_property_len).unwrap();
+            let wil_prop_len_enc =
+                VariableByteIntegerEncoder::encode(self.will_property_len).unwrap();
             let wil_prop_len_len = VariableByteIntegerEncoder::len(wil_prop_len_enc);
-            rm_ln = rm_ln + wil_prop_len_len as u32 + self.will_property_len as u32 + self.will_topic.len as u32 + self.will_payload.len as u32;
+            rm_ln = rm_ln
+                + wil_prop_len_len as u32
+                + self.will_property_len as u32
+                + self.will_topic.len as u32
+                + self.will_payload.len as u32;
         }
 
         if self.connect_flags & 0x80 == 1 {
@@ -134,17 +144,17 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
 
         if self.connect_flags & 0x04 == 1 {
             buff_writer.write_variable_byte_int(self.will_property_len);
-            buff_writer.encode_properties(& self.will_properties);
-            buff_writer.write_string_ref(& self.will_topic);
-            buff_writer.write_binary_ref(& self.will_payload);
+            buff_writer.encode_properties(&self.will_properties);
+            buff_writer.write_string_ref(&self.will_topic);
+            buff_writer.write_binary_ref(&self.will_payload);
         }
 
         if self.connect_flags & 0x80 == 1 {
-            buff_writer.write_string_ref(& self.username);
+            buff_writer.write_string_ref(&self.username);
         }
 
         if self.connect_flags & 0x40 == 1 {
-            buff_writer.write_binary_ref(& self.password);
+            buff_writer.write_binary_ref(&self.password);
         }
 
         return buff_writer.position;
@@ -166,11 +176,11 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
         self.properties.push(property);
     }
 
-    fn set_fixed_header(& mut self, header: u8) {
+    fn set_fixed_header(&mut self, header: u8) {
         self.fixed_header = header;
     }
 
-    fn set_remaining_len(& mut self, remaining_len: u32) {
+    fn set_remaining_len(&mut self, remaining_len: u32) {
         self.remain_len = remaining_len;
     }
 

@@ -14,7 +14,7 @@ fn main() {
         .filter_level(log::LevelFilter::Info)
         .format_timestamp_nanos()
         .init();
-    
+
     let mut pckt: SubscriptionPacket<1> = SubscriptionPacket::new();
     let mut res = vec![0; 140];
     let lnsub = pckt.encode(&mut res);
@@ -31,7 +31,7 @@ fn main() {
     let lncntrl = cntrl.encode(&mut res3);
     println!("{:02X?}", &res3[0..lncntrl]);
     log::info!("xxx");
-    
+
     /*let fl = File::open("/Users/obabec/development/school/rust-mqtt/mqtt_control_example.bin");
 
     let mut f = File::open("/Users/obabec/development/school/rust-mqtt/mqtt_control_example.bin").expect("no file found");

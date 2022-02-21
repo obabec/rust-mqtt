@@ -58,7 +58,6 @@ impl VariableByteIntegerEncoder {
             if (encoded_byte & 128) == 0 {
                 break;
             }
-
         }
         return i;
     }

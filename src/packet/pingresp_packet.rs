@@ -46,11 +46,11 @@ impl<'a> Packet<'a> for PingrespPacket {
         log::error!("PINGRESP packet does not contain any properties!");
     }
 
-    fn set_fixed_header(& mut self, header: u8) {
+    fn set_fixed_header(&mut self, header: u8) {
         self.fixed_header = header;
     }
 
-    fn set_remaining_len(& mut self, remaining_len: u32) {
+    fn set_remaining_len(&mut self, remaining_len: u32) {
         self.remain_len = remaining_len;
     }
 }

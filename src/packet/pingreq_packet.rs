@@ -5,8 +5,6 @@ use crate::utils::buffer_writer::BuffWriter;
 use super::packet_type::PacketType;
 use super::property::Property;
 
-pub const MAX_PROPERTIES: usize = 2;
-
 pub struct PingreqPacket {
     // 7 - 4 mqtt control packet type, 3-0 flagy
     pub fixed_header: u8,
@@ -41,11 +39,11 @@ impl<'a> Packet<'a> for PingreqPacket {
         log::error!("PINGREQ packet does not contain any properties!");
     }
 
-    fn set_fixed_header(& mut self, header: u8) {
+    fn set_fixed_header(&mut self, header: u8) {
         self.fixed_header = header;
     }
 
-    fn set_remaining_len(& mut self, remaining_len: u32) {
+    fn set_remaining_len(&mut self, remaining_len: u32) {
         self.remain_len = remaining_len;
     }
 }

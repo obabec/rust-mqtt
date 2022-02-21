@@ -1,5 +1,5 @@
-use heapless::Vec;
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
+use heapless::Vec;
 
 use crate::packet::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
@@ -8,9 +8,7 @@ use crate::utils::buffer_writer::BuffWriter;
 use super::packet_type::PacketType;
 use super::property::Property;
 
-pub const MAX_PROPERTIES: usize = 2;
-
-pub struct PubackPacket<'a> {
+pub struct PubackPacket<'a, const MAX_PROPERTIES: usize> {
     // 7 - 4 mqtt control packet type, 3-0 flagy
     pub fixed_header: u8,
     // 1 - 4 B lenght of variable header + len of payload
@@ -25,7 +23,7 @@ pub struct PubackPacket<'a> {
     pub properties: Vec<Property<'a>, MAX_PROPERTIES>,
 }
 
-impl<'a> PubackPacket<'a> {
+impl<'a, const MAX_PROPERTIES: usize> PubackPacket<'a, MAX_PROPERTIES> {
     pub fn decode_puback_packet(&mut self, buff_reader: &mut BuffReader<'a>) {
         if self.decode_fixed_header(buff_reader) != (PacketType::Puback).into() {
             log::error!("Packet you are trying to decode is not PUBACK packet!");
@@ -37,12 +35,13 @@ impl<'a> PubackPacket<'a> {
     }
 }
 
-impl<'a> Packet<'a> for PubackPacket<'a> {
+impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubackPacket<'a, MAX_PROPERTIES> {
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
 
         let mut rm_ln = self.property_len;
-        let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len).unwrap();
+        let property_len_enc: [u8; 4] =
+            VariableByteIntegerEncoder::encode(self.property_len).unwrap();
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
         rm_ln = rm_ln + property_len_len as u32 + 3;
 
@@ -71,11 +70,11 @@ impl<'a> Packet<'a> for PubackPacket<'a> {
         self.properties.push(property);
     }
 
-    fn set_fixed_header(& mut self, header: u8) {
+    fn set_fixed_header(&mut self, header: u8) {
         self.fixed_header = header;
     }
 
-    fn set_remaining_len(& mut self, remaining_len: u32) {
+    fn set_remaining_len(&mut self, remaining_len: u32) {
         self.remain_len = remaining_len;
     }
 }
