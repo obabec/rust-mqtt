@@ -1,55 +1,50 @@
+use crate::packet::packet_type::PacketType;
+use crate::utils::buffer_reader::BuffReader;
+use crate::utils::buffer_reader::ParseError;
+
 use super::property::Property;
-use super::packet_type::PacketType;
-use heapless::Vec;
 
-pub const MAX_PROPERTIES: usize = 18;
+pub trait Packet<'a> {
+    //fn new() -> dyn Packet<'a> where Self: Sized;
 
-pub struct Packet<'a> {
-    // 7 - 4 mqtt control packet type, 3-0 flagy
-    pub fixed_header: u8,
-    // 1 - 4 B lenght of variable header + len of payload
-    pub remain_len: u32,
-
-    // variable header
-    //optional  prida se pouze u packetu ve kterych ma co delat 
-    pub packet_identifier: u16,
-
-    pub protocol_name_len: u16,
-
-    pub protocol_name: u32,
-
-    pub protocol_version: u8,
-
-    pub connect_flags: u8,
-
-    pub keep_alive: u16,
-    // property len
-    pub property_len: u32,
+    fn encode(&mut self, buffer: &mut [u8]) -> usize;
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>);
 
     // properties
-    pub properties: Vec<Property<'a>, MAX_PROPERTIES>,
+    fn set_property_len(&mut self, value: u32);
+    fn get_property_len(&mut self) -> u32;
+    fn push_to_properties(&mut self, property: Property<'a>);
 
-    // Payload of message
-    pub payload: &'a mut [u8]
-}
+    // header
+    fn set_fixed_header(&mut self, header: u8);
+    fn set_remaining_len(&mut self, remaining_len: u32);
 
-impl<'a> Packet<'a> {
-    pub fn new(fixed_header: u8, remain_len: u32, packet_identifier: u16, protocol_name_len: u16,
-                protocol_name: u32, protocol_version: u8, 
-                connect_flags: u8, keep_alive: u16, property_len: u32,
-                properties: Vec<Property<'a>, MAX_PROPERTIES>, payload: &'a mut [u8]) -> Self {
-        Self { fixed_header, remain_len, packet_identifier, property_len, properties, payload, connect_flags, keep_alive, protocol_name_len, protocol_name, protocol_version }
+    fn decode_properties(&mut self, buff_reader: &mut BuffReader<'a>) {
+        self.set_property_len(buff_reader.read_variable_byte_int().unwrap());
+        let mut x: u32 = 0;
+        let mut prop: Result<Property, ParseError>;
+        loop {
+            let mut res: Property;
+            prop = Property::decode(buff_reader);
+            if let Ok(res) = prop {
+                log::info!("Parsed property {:?}", res);
+                x = x + res.len() as u32 + 1;
+                self.push_to_properties(res);
+            } else {
+                // error handler
+                log::error!("Problem during property decoding");
+            }
+
+            if x == self.get_property_len() {
+                break;
+            }
+        }
     }
 
-    pub fn clean(properties: Vec<Property<'a>, MAX_PROPERTIES>, payload: &'a mut [u8]) -> Self {
-        Self{ fixed_header: 0x00, remain_len: 0, packet_identifier: 0, property_len: 0, properties, payload, connect_flags: 0, keep_alive: 0, protocol_name_len: 0, protocol_name: 0, protocol_version: 5}
-    }
-
-    pub fn encode(&self) {
-        log::info!("Encoding!");
-    }
-
-    pub fn get_reason_code(&self) {
-        log::info!("Getting reason code!");
+    fn decode_fixed_header(&mut self, buff_reader: &mut BuffReader) -> PacketType {
+        let first_byte: u8 = buff_reader.read_u8().unwrap();
+        self.set_fixed_header(first_byte);
+        self.set_remaining_len(buff_reader.read_variable_byte_int().unwrap());
+        return PacketType::from(first_byte);
     }
 }
