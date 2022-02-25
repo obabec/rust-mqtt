@@ -1,8 +1,10 @@
+use core::str;
+
+use heapless::Vec;
+
 use crate::encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerEncoder};
 use crate::packet::property::Property;
 use crate::utils::buffer_reader::{BinaryData, EncodedString, StringPair, TopicFilter};
-use core::str;
-use heapless::Vec;
 
 pub struct BuffWriter<'a> {
     buffer: &'a mut [u8],

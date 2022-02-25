@@ -1,6 +1,6 @@
-use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use heapless::Vec;
 
+use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BinaryData;
 use crate::utils::buffer_reader::BuffReader;

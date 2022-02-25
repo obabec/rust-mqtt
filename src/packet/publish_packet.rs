@@ -1,6 +1,6 @@
-use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use heapless::Vec;
 
+use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::mqtt_packet::Packet;
 use crate::packet::publish_packet::QualityOfService::{INVALID, QoS0, QoS1, QoS2};
 use crate::utils::buffer_reader::BuffReader;

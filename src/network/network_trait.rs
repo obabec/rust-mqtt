@@ -1,6 +1,6 @@
 use core::fmt::Error;
-
 use core::future::Future;
+
 use crate::packet::mqtt_packet::Packet;
 
 pub enum NetworkError {

@@ -4,9 +4,11 @@ use core::borrow::BorrowMut;
 use core::fmt::Error;
 use core::future::Future;
 use core::ptr::null;
+
 use embassy::io::WriteAll;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+
 use crate::network::network_trait::{Network, NetworkError};
 use crate::packet::mqtt_packet::Packet;
 
