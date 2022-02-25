@@ -27,19 +27,23 @@ pub struct PublishPacket<'a, const MAX_PROPERTIES: usize> {
 }
 
 impl<'a, const MAX_PROPERTIES: usize> PublishPacket<'a, MAX_PROPERTIES> {
-    pub fn new(message: &'a [u8]) -> Self {
+    pub fn new(topic_name: & str, message: &'a str) -> Self {
         let mut x = Self {
             fixed_header: PacketType::Publish.into(),
             remain_len: 0,
             topic_name: EncodedString::new(),
-            packet_identifier: 0,
+            packet_identifier: 1,
             property_len: 0,
             properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
-            message,
+            message: message.as_bytes(),
         };
-        x.topic_name.string = "test/topic";
-        x.topic_name.len = 10;
+        x.add_topic_name(topic_name);
         return x;
+    }
+
+    pub fn add_topic_name(&mut self, topic_name: & str) {
+        self.topic_name.string = topic_name;
+        self.topic_name.len = topic_name.len() as u16;
     }
 
     pub fn decode_publish_packet(&mut self, buff_reader: &mut BuffReader<'a>) {
