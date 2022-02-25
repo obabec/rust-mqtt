@@ -1,3 +1,4 @@
+use core::future::Future;
 use crate::network::network_trait::{Network, NetworkError};
 use crate::packet::connack_packet::ConnackPacket;
 use crate::packet::connect_packet::ConnectPacket;
@@ -23,42 +24,53 @@ where
         }
     }
     // connect -> connack -> publish -> QoS ? -> disconn
-    pub async fn send_message(&'a mut self, topic_name: & str, message: & str, qos: QualityOfService) -> Result<(), NetworkError> {
-        //connect
-        self.network_driver.create_connection().await ?;
+    pub async fn send_message(&'a mut self, topic_name: & str, message: & str, qos: QualityOfService) -> impl Future<Output = Result<(), NetworkError>> {
+        async move {
+            let mut len = {
+                let mut connect = ConnectPacket::<3, 0>::clean();
+                connect.encode(self.buffer)
+            };
 
-        let mut connect = ConnectPacket::<3, 0>::clean();
-        let mut len = connect.encode(self.buffer);
+            self.network_driver.send(self.buffer, len).await?;
 
-        self.network_driver.send(self.buffer, len).await ?;
-        //connack
-        let connack: ConnackPacket<MAX_PROPERTIES> = self.receive::<ConnackPacket<MAX_PROPERTIES>>().await ?;
-        if connack.connect_reason_code != 0x00 {
-            todo!();
+            //connack
+            let connack = {
+                let connack = self.receive().await?;
+                let mut packet = ConnackPacket::new();
+                packet.decode(&mut BuffReader::new(self.buffer));
+                packet
+            };
+
+            if connack.connect_reason_code != 0x00 {
+                todo!();
+            }
+
+            // publish
+
+            len = {
+                let mut packet = PublishPacket::<5>::new(topic_name, message);
+                packet.encode(self.buffer)
+            };
+
+            self.network_driver.send(self.buffer, len).await?;
+
+
+            //QoS1
+            if <QualityOfService as Into<u8>>::into(qos) == <QualityOfService as Into<u8>>::into(QoS1) {
+                todo!();
+            }
+
+            //Disconnect
+            let mut disconnect = DisconnectPacket::<5>::new();
+            len = disconnect.encode(self.buffer);
+            self.network_driver.send(self.buffer, len);
+            Ok(())
         }
-
-        // publish
-        let mut packet = PublishPacket::<5>::new(topic_name, message);
-        len = packet.encode(self.buffer);
-        self.network_driver.send(self.buffer, len).await ?;
-
-        //QoS1
-        if <QualityOfService as Into<u8>>::into(qos) == <QualityOfService as Into<u8>>::into(QoS1) {
-            todo!();
-        }
-
-        //Disconnect
-        let mut disconnect = DisconnectPacket::<5>::new();
-        len = disconnect.encode(self.buffer);
-        self.network_driver.send(self.buffer, len);
-        Ok(())
     }
 
-    pub async fn receive<P: Packet<'p>>(&'a mut self) -> Result<P, NetworkError> {
+    pub async fn receive(&'a mut self) -> Result<(), NetworkError> {
         self.network_driver.receive(self.buffer).await ?;
-        let mut packet = P::new();
-        packet.decode(&mut BuffReader::new(self.buffer));
-        return Ok(packet);
+        Ok(())
     }
 
     pub async fn receive_message(&'a mut self) -> Result<(), NetworkError> {

@@ -31,7 +31,8 @@ fn main() {
     let mut ip: [u8; 4] = [37, 205, 11, 180];
     let mut port: u16 = 1883;
     let mut tokio_network: TokioNetwork = TokioNetwork::new(ip, port);
-    let client = MqttClientV5::new::<TokioNetwork, 5>(tokio_network);
-    let mut x = b"hello world";
+    tokio_network.create_connection().await;
     let mut res2 = vec![0; 260];
+    let client = MqttClientV5::new(&mut tokio_network, &mut res2);
+    let mut x = b"hello world";
 }

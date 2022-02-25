@@ -24,6 +24,10 @@ impl TokioNetwork {
     }
 }
 
+impl TokioNetwork {
+
+}
+
 impl Network for TokioNetwork {
     type ConnectionFuture<'m> where Self: 'm = impl Future<Output = Result<(), NetworkError>> + 'm;
     type WriteFuture<'m> where Self: 'm = impl Future<Output = Result<(), NetworkError>> + 'm;
