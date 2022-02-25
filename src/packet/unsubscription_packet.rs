@@ -32,14 +32,16 @@ pub struct UnsubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTI
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
     UnsubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
-    /*pub fn new() -> Self {
 
-    }*/
 }
 
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     for UnsubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
+    fn new() -> Self {
+        todo!()
+    }
+
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
 

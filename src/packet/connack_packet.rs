@@ -32,6 +32,10 @@ impl<'a, const MAX_PROPERTIES: usize> ConnackPacket<'a, MAX_PROPERTIES> {
 }
 
 impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for ConnackPacket<'a, MAX_PROPERTIES> {
+    fn new() -> Self {
+        todo!()
+    }
+
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
         buff_writer.write_u8(self.fixed_header);

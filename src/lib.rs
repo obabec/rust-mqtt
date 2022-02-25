@@ -2,12 +2,18 @@
 #![macro_use]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code)]
+#![feature(type_alias_impl_trait)]
+#![feature(generic_associated_types)]
+#![feature(async)]
+
+extern crate alloc;
 
 pub mod encoding;
 pub mod packet;
 pub mod utils;
 pub mod client;
-mod network;
+pub mod network;
+pub mod tokio_network;
 
 #[allow(unused_variables)]
 pub fn print_stack(file: &'static str, line: u32) {

@@ -50,6 +50,10 @@ impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize>
 impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     for UnsubackPacket<'a, MAX_REASONS, MAX_PROPERTIES>
 {
+    fn new() -> Self {
+        todo!()
+    }
+
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
         log::error!("UNSUBACK packet does not support encoding!");
         return 0;

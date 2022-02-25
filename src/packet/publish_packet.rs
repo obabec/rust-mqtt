@@ -2,12 +2,42 @@ use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use heapless::Vec;
 
 use crate::packet::mqtt_packet::Packet;
+use crate::packet::publish_packet::QualityOfService::{INVALID, QoS0, QoS1, QoS2};
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_reader::EncodedString;
 use crate::utils::buffer_writer::BuffWriter;
 
 use super::packet_type::PacketType;
 use super::property::Property;
+
+pub enum QualityOfService {
+    QoS0,
+    QoS1,
+    QoS2,
+    INVALID
+}
+
+impl From<u8> for QualityOfService {
+    fn from(orig: u8) -> Self {
+        return match orig {
+            0 => QoS0,
+            1 => QoS1,
+            2 => QoS2,
+            _ => INVALID
+        }
+    }
+}
+
+impl Into<u8> for QualityOfService {
+    fn into(self) -> u8 {
+        return match self {
+            QoS0 => 0,
+            QoS1 => 1,
+            QoS2 => 2,
+            INVALID => 3,
+        }
+    }
+}
 
 pub struct PublishPacket<'a, const MAX_PROPERTIES: usize> {
     // 7 - 4 mqtt control packet type, 3-0 flagy
@@ -27,7 +57,7 @@ pub struct PublishPacket<'a, const MAX_PROPERTIES: usize> {
 }
 
 impl<'a, const MAX_PROPERTIES: usize> PublishPacket<'a, MAX_PROPERTIES> {
-    pub fn new(topic_name: & str, message: &'a str) -> Self {
+    pub fn new(topic_name: &'a str, message: &'a str) -> Self {
         let mut x = Self {
             fixed_header: PacketType::Publish.into(),
             remain_len: 0,
@@ -41,7 +71,7 @@ impl<'a, const MAX_PROPERTIES: usize> PublishPacket<'a, MAX_PROPERTIES> {
         return x;
     }
 
-    pub fn add_topic_name(&mut self, topic_name: & str) {
+    pub fn add_topic_name(&mut self, topic_name: &'a str) {
         self.topic_name.string = topic_name;
         self.topic_name.len = topic_name.len() as u16;
     }
@@ -63,6 +93,10 @@ impl<'a, const MAX_PROPERTIES: usize> PublishPacket<'a, MAX_PROPERTIES> {
 }
 
 impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PublishPacket<'a, MAX_PROPERTIES> {
+    fn new() -> Self {
+        todo!()
+    }
+
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
 

@@ -5,9 +5,10 @@ use crate::utils::buffer_reader::ParseError;
 use super::property::Property;
 
 pub trait Packet<'a> {
-    //fn new() -> dyn Packet<'a> where Self: Sized;
+    fn new() -> Self;
 
     fn encode(&mut self, buffer: &mut [u8]) -> usize;
+    //  -> Result<Ok(), Err()>
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>);
 
     // properties

@@ -30,9 +30,23 @@ impl<'a, const MAX_PROPERTIES: usize> DisconnectPacket<'a, MAX_PROPERTIES> {
         self.disconnect_reason = buff_reader.read_u8().unwrap();
         self.decode_properties(buff_reader);
     }
+
+    fn add_reason(& mut self, reason: u8) {
+        self.disconnect_reason = reason;
+    }
 }
 
 impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for DisconnectPacket<'a, MAX_PROPERTIES> {
+    fn new() -> Self {
+        Self {
+            fixed_header: PacketType::Disconnect.into(),
+            remain_len: 5,
+            disconnect_reason: 0x00,
+            property_len: 0,
+            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new()
+        }
+    }
+
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
         buff_writer.write_u8(self.fixed_header);

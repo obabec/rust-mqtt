@@ -22,6 +22,10 @@ impl<'a> PingrespPacket {
 }
 
 impl<'a> Packet<'a> for PingrespPacket {
+    fn new() -> Self {
+        todo!()
+    }
+
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
         buff_writer.write_u8(self.fixed_header);

@@ -46,6 +46,9 @@ impl<'a, const MAX_PROPERTIES: usize> AuthPacket<'a, MAX_PROPERTIES> {
 }
 
 impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTIES> {
+    fn new() -> Self {
+        todo!()
+    }
     /*fn new() -> Packet<'a, MAX_PROPERTIES> {
         return AuthPacket { fixed_header: PacketType::Auth.into(), remain_len: 0, auth_reason: 0, property_len: 0, properties: Vec::<Property<'a>, MAX_PROPERTIES>::new() }
     }*/
