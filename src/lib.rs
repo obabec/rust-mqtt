@@ -4,7 +4,6 @@
 #![allow(dead_code)]
 #![feature(type_alias_impl_trait)]
 #![feature(generic_associated_types)]
-#![feature(async)]
 
 extern crate alloc;
 

@@ -25,9 +25,9 @@ pub trait Network {
 
     fn new(ip: [u8; 4], port: u16) -> Self;
 
-    fn create_connection(& mut self) -> Self::ConnectionFuture<'m>;
+    fn create_connection(&'m mut self) -> Self::ConnectionFuture<'m>;
 
-    fn send(& mut self, buffer: & mut [u8], len: usize) -> Self::WriteFuture<'m>;
+    fn send(&'m mut self, buffer: &'m mut [u8], len: usize) -> Self::WriteFuture<'m>;
 
-    fn receive(& mut self, buffer: & mut [u8]) -> Self::ReadFuture<'m>;
+    fn receive(&'m mut self, buffer: &'m mut [u8]) -> Self::ReadFuture<'m>;
 }
