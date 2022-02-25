@@ -7,7 +7,7 @@ use rust_mqtt::packet::subscription_packet::SubscriptionPacket;
 use rust_mqtt::tokio_network::TokioNetwork;
 
 #[tokio::main]
-fn main() {
+async fn main() {
     env_logger::builder()
         .filter_level(log::LevelFilter::Info)
         .format_timestamp_nanos()

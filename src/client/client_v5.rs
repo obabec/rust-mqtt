@@ -34,16 +34,18 @@ where
         self.network_driver.send(self.buffer, len).await ?;
 
         //connack
-        let connack = {
+        {
             self.receive().await ?;
-            let mut packet = ConnackPacket::new();
+            let mut packet = ConnackPacket::<5>::new();
             packet.decode(&mut BuffReader::new(self.buffer));
-            packet
+
+
+            if packet.connect_reason_code != 0x00 {
+                todo!();
+            }
         };
 
-        if connack.connect_reason_code != 0x00 {
-            todo!();
-        }
+
 
         // publish
 
