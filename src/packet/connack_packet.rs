@@ -33,7 +33,14 @@ impl<'a, const MAX_PROPERTIES: usize> ConnackPacket<'a, MAX_PROPERTIES> {
 
 impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for ConnackPacket<'a, MAX_PROPERTIES> {
     fn new() -> Self {
-        todo!()
+        Self {
+            fixed_header: PacketType::Connack.into(),
+            remain_len: 0,
+            ack_flags: 0,
+            connect_reason_code: 0,
+            property_len: 0,
+            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
+        }
     }
 
     fn encode(&mut self, buffer: &mut [u8]) -> usize {

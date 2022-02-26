@@ -53,7 +53,14 @@ impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     for SubackPacket<'a, MAX_REASONS, MAX_PROPERTIES>
 {
     fn new() -> Self {
-        todo!()
+        Self {
+            fixed_header: PacketType::Suback.into(),
+            remain_len: 0,
+            packet_identifier: 0,
+            property_len: 0,
+            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
+            reason_codes: Vec::<u8, MAX_REASONS>::new()
+        }
     }
 
     fn encode(&mut self, buffer: &mut [u8]) -> usize {

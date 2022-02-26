@@ -32,7 +32,6 @@ pub struct UnsubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTI
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
     UnsubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
-
 }
 
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>

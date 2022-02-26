@@ -7,12 +7,12 @@
 
 extern crate alloc;
 
-pub mod encoding;
-pub mod packet;
-pub mod utils;
 pub mod client;
+pub mod encoding;
 pub mod network;
+pub mod packet;
 pub mod tokio_network;
+pub mod utils;
 
 #[allow(unused_variables)]
 pub fn print_stack(file: &'static str, line: u32) {

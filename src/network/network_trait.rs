@@ -3,17 +3,17 @@ use core::future::Future;
 
 use crate::packet::mqtt_packet::Packet;
 
+
+#[derive(Debug)]
 pub enum NetworkError {
     Connection,
     Unknown,
 }
 
-
-
 pub trait Network {
     type ConnectionFuture<'m>: Future<Output = Result<(), NetworkError>>
     where
-    Self: 'm;
+        Self: 'm;
 
     type WriteFuture<'m>: Future<Output = Result<(), NetworkError>>
     where

@@ -32,14 +32,27 @@ pub struct SubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
     SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
-    pub fn new() -> Self {
+    pub fn add_new_filter(& mut self, topic_name: &'a str) {
+        let len = topic_name.len();
+        let mut new_filter = TopicFilter::new();
+        new_filter.filter.string = topic_name;
+        new_filter.filter.len = len as u16;
+        self.topic_filters.push(new_filter);
+        self.topic_filter_len = self.topic_filter_len + 1;
+    }
+}
+
+impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
+    for SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
+{
+     fn new() -> Self {
         let mut x = Self {
             fixed_header: PacketType::Subscribe.into(),
             remain_len: 0,
             packet_identifier: 1,
             property_len: 0,
             properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
-            topic_filter_len: 1,
+            topic_filter_len: 0,
             topic_filters: Vec::<TopicFilter<'a>, MAX_FILTERS>::new(),
         };
         let mut p = TopicFilter::new();
@@ -47,14 +60,6 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
         p.filter.string = "test/#";
         x.topic_filters.push(p);
         return x;
-    }
-}
-
-impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
-    for SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
-{
-    fn new() -> Self {
-        todo!()
     }
 
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
@@ -82,7 +87,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         buff_writer.write_variable_byte_int(self.property_len);
         buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties);
         buff_writer.encode_topic_filters_ref(
-            false,
+            true,
             self.topic_filter_len as usize,
             &self.topic_filters,
         );

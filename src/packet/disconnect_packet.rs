@@ -31,7 +31,7 @@ impl<'a, const MAX_PROPERTIES: usize> DisconnectPacket<'a, MAX_PROPERTIES> {
         self.decode_properties(buff_reader);
     }
 
-    fn add_reason(& mut self, reason: u8) {
+    fn add_reason(&mut self, reason: u8) {
         self.disconnect_reason = reason;
     }
 }
@@ -43,7 +43,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for DisconnectPacket<'a, MAX_PR
             remain_len: 5,
             disconnect_reason: 0x00,
             property_len: 0,
-            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new()
+            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
         }
     }
 

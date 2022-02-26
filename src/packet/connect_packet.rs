@@ -98,6 +98,7 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize>
         self.fixed_header = cur_type | flags;
     }
 }
+
 impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'a>
     for ConnectPacket<'a, MAX_PROPERTIES, MAX_WILL_PROPERTIES>
 {

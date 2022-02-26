@@ -49,7 +49,7 @@ impl<'a> BuffWriter<'a> {
 
     pub fn write_u32(&mut self, four_bytes: u32) {
         let bytes: [u8; 4] = four_bytes.to_be_bytes();
-        self.insert_ref(4,&bytes);
+        self.insert_ref(4, &bytes);
     }
 
     pub fn write_string_ref(&mut self, str: &EncodedString<'a>) {

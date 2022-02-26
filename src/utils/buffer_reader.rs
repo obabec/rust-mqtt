@@ -150,6 +150,7 @@ impl<'a> BuffReader<'a> {
             log::error!("Could not parse utf-8 string");
             return Err(ParseError::Utf8Error);
         }
+        self.increment_position(len_res as usize);
         return Ok(EncodedString {
             string: res_str.unwrap(),
             len: len_res,
@@ -188,7 +189,7 @@ impl<'a> BuffReader<'a> {
         });
     }
 
-    pub fn read_message(&mut self) -> &'a [u8] {
-        return &self.buffer[self.position..];
+    pub fn read_message(&mut self, total_len: usize) -> &'a [u8] {
+        return &self.buffer[self.position..total_len];
     }
 }

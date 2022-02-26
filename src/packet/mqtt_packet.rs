@@ -24,20 +24,22 @@ pub trait Packet<'a> {
         self.set_property_len(buff_reader.read_variable_byte_int().unwrap());
         let mut x: u32 = 0;
         let mut prop: Result<Property, ParseError>;
-        loop {
-            let mut res: Property;
-            prop = Property::decode(buff_reader);
-            if let Ok(res) = prop {
-                log::info!("Parsed property {:?}", res);
-                x = x + res.len() as u32 + 1;
-                self.push_to_properties(res);
-            } else {
-                // error handler
-                log::error!("Problem during property decoding");
-            }
+        if self.get_property_len() != 0 {
+            loop {
+                let mut res: Property;
+                prop = Property::decode(buff_reader);
+                if let Ok(res) = prop {
+                    log::info!("Parsed property {:?}", res);
+                    x = x + res.len() as u32 + 1;
+                    self.push_to_properties(res);
+                } else {
+                    // error handler
+                    log::error!("Problem during property decoding");
+                }
 
-            if x == self.get_property_len() {
-                break;
+                if x == self.get_property_len() {
+                    break;
+                }
             }
         }
     }
