@@ -23,4 +23,4 @@
  */
 
 
-pub mod variable_byte_integer;
+pub mod network_trait;

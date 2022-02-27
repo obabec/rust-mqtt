@@ -1,7 +1,32 @@
-use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
+/*
+ * MIT License
+ *
+ * Copyright (c) [2022] [Ondrej Babec <ond.babec@gmail.com>]
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 use heapless::Vec;
 
+use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::mqtt_packet::Packet;
+use crate::packet::publish_packet::QualityOfService;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_reader::TopicFilter;
 use crate::utils::buffer_writer::BuffWriter;
@@ -32,27 +57,33 @@ pub struct SubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
     SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
-    pub fn new() -> Self {
-        let mut x = Self {
-            fixed_header: PacketType::Subscribe.into(),
-            remain_len: 0,
-            packet_identifier: 1,
-            property_len: 0,
-            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
-            topic_filter_len: 1,
-            topic_filters: Vec::<TopicFilter<'a>, MAX_FILTERS>::new(),
-        };
-        let mut p = TopicFilter::new();
-        p.filter.len = 6;
-        p.filter.string = "test/#";
-        x.topic_filters.push(p);
-        return x;
+    pub fn add_new_filter(& mut self, topic_name: &'a str, qos: QualityOfService) {
+        let len = topic_name.len();
+        let mut new_filter = TopicFilter::new();
+        new_filter.filter.string = topic_name;
+        new_filter.filter.len = len as u16;
+        new_filter.sub_options = new_filter.sub_options | (<QualityOfService as Into<u8>>::into(qos) >> 1);
+        self.topic_filters.push(new_filter);
+        self.topic_filter_len = self.topic_filter_len + 1;
     }
 }
 
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     for SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
+     fn new() -> Self {
+        let mut x = Self {
+            fixed_header: PacketType::Subscribe.into(),
+            remain_len: 0,
+            packet_identifier: 1,
+            property_len: 0,
+            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
+            topic_filter_len: 0,
+            topic_filters: Vec::<TopicFilter<'a>, MAX_FILTERS>::new(),
+        };
+        return x;
+    }
+
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
 
@@ -78,7 +109,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         buff_writer.write_variable_byte_int(self.property_len);
         buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties);
         buff_writer.encode_topic_filters_ref(
-            false,
+            true,
             self.topic_filter_len as usize,
             &self.topic_filters,
         );

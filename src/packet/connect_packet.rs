@@ -1,6 +1,30 @@
-use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
+/*
+ * MIT License
+ *
+ * Copyright (c) [2022] [Ondrej Babec <ond.babec@gmail.com>]
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 use heapless::Vec;
 
+use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BinaryData;
 use crate::utils::buffer_reader::BuffReader;
@@ -97,10 +121,25 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize>
         }
         self.fixed_header = cur_type | flags;
     }
+
+    pub fn add_username(&mut self, username: &EncodedString<'a>) {
+        self.username = (*username).clone();
+        self.connect_flags = self.connect_flags | 0x80;
+    }
+
+    pub fn add_password(&mut self, password: &BinaryData<'a>) {
+        self.password = (*password).clone();
+        self.connect_flags = self.connect_flags | 0x40;
+    }
 }
+
 impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'a>
     for ConnectPacket<'a, MAX_PROPERTIES, MAX_WILL_PROPERTIES>
 {
+    fn new() -> Self {
+        todo!()
+    }
+
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);
 
@@ -111,7 +150,7 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
         // 12 = protocol_name_len + protocol_name + protocol_version + connect_flags + keep_alive + client_id_len
         rm_ln = rm_ln + property_len_len as u32 + 12;
 
-        if self.connect_flags & 0x04 == 1 {
+        if self.connect_flags & 0x04 != 0 {
             let wil_prop_len_enc =
                 VariableByteIntegerEncoder::encode(self.will_property_len).unwrap();
             let wil_prop_len_len = VariableByteIntegerEncoder::len(wil_prop_len_enc);
@@ -121,13 +160,13 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
                 + self.will_topic.len as u32
                 + self.will_payload.len as u32;
         }
-
-        if self.connect_flags & 0x80 == 1 {
-            rm_ln = rm_ln + self.username.len as u32;
+        let x = self.connect_flags & 0x80;
+        if (self.connect_flags & 0x80) != 0 {
+            rm_ln = rm_ln + self.username.len as u32 + 2;
         }
 
-        if self.connect_flags & 0x40 == 1 {
-            rm_ln = rm_ln + self.password.len as u32;
+        if self.connect_flags & 0x40 != 0 {
+            rm_ln = rm_ln + self.password.len as u32 + 2;
         }
 
         buff_writer.write_u8(self.fixed_header);
@@ -142,18 +181,18 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
         buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties);
         buff_writer.write_string_ref(&self.client_id);
 
-        if self.connect_flags & 0x04 == 1 {
+        if self.connect_flags & 0x04 != 0 {
             buff_writer.write_variable_byte_int(self.will_property_len);
             buff_writer.encode_properties(&self.will_properties);
             buff_writer.write_string_ref(&self.will_topic);
             buff_writer.write_binary_ref(&self.will_payload);
         }
 
-        if self.connect_flags & 0x80 == 1 {
+        if self.connect_flags & 0x80 != 0 {
             buff_writer.write_string_ref(&self.username);
         }
 
-        if self.connect_flags & 0x40 == 1 {
+        if self.connect_flags & 0x40 != 0 {
             buff_writer.write_binary_ref(&self.password);
         }
 
