@@ -19,12 +19,18 @@ async fn receive() {
     let mut config = ClientConfig::new();
     config.add_qos(QualityOfService::QoS1);
     config.add_username("test");
-    config.add_password("testPass");
+    config.add_password("testPass1");
     let mut res2 = vec![0; 260];
     let mut res3 = vec![0; 260];
     let mut client = MqttClientV5::<TokioNetwork, 5>::new(&mut tokio_network, &mut res2, & mut res3, config);
 
-    let mut result = { client.connect_to_broker().await };
+    let mut result = {
+        client.connect_to_broker().await
+    };
+    if let Err(r) = result {
+        log::error!("[ERROR]: {}", r);
+        return;
+    }
 
     {
         client.subscribe_to_topic("test/topic").await;

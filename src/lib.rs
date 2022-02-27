@@ -1,3 +1,27 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) [2022] [Ondrej Babec <ond.babec@gmail.com>]
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 #![feature(in_band_lifetimes)]
 #![macro_use]
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -13,31 +37,3 @@ pub mod network;
 pub mod packet;
 pub mod tokio_network;
 pub mod utils;
-
-#[allow(unused_variables)]
-pub fn print_stack(file: &'static str, line: u32) {
-    let _u: u32 = 1;
-    let _uptr: *const u32 = &_u;
-    // log::trace!("[{}:{}] SP: 0x{:p}", file, line, &_uptr);
-}
-
-#[allow(unused_variables)]
-pub fn log_stack(file: &'static str) {
-    let _u: u32 = 1;
-    let _uptr: *const u32 = &_u;
-    //trace!("[{}] SP: 0x{:?}", file, &_uptr);
-}
-
-#[allow(unused_variables)]
-pub fn print_size<T>(name: &'static str) {
-    //log::info!("[{}] size: {}", name, core::mem::size_of::<T>());
-}
-
-#[allow(unused_variables)]
-pub fn print_value_size<T>(name: &'static str, val: &T) {
-    /*    log::info!(
-        "[{}] value size: {}",
-        name,
-        core::mem::size_of_val::<T>(val)
-    );*/
-}

@@ -1,3 +1,6 @@
+// This code is handed from Embedded Rust documentation and
+// is accessible from https://docs.rust-embedded.org/cortex-m-rt/0.6.0/rand/trait.RngCore.html
+
 use rand_core::{RngCore, Error, impls};
 
 pub struct CountingRng(pub u64);

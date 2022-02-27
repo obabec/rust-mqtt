@@ -1,3 +1,28 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) [2022] [Ondrej Babec <ond.babec@gmail.com>]
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+
 use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
@@ -8,20 +33,18 @@ use crate::utils::buffer_writer::BuffWriter;
 use super::packet_type::PacketType;
 use super::property::Property;
 
+/// Auth packets serves MQTTv5 extended authentication. This packet is not currently supported
+/// by rust-mqtt client but decoding and encoding of packet is prepared for future development.
 pub struct AuthPacket<'a, const MAX_PROPERTIES: usize> {
-    // 7 - 4 mqtt control packet type, 3-0 flagy
     pub fixed_header: u8,
-    // 1 - 4 B lenght of variable header + len of payload
     pub remain_len: u32,
-
     pub auth_reason: u8,
-
     pub property_len: u32,
-
     pub properties: Vec<Property<'a>, MAX_PROPERTIES>,
 }
 
 impl<'a, const MAX_PROPERTIES: usize> AuthPacket<'a, MAX_PROPERTIES> {
+    /// Function is decoding auth packet from Byte array (buffer).
     pub fn decode_auth_packet(&mut self, buff_reader: &mut BuffReader<'a>) {
         self.decode_fixed_header(buff_reader);
         self.auth_reason = buff_reader.read_u8().unwrap();
@@ -47,11 +70,14 @@ impl<'a, const MAX_PROPERTIES: usize> AuthPacket<'a, MAX_PROPERTIES> {
 
 impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTIES> {
     fn new() -> Self {
-        todo!()
+        Self {
+            fixed_header: PacketType::Auth.into(),
+            remain_len: 0,
+            auth_reason: 0x00,
+            property_len: 0,
+            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new()
+        }
     }
-    /*fn new() -> Packet<'a, MAX_PROPERTIES> {
-        return AuthPacket { fixed_header: PacketType::Auth.into(), remain_len: 0, auth_reason: 0, property_len: 0, properties: Vec::<Property<'a>, MAX_PROPERTIES>::new() }
-    }*/
 
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
         let mut buff_writer = BuffWriter::new(buffer);

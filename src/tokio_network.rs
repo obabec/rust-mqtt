@@ -8,8 +8,9 @@ use core::ptr::null;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
-use crate::network::network_trait::{Network, NetworkError};
+use crate::network::network_trait::{Network};
 use crate::packet::mqtt_packet::Packet;
+use crate::packet::reason_codes::ReasonCode;
 
 pub struct TokioNetwork {
     ip: [u8; 4],
@@ -32,15 +33,15 @@ impl Network for TokioNetwork {
     type ConnectionFuture<'m>
     where
         Self: 'm,
-    = impl Future<Output = Result<(), NetworkError>> + 'm;
+    = impl Future<Output = Result<(), ReasonCode>> + 'm;
     type WriteFuture<'m>
     where
         Self: 'm,
-    = impl Future<Output = Result<(), NetworkError>> + 'm;
+    = impl Future<Output = Result<(), ReasonCode>> + 'm;
     type ReadFuture<'m>
     where
         Self: 'm,
-    = impl Future<Output = Result<usize, NetworkError>> + 'm;
+    = impl Future<Output = Result<usize, ReasonCode>> + 'm;
 
     fn new(ip: [u8; 4], port: u16) -> Self {
         return Self {
@@ -56,7 +57,7 @@ impl Network for TokioNetwork {
                 .await
                 .map(|socket| self.socket = Some(socket))
                 .map(|_| ())
-                .map_err(|_| NetworkError::Connection)
+                .map_err(|_| ReasonCode::NetworkError)
         }
     }
 
@@ -66,9 +67,9 @@ impl Network for TokioNetwork {
                 stream
                     .write_all(&buffer[0..len])
                     .await
-                    .map_err(|_| NetworkError::Unknown)
+                    .map_err(|_| ReasonCode::NetworkError)
             } else {
-                Err(NetworkError::Unknown)
+                Err(ReasonCode::NetworkError)
             };
         }
     }
@@ -79,20 +80,10 @@ impl Network for TokioNetwork {
                 stream
                     .read(buffer)
                     .await
-                    .map_err(|_| NetworkError::Connection)
+                    .map_err(|_| ReasonCode::NetworkError)
             } else {
-                Err(NetworkError::Unknown)
+                Err(ReasonCode::NetworkError)
             };
         }
     }
-
-    /*fn send(&mut self, buffer: &mut [u8], len: usize) -> Result<(), NetworkError> {
-        self.socket.write_all(&buffer[0..len]);
-        Ok(())
-    }
-
-    fn receive(&mut self, buffer: &mut [u8]) -> Result<usize, NetworkError> {
-        let len = self.socket.read(buffer).await ?;
-        Ok(len)
-    }*/
 }

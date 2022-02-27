@@ -1,6 +1,6 @@
 use core::fmt::Error;
 use core::future::Future;
-
+use crate::packet::reason_codes::ReasonCode;
 use crate::packet::mqtt_packet::Packet;
 
 
@@ -14,15 +14,15 @@ pub enum NetworkError {
 }
 
 pub trait Network {
-    type ConnectionFuture<'m>: Future<Output = Result<(), NetworkError>>
+    type ConnectionFuture<'m>: Future<Output = Result<(), ReasonCode>>
     where
         Self: 'm;
 
-    type WriteFuture<'m>: Future<Output = Result<(), NetworkError>>
+    type WriteFuture<'m>: Future<Output = Result<(), ReasonCode>>
     where
         Self: 'm;
 
-    type ReadFuture<'m>: Future<Output = Result<usize, NetworkError>>
+    type ReadFuture<'m>: Future<Output = Result<usize, ReasonCode>>
     where
         Self: 'm;
 

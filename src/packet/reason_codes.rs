@@ -1,6 +1,7 @@
 use core::fmt::{Display, Formatter, write};
 use crate::packet::reason_codes::ReasonCode::ServerMoved;
 
+#[derive(Debug)]
 pub enum ReasonCode {
     Success,
     GrantedQoS1,
@@ -45,7 +46,7 @@ pub enum ReasonCode {
     MaximumConnectTime,
     SubscriptionIdentifiersNotSupported,
     WildcardSubscriptionNotSupported,
-    Unknown
+    NetworkError,
 }
 
 impl Into<u8> for ReasonCode {
@@ -94,7 +95,7 @@ impl Into<u8> for ReasonCode {
             ReasonCode::MaximumConnectTime => 0xA0,
             ReasonCode::SubscriptionIdentifiersNotSupported => 0xA1,
             ReasonCode::WildcardSubscriptionNotSupported => 0xA2,
-            ReasonCode::Unknown => 0xFF
+            ReasonCode::NetworkError => 0xFF
         }
 
     }
@@ -145,7 +146,7 @@ impl From<u8> for ReasonCode {
             0xA0 => ReasonCode::MaximumConnectTime,
             0xA1 => ReasonCode::SubscriptionIdentifiersNotSupported,
             0xA2 => ReasonCode::WildcardSubscriptionNotSupported,
-            _ => ReasonCode::Unknown
+            _ => ReasonCode::NetworkError
         }
     }
 }
@@ -156,7 +157,7 @@ impl Display for ReasonCode {
             ReasonCode::Success => write!(f, "Operation was successful!"),
             ReasonCode::GrantedQoS1 => write!(f, "Granted QoS level 1!"),
             ReasonCode::GrantedQoS2 => write!(f, "Granted QoS level 2!"),
-            ReasonCode::DisconnectWithWillMessage => {}
+            ReasonCode::DisconnectWithWillMessage => write!(f, "Disconnected with Will message!"),
             ReasonCode::NoMatchingSubscribers => write!(f, "No matching subscribers on broker!"),
             ReasonCode::NoSubscriptionExisted => write!(f, "Subscription not exist!"),
             ReasonCode::ContinueAuth => write!(f, "Broker asks for more AUTH packets!"),
@@ -196,7 +197,7 @@ impl Display for ReasonCode {
             ReasonCode::MaximumConnectTime => write!(f, "Maximum connect time exceeded!"),
             ReasonCode::SubscriptionIdentifiersNotSupported => write!(f, "Subscription identifier not supported!"),
             ReasonCode::WildcardSubscriptionNotSupported => write!(f, "Wildcard subscription not supported!"),
-            ReasonCode::Unknown => write!(f, "Unknown error!"),
+            ReasonCode::NetworkError => write!(f, "Unknown error!"),
         }
     }
 }
