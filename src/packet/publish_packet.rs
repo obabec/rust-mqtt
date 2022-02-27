@@ -11,6 +11,7 @@ use crate::utils::buffer_writer::BuffWriter;
 use super::packet_type::PacketType;
 use super::property::Property;
 
+#[derive(Clone, Copy)]
 pub enum QualityOfService {
     QoS0,
     QoS1,
@@ -22,8 +23,8 @@ impl From<u8> for QualityOfService {
     fn from(orig: u8) -> Self {
         return match orig {
             0 => QoS0,
-            1 => QoS1,
-            2 => QoS2,
+            2 => QoS1,
+            4 => QoS2,
             _ => INVALID,
         };
     }
@@ -33,8 +34,8 @@ impl Into<u8> for QualityOfService {
     fn into(self) -> u8 {
         return match self {
             QoS0 => 0,
-            QoS1 => 1,
-            QoS2 => 2,
+            QoS1 => 2,
+            QoS2 => 4,
             INVALID => 3,
         };
     }
@@ -65,6 +66,14 @@ impl<'a, const MAX_PROPERTIES: usize> PublishPacket<'a, MAX_PROPERTIES> {
 
     pub fn add_message(& mut self, message: &'a [u8]) {
         self.message = Some(message);
+    }
+
+    pub fn add_qos(& mut self, qos: QualityOfService) {
+        self.fixed_header = self.fixed_header | <QualityOfService as Into<u8>>::into(qos);
+    }
+
+    pub fn add_identifier(& mut self, identifier: u16) {
+        self.packet_identifier = identifier;
     }
 
     pub fn decode_publish_packet(&mut self, buff_reader: &mut BuffReader<'a>) {
@@ -112,7 +121,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PublishPacket<'a, MAX_PROPE
         buff_writer.write_u8(self.fixed_header);
         let qos = self.fixed_header & 0x03;
         if qos != 0 {
-            rm_ln + 2;
+            rm_ln = rm_ln + 2;
         }
 
         buff_writer.write_variable_byte_int(rm_ln);

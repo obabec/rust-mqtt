@@ -18,3 +18,4 @@ pub mod pingreq_packet;
 pub mod pingresp_packet;
 pub mod suback_packet;
 pub mod unsuback_packet;
+pub mod reason_codes;

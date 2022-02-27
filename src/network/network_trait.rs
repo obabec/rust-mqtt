@@ -8,6 +8,9 @@ use crate::packet::mqtt_packet::Packet;
 pub enum NetworkError {
     Connection,
     Unknown,
+    QoSAck,
+    IDNotMatchedOnAck,
+    NoMatchingSubs,
 }
 
 pub trait Network {

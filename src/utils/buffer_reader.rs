@@ -4,6 +4,7 @@ use core::str;
 use crate::encoding::variable_byte_integer::VariableByteIntegerDecoder;
 
 #[derive(Debug)]
+#[derive(Clone)]
 pub struct EncodedString<'a> {
     pub string: &'a str,
     pub len: u16,
@@ -20,6 +21,7 @@ impl EncodedString<'_> {
 }
 
 #[derive(Debug)]
+#[derive(Clone)]
 pub struct BinaryData<'a> {
     pub bin: &'a [u8],
     pub len: u16,

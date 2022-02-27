@@ -30,14 +30,28 @@ impl<'a, const MAX_PROPERTIES: usize> PubackPacket<'a, MAX_PROPERTIES> {
             return;
         }
         self.packet_identifier = buff_reader.read_u16().unwrap();
-        self.reason_code = buff_reader.read_u8().unwrap();
-        self.decode_properties(buff_reader);
+        if self.remain_len != 2 {
+            self.reason_code = buff_reader.read_u8().unwrap();
+        }
+        if self.remain_len < 4 {
+            self.property_len = 0;
+        } else {
+            self.decode_properties(buff_reader);
+        }
+
     }
 }
 
 impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubackPacket<'a, MAX_PROPERTIES> {
     fn new() -> Self {
-        todo!()
+        Self {
+            fixed_header: PacketType::Puback.into(),
+            remain_len: 0,
+            packet_identifier: 0,
+            reason_code: 0,
+            property_len: 0,
+            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new()
+        }
     }
 
     fn encode(&mut self, buffer: &mut [u8]) -> usize {
