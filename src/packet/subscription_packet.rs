@@ -24,14 +24,14 @@
 
 use heapless::Vec;
 
+use super::packet_type::PacketType;
+use super::property::Property;
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::mqtt_packet::Packet;
 use crate::packet::publish_packet::QualityOfService;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BufferError, TopicFilter};
-use super::packet_type::PacketType;
-use super::property::Property;
 
 pub struct SubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> {
     pub fixed_header: u8,
@@ -46,12 +46,13 @@ pub struct SubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
     SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
-    pub fn add_new_filter(& mut self, topic_name: &'a str, qos: QualityOfService) {
+    pub fn add_new_filter(&mut self, topic_name: &'a str, qos: QualityOfService) {
         let len = topic_name.len();
         let mut new_filter = TopicFilter::new();
         new_filter.filter.string = topic_name;
         new_filter.filter.len = len as u16;
-        new_filter.sub_options = new_filter.sub_options | (<QualityOfService as Into<u8>>::into(qos) >> 1);
+        new_filter.sub_options =
+            new_filter.sub_options | (<QualityOfService as Into<u8>>::into(qos) >> 1);
         self.topic_filters.push(new_filter);
         self.topic_filter_len = self.topic_filter_len + 1;
     }
@@ -60,7 +61,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     for SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
-     fn new() -> Self {
+    fn new() -> Self {
         let x = Self {
             fixed_header: PacketType::Subscribe.into(),
             remain_len: 0,
@@ -77,8 +78,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
 
         let mut rm_ln = self.property_len;
-        let property_len_enc: [u8; 4] =
-            VariableByteIntegerEncoder::encode(self.property_len) ?;
+        let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len)?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
 
         let mut lt = 0;
@@ -92,16 +92,16 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         }
         rm_ln = rm_ln + property_len_len as u32 + 2 + filters_len as u32;
 
-        buff_writer.write_u8(self.fixed_header) ?;
-        buff_writer.write_variable_byte_int(rm_ln) ?;
-        buff_writer.write_u16(self.packet_identifier) ?;
-        buff_writer.write_variable_byte_int(self.property_len) ?;
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties) ?;
+        buff_writer.write_u8(self.fixed_header)?;
+        buff_writer.write_variable_byte_int(rm_ln)?;
+        buff_writer.write_u16(self.packet_identifier)?;
+        buff_writer.write_variable_byte_int(self.property_len)?;
+        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
         buff_writer.encode_topic_filters_ref(
             true,
             self.topic_filter_len as usize,
             &self.topic_filters,
-        ) ?;
+        )?;
         Ok(buff_writer.position)
     }
 

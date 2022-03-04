@@ -128,15 +128,13 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
 
         let mut rm_ln = self.property_len;
-        let property_len_enc: [u8; 4] =
-            VariableByteIntegerEncoder::encode(self.property_len) ?;
+        let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len)?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
         // Number 12 => protocol_name_len + protocol_name + protocol_version + connect_flags + keep_alive + client_id_len
         rm_ln = rm_ln + property_len_len as u32 + 12;
 
         if self.connect_flags & 0x04 != 0 {
-            let wil_prop_len_enc =
-                VariableByteIntegerEncoder::encode(self.will_property_len) ?;
+            let wil_prop_len_enc = VariableByteIntegerEncoder::encode(self.will_property_len)?;
             let wil_prop_len_len = VariableByteIntegerEncoder::len(wil_prop_len_enc);
             rm_ln = rm_ln
                 + wil_prop_len_len as u32
@@ -152,31 +150,31 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
             rm_ln = rm_ln + self.password.len as u32 + 2;
         }
 
-        buff_writer.write_u8(self.fixed_header) ?;
-        buff_writer.write_variable_byte_int(rm_ln) ?;
+        buff_writer.write_u8(self.fixed_header)?;
+        buff_writer.write_variable_byte_int(rm_ln)?;
 
-        buff_writer.write_u16(self.protocol_name_len) ?;
-        buff_writer.write_u32(self.protocol_name) ?;
-        buff_writer.write_u8(self.protocol_version) ?;
-        buff_writer.write_u8(self.connect_flags) ?;
-        buff_writer.write_u16(self.keep_alive) ?;
-        buff_writer.write_variable_byte_int(self.property_len) ?;
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties) ?;
-        buff_writer.write_string_ref(&self.client_id) ?;
+        buff_writer.write_u16(self.protocol_name_len)?;
+        buff_writer.write_u32(self.protocol_name)?;
+        buff_writer.write_u8(self.protocol_version)?;
+        buff_writer.write_u8(self.connect_flags)?;
+        buff_writer.write_u16(self.keep_alive)?;
+        buff_writer.write_variable_byte_int(self.property_len)?;
+        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
+        buff_writer.write_string_ref(&self.client_id)?;
 
         if self.connect_flags & 0x04 != 0 {
-            buff_writer.write_variable_byte_int(self.will_property_len) ?;
-            buff_writer.encode_properties(&self.will_properties) ?;
-            buff_writer.write_string_ref(&self.will_topic) ?;
-            buff_writer.write_binary_ref(&self.will_payload) ?;
+            buff_writer.write_variable_byte_int(self.will_property_len)?;
+            buff_writer.encode_properties(&self.will_properties)?;
+            buff_writer.write_string_ref(&self.will_topic)?;
+            buff_writer.write_binary_ref(&self.will_payload)?;
         }
 
         if self.connect_flags & 0x80 != 0 {
-            buff_writer.write_string_ref(&self.username) ?;
+            buff_writer.write_string_ref(&self.username)?;
         }
 
         if self.connect_flags & 0x40 != 0 {
-            buff_writer.write_binary_ref(&self.password) ?;
+            buff_writer.write_binary_ref(&self.password)?;
         }
 
         Ok(buff_writer.position)

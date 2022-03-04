@@ -35,26 +35,26 @@ pub struct PingrespPacket {
     pub remain_len: u32,
 }
 
-impl<'a> PingrespPacket {
-}
+impl<'a> PingrespPacket {}
 
 impl<'a> Packet<'a> for PingrespPacket {
     fn new() -> Self {
         Self {
             fixed_header: PacketType::Pingresp.into(),
-            remain_len: 0
+            remain_len: 0,
         }
     }
 
     fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
-        buff_writer.write_u8(self.fixed_header) ?;
-        buff_writer.write_variable_byte_int(0 as u32) ?;
+        buff_writer.write_u8(self.fixed_header)?;
+        buff_writer.write_variable_byte_int(0 as u32)?;
         Ok(buff_writer.position)
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        if self.decode_fixed_header(buff_reader) ? != (PacketType::Pingresp).into() {
+        let x = self.decode_fixed_header(buff_reader)?;
+        if x != (PacketType::Pingresp).into() {
             log::error!("Packet you are trying to decode is not PINGRESP packet!");
             return Err(BufferError::PacketTypeMismatch);
         }

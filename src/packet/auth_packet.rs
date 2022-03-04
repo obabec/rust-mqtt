@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-
 use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
@@ -69,7 +68,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTI
             remain_len: 0,
             auth_reason: 0x00,
             property_len: 0,
-            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new()
+            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
         }
     }
 
@@ -77,23 +76,22 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTI
         let mut buff_writer = BuffWriter::new(buffer, buff_len);
 
         let mut rm_ln = self.property_len;
-        let property_len_enc: [u8; 4] =
-            VariableByteIntegerEncoder::encode(self.property_len) ?;
+        let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len)?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
         rm_ln = rm_ln + property_len_len as u32;
         rm_ln = rm_ln + 1;
 
-        buff_writer.write_u8(self.fixed_header) ?;
-        buff_writer.write_variable_byte_int(rm_ln) ?;
-        buff_writer.write_u8(self.auth_reason) ?;
-        buff_writer.write_variable_byte_int(self.property_len) ?;
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties) ?;
+        buff_writer.write_u8(self.fixed_header)?;
+        buff_writer.write_variable_byte_int(rm_ln)?;
+        buff_writer.write_u8(self.auth_reason)?;
+        buff_writer.write_variable_byte_int(self.property_len)?;
+        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
         Ok(buff_writer.position)
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        self.decode_fixed_header(buff_reader) ?;
-        self.auth_reason = buff_reader.read_u8() ?;
+        self.decode_fixed_header(buff_reader)?;
+        self.auth_reason = buff_reader.read_u8()?;
         return self.decode_properties(buff_reader);
     }
 

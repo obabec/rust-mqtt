@@ -41,14 +41,14 @@ impl<'a> Packet<'a> for PingreqPacket {
     fn new() -> Self {
         Self {
             fixed_header: PacketType::Pingreq.into(),
-            remain_len: 0
+            remain_len: 0,
         }
     }
 
     fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
-        buff_writer.write_u8(self.fixed_header) ?;
-        buff_writer.write_variable_byte_int(0 as u32) ?;
+        buff_writer.write_u8(self.fixed_header)?;
+        buff_writer.write_variable_byte_int(0 as u32)?;
         Ok(buff_writer.position)
     }
 

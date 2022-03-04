@@ -26,7 +26,7 @@ use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::mqtt_packet::Packet;
-use crate::packet::publish_packet::QualityOfService::{INVALID, QoS0, QoS1, QoS2};
+use crate::packet::publish_packet::QualityOfService::{QoS0, QoS1, QoS2, INVALID};
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BufferError, EncodedString};
@@ -80,15 +80,15 @@ impl<'a, const MAX_PROPERTIES: usize> PublishPacket<'a, MAX_PROPERTIES> {
         self.topic_name.len = topic_name.len() as u16;
     }
 
-    pub fn add_message(& mut self, message: &'a [u8]) {
+    pub fn add_message(&mut self, message: &'a [u8]) {
         self.message = Some(message);
     }
 
-    pub fn add_qos(& mut self, qos: QualityOfService) {
+    pub fn add_qos(&mut self, qos: QualityOfService) {
         self.fixed_header = self.fixed_header | <QualityOfService as Into<u8>>::into(qos);
     }
 
-    pub fn add_identifier(& mut self, identifier: u16) {
+    pub fn add_identifier(&mut self, identifier: u16) {
         self.packet_identifier = identifier;
     }
 }
@@ -102,7 +102,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PublishPacket<'a, MAX_PROPE
             packet_identifier: 1,
             property_len: 0,
             properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
-            message: None
+            message: None,
         }
     }
 
@@ -110,45 +110,44 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PublishPacket<'a, MAX_PROPE
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
 
         let mut rm_ln = self.property_len;
-        let property_len_enc: [u8; 4] =
-            VariableByteIntegerEncoder::encode(self.property_len) ?;
+        let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len)?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
         let msg_len = self.message.unwrap().len() as u32;
         rm_ln = rm_ln + property_len_len as u32 + msg_len + self.topic_name.len as u32 + 2;
 
-        buff_writer.write_u8(self.fixed_header) ?;
+        buff_writer.write_u8(self.fixed_header)?;
         let qos = self.fixed_header & 0x03;
         if qos != 0 {
             rm_ln = rm_ln + 2;
         }
 
-        buff_writer.write_variable_byte_int(rm_ln) ?;
-        buff_writer.write_string_ref(&self.topic_name) ?;
+        buff_writer.write_variable_byte_int(rm_ln)?;
+        buff_writer.write_string_ref(&self.topic_name)?;
 
         if qos != 0 {
-            buff_writer.write_u16(self.packet_identifier) ?;
+            buff_writer.write_u16(self.packet_identifier)?;
         }
 
-        buff_writer.write_variable_byte_int(self.property_len) ?;
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties) ?;
-        buff_writer.insert_ref(msg_len as usize, self.message.unwrap()) ?;
+        buff_writer.write_variable_byte_int(self.property_len)?;
+        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
+        buff_writer.insert_ref(msg_len as usize, self.message.unwrap())?;
         Ok(buff_writer.position)
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        if self.decode_fixed_header(buff_reader) ? != (PacketType::Publish).into() {
+        if self.decode_fixed_header(buff_reader)? != (PacketType::Publish).into() {
             log::error!("Packet you are trying to decode is not PUBLISH packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
-        self.topic_name = buff_reader.read_string() ?;
+        self.topic_name = buff_reader.read_string()?;
         let qos = self.fixed_header & 0x03;
         if qos != 0 {
             // Decode only for QoS 1 / 2
-            self.packet_identifier = buff_reader.read_u16() ?;
+            self.packet_identifier = buff_reader.read_u16()?;
         }
-        self.decode_properties(buff_reader) ?;
-        let mut total_len = VariableByteIntegerEncoder::len(
-            VariableByteIntegerEncoder::encode(self.remain_len) ?);
+        self.decode_properties(buff_reader)?;
+        let mut total_len =
+            VariableByteIntegerEncoder::len(VariableByteIntegerEncoder::encode(self.remain_len)?);
         total_len = total_len + 1 + self.remain_len as usize;
         self.message = Some(buff_reader.read_message(total_len));
         Ok(())

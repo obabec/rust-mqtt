@@ -57,7 +57,7 @@ pub trait Packet<'a> {
         let mut prop: Property;
         if self.get_property_len() != 0 {
             loop {
-                prop = Property::decode(buff_reader) ?;
+                prop = Property::decode(buff_reader)?;
                 log::debug!("Parsed property {:?}", prop);
                 x = x + prop.len() as u32 + 1;
                 self.push_to_properties(prop);
@@ -71,10 +71,13 @@ pub trait Packet<'a> {
     }
 
     /// Method is decoding packet header into fixed header part and remaining length
-    fn decode_fixed_header(&mut self, buff_reader: &mut BuffReader) -> Result<PacketType, BufferError> {
+    fn decode_fixed_header(
+        &mut self,
+        buff_reader: &mut BuffReader,
+    ) -> Result<PacketType, BufferError> {
         let first_byte: u8 = buff_reader.read_u8()?;
         self.set_fixed_header(first_byte);
-        self.set_remaining_len(buff_reader.read_variable_byte_int() ?);
+        self.set_remaining_len(buff_reader.read_variable_byte_int()?);
         return Ok(PacketType::from(first_byte));
     }
 }

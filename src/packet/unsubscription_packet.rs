@@ -58,7 +58,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
             property_len: 0,
             properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
             topic_filter_len: 0,
-            topic_filters: Vec::<TopicFilter<'a>, MAX_FILTERS>::new()
+            topic_filters: Vec::<TopicFilter<'a>, MAX_FILTERS>::new(),
         }
     }
 
@@ -66,22 +66,21 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
 
         let mut rm_ln = self.property_len;
-        let property_len_enc: [u8; 4] =
-            VariableByteIntegerEncoder::encode(self.property_len) ?;
+        let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len)?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
         rm_ln = rm_ln + property_len_len as u32 + 4 + self.topic_filter_len as u32;
 
-        buff_writer.write_u8(self.fixed_header) ?;
-        buff_writer.write_variable_byte_int(rm_ln) ?;
-        buff_writer.write_u16(self.packet_identifier) ?;
-        buff_writer.write_variable_byte_int(self.property_len) ?;
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties) ?;
-        buff_writer.write_u16(self.topic_filter_len) ?;
+        buff_writer.write_u8(self.fixed_header)?;
+        buff_writer.write_variable_byte_int(rm_ln)?;
+        buff_writer.write_u16(self.packet_identifier)?;
+        buff_writer.write_variable_byte_int(self.property_len)?;
+        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
+        buff_writer.write_u16(self.topic_filter_len)?;
         buff_writer.encode_topic_filters_ref(
             false,
             self.topic_filter_len as usize,
             &self.topic_filters,
-        ) ?;
+        )?;
         Ok(buff_writer.position)
     }
 

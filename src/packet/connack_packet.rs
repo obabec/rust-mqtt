@@ -43,13 +43,16 @@ pub struct ConnackPacket<'a, const MAX_PROPERTIES: usize> {
 }
 
 impl<'a, const MAX_PROPERTIES: usize> ConnackPacket<'a, MAX_PROPERTIES> {
-    pub fn decode_connack_packet(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        if self.decode_fixed_header(buff_reader) ? != (PacketType::Connack).into() {
+    pub fn decode_connack_packet(
+        &mut self,
+        buff_reader: &mut BuffReader<'a>,
+    ) -> Result<(), BufferError> {
+        if self.decode_fixed_header(buff_reader)? != (PacketType::Connack).into() {
             log::error!("Packet you are trying to decode is not CONNACK packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
-        self.ack_flags = buff_reader.read_u8() ?;
-        self.connect_reason_code = buff_reader.read_u8() ?;
+        self.ack_flags = buff_reader.read_u8()?;
+        self.connect_reason_code = buff_reader.read_u8()?;
         self.decode_properties(buff_reader)
     }
 }
@@ -68,16 +71,16 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for ConnackPacket<'a, MAX_PROPE
 
     fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
-        buff_writer.write_u8(self.fixed_header) ?;
-        let property_len_enc = VariableByteIntegerEncoder::encode(self.property_len) ?;
+        buff_writer.write_u8(self.fixed_header)?;
+        let property_len_enc = VariableByteIntegerEncoder::encode(self.property_len)?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
 
         let rm_len: u32 = 2 + self.property_len + property_len_len as u32;
-        buff_writer.write_variable_byte_int(rm_len) ?;
-        buff_writer.write_u8(self.ack_flags) ?;
-        buff_writer.write_u8(self.connect_reason_code) ?;
-        buff_writer.write_variable_byte_int(self.property_len) ?;
-        buff_writer.encode_properties(&self.properties) ?;
+        buff_writer.write_variable_byte_int(rm_len)?;
+        buff_writer.write_u8(self.ack_flags)?;
+        buff_writer.write_u8(self.connect_reason_code)?;
+        buff_writer.write_variable_byte_int(self.property_len)?;
+        buff_writer.encode_properties(&self.properties)?;
         Ok(buff_writer.position)
     }
 

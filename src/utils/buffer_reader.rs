@@ -45,7 +45,7 @@ impl<'a> BuffReader<'a> {
         return BuffReader {
             buffer,
             position: 0,
-            len: buff_len
+            len: buff_len,
         };
     }
 
@@ -101,7 +101,7 @@ impl<'a> BuffReader<'a> {
         let len = self.read_u16();
         match len {
             Err(err) => return Err(err),
-            _ => {},
+            _ => {}
         }
         let len_res = len.unwrap();
         let res_str =
@@ -119,7 +119,7 @@ impl<'a> BuffReader<'a> {
 
     /// Read Binary data from buffer
     pub fn read_binary(&mut self) -> Result<BinaryData<'a>, BufferError> {
-        let len = self.read_u16() ?;
+        let len = self.read_u16()?;
         let res_bin = &(self.buffer[self.position..(self.position + len as usize)]);
         return Ok(BinaryData {
             bin: res_bin,
@@ -147,7 +147,6 @@ impl<'a> BuffReader<'a> {
 
     /// Read payload message from buffer
     pub fn read_message(&mut self, total_len: usize) -> &'a [u8] {
-
         if total_len > self.len {
             return &self.buffer[self.position..self.len];
         }

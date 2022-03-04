@@ -35,7 +35,7 @@ pub enum BufferError {
     PacketTypeMismatch,
     WrongPacketToDecode,
     WrongPacketToEncode,
-    PropertyNotFound
+    PropertyNotFound,
 }
 
 impl Display for BufferError {
@@ -55,8 +55,7 @@ impl Display for BufferError {
     }
 }
 /// Encoded string provides structure representing UTF-8 encoded string in MQTTv5 packets
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct EncodedString<'a> {
     pub string: &'a str,
     pub len: u16,
@@ -73,8 +72,7 @@ impl EncodedString<'_> {
 }
 
 /// Binary data represents `Binary data` in MQTTv5 protocol
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct BinaryData<'a> {
     pub bin: &'a [u8],
     pub len: u16,

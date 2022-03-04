@@ -39,6 +39,6 @@ pub mod connect_packet;
 pub mod disconnect_packet;
 pub mod pingreq_packet;
 pub mod pingresp_packet;
+pub mod reason_codes;
 pub mod suback_packet;
 pub mod unsuback_packet;
-pub mod reason_codes;

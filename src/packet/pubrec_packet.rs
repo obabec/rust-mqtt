@@ -42,8 +42,7 @@ pub struct PubrecPacket<'a, const MAX_PROPERTIES: usize> {
     pub properties: Vec<Property<'a>, MAX_PROPERTIES>,
 }
 
-impl<'a, const MAX_PROPERTIES: usize> PubrecPacket<'a, MAX_PROPERTIES> {
-}
+impl<'a, const MAX_PROPERTIES: usize> PubrecPacket<'a, MAX_PROPERTIES> {}
 
 impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubrecPacket<'a, MAX_PROPERTIES> {
     fn new() -> Self {
@@ -53,7 +52,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubrecPacket<'a, MAX_PROPER
             packet_identifier: 0,
             reason_code: 0,
             property_len: 0,
-            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new()
+            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
         }
     }
 
@@ -61,27 +60,26 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubrecPacket<'a, MAX_PROPER
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
 
         let mut rm_ln = self.property_len;
-        let property_len_enc: [u8; 4] =
-            VariableByteIntegerEncoder::encode(self.property_len) ?;
+        let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len)?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
         rm_ln = rm_ln + property_len_len as u32 + 3;
 
-        buff_writer.write_u8(self.fixed_header) ?;
-        buff_writer.write_variable_byte_int(rm_ln) ?;
-        buff_writer.write_u16(self.packet_identifier) ?;
-        buff_writer.write_u8(self.reason_code) ?;
-        buff_writer.write_variable_byte_int(self.property_len) ?;
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties) ?;
+        buff_writer.write_u8(self.fixed_header)?;
+        buff_writer.write_variable_byte_int(rm_ln)?;
+        buff_writer.write_u16(self.packet_identifier)?;
+        buff_writer.write_u8(self.reason_code)?;
+        buff_writer.write_variable_byte_int(self.property_len)?;
+        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
         Ok(buff_writer.position)
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        if self.decode_fixed_header(buff_reader) ? != (PacketType::Pubrec).into() {
+        if self.decode_fixed_header(buff_reader)? != (PacketType::Pubrec).into() {
             log::error!("Packet you are trying to decode is not PUBREC packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
-        self.packet_identifier = buff_reader.read_u16() ?;
-        self.reason_code = buff_reader.read_u8() ?;
+        self.packet_identifier = buff_reader.read_u16()?;
+        self.reason_code = buff_reader.read_u8()?;
         return self.decode_properties(buff_reader);
     }
 
