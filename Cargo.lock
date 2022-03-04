@@ -746,6 +746,7 @@ dependencies = [
  "env_logger",
  "heapless",
  "log",
+ "rand_core",
  "tokio",
 ]
 
