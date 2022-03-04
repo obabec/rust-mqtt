@@ -1,5 +1,4 @@
-use core::fmt::{Display, Formatter, write};
-use crate::packet::reason_codes::ReasonCode::ServerMoved;
+use core::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub enum ReasonCode {
@@ -46,6 +45,7 @@ pub enum ReasonCode {
     MaximumConnectTime,
     SubscriptionIdentifiersNotSupported,
     WildcardSubscriptionNotSupported,
+    BuffError,
     NetworkError,
 }
 
@@ -95,9 +95,9 @@ impl Into<u8> for ReasonCode {
             ReasonCode::MaximumConnectTime => 0xA0,
             ReasonCode::SubscriptionIdentifiersNotSupported => 0xA1,
             ReasonCode::WildcardSubscriptionNotSupported => 0xA2,
-            ReasonCode::NetworkError => 0xFF
-        }
-
+            ReasonCode::BuffError => 0xFE,
+            ReasonCode::NetworkError => 0xFF,
+        };
     }
 }
 
@@ -146,8 +146,9 @@ impl From<u8> for ReasonCode {
             0xA0 => ReasonCode::MaximumConnectTime,
             0xA1 => ReasonCode::SubscriptionIdentifiersNotSupported,
             0xA2 => ReasonCode::WildcardSubscriptionNotSupported,
-            _ => ReasonCode::NetworkError
-        }
+            0xFE => ReasonCode::BuffError,
+            _ => ReasonCode::NetworkError,
+        };
     }
 }
 
@@ -168,7 +169,9 @@ impl Display for ReasonCode {
             ReasonCode::ImplementationSpecificError => write!(f, "Implementation specific error!"),
             ReasonCode::UnsupportedProtocolVersion => write!(f, "Unsupported protocol version!"),
             ReasonCode::ClientIdNotValid => write!(f, "Client sent not valid identification"),
-            ReasonCode::BadUserNameOrPassword => write!(f, "Authentication error, username of password not valid!"),
+            ReasonCode::BadUserNameOrPassword => {
+                write!(f, "Authentication error, username of password not valid!")
+            }
             ReasonCode::NotAuthorized => write!(f, "Client not authorized!"),
             ReasonCode::ServerUnavailable => write!(f, "Server unavailable!"),
             ReasonCode::ServerBusy => write!(f, "Server is busy!"),
@@ -192,11 +195,18 @@ impl Display for ReasonCode {
             ReasonCode::QoSNotSupported => write!(f, "Used QoS is not supported!"),
             ReasonCode::UseAnotherServer => write!(f, "Use another server!"),
             ReasonCode::ServerMoved => write!(f, "Server moved!"),
-            ReasonCode::SharedSubscriptionNotSupported => write!(f, "Shared subscription is not supported"),
+            ReasonCode::SharedSubscriptionNotSupported => {
+                write!(f, "Shared subscription is not supported")
+            }
             ReasonCode::ConnectionRateExceeded => write!(f, "Connection rate exceeded!"),
             ReasonCode::MaximumConnectTime => write!(f, "Maximum connect time exceeded!"),
-            ReasonCode::SubscriptionIdentifiersNotSupported => write!(f, "Subscription identifier not supported!"),
-            ReasonCode::WildcardSubscriptionNotSupported => write!(f, "Wildcard subscription not supported!"),
+            ReasonCode::SubscriptionIdentifiersNotSupported => {
+                write!(f, "Subscription identifier not supported!")
+            }
+            ReasonCode::WildcardSubscriptionNotSupported => {
+                write!(f, "Wildcard subscription not supported!")
+            }
+            ReasonCode::BuffError => write!(f, "Error encountered during write / read from packet"),
             ReasonCode::NetworkError => write!(f, "Unknown error!"),
         }
     }

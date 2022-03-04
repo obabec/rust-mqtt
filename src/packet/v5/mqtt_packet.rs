@@ -22,19 +22,20 @@
  * SOFTWARE.
  */
 
-use crate::packet::packet_type::PacketType;
+use crate::packet::v5::packet_type::PacketType;
 use crate::utils::buffer_reader::BuffReader;
-use crate::utils::buffer_reader::ParseError;
+use crate::utils::types::BufferError;
 
 use super::property::Property;
+
 /// This trait provide interface for mapping MQTTv5 packets to human readable structures
 /// which can be later modified and used for communication purposes.
 pub trait Packet<'a> {
     fn new() -> Self;
     /// Method encode provide way how to transfer Packet struct into Byte array (buffer)
-    fn encode(&mut self, buffer: &mut [u8]) -> usize;
+    fn encode(&mut self, buffer: &mut [u8], buff_len: usize) -> Result<usize, BufferError>;
     /// Decode method is opposite of encode - decoding Byte array and mapping it into corresponding Packet struct
-    fn decode(&mut self, buff_reader: &mut BuffReader<'a>);
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError>;
 
     /// Setter method for packet properties len - not all Packet types support this
     fn set_property_len(&mut self, value: u32);
@@ -50,34 +51,33 @@ pub trait Packet<'a> {
 
     /// Method is decoding Byte array pointing to properties into heapless Vec
     /// in packet. If decoding goes wrong method is returning Error
-    fn decode_properties(&mut self, buff_reader: &mut BuffReader<'a>) {
+    fn decode_properties(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
         self.set_property_len(buff_reader.read_variable_byte_int().unwrap());
         let mut x: u32 = 0;
-        let mut prop: Result<Property, ParseError>;
+        let mut prop: Property;
         if self.get_property_len() != 0 {
             loop {
-                let mut res: Property;
-                prop = Property::decode(buff_reader);
-                if let Ok(res) = prop {
-                    log::debug!("Parsed property {:?}", res);
-                    x = x + res.len() as u32 + 1;
-                    self.push_to_properties(res);
-                } else {
-                    log::error!("Problem during property decoding");
-                }
+                prop = Property::decode(buff_reader)?;
+                log::debug!("Parsed property {:?}", prop);
+                x = x + prop.len() as u32 + 1;
+                self.push_to_properties(prop);
 
                 if x == self.get_property_len() {
                     break;
                 }
             }
         }
+        Ok(())
     }
 
     /// Method is decoding packet header into fixed header part and remaining length
-    fn decode_fixed_header(&mut self, buff_reader: &mut BuffReader) -> PacketType {
-        let first_byte: u8 = buff_reader.read_u8().unwrap();
+    fn decode_fixed_header(
+        &mut self,
+        buff_reader: &mut BuffReader,
+    ) -> Result<PacketType, BufferError> {
+        let first_byte: u8 = buff_reader.read_u8()?;
         self.set_fixed_header(first_byte);
-        self.set_remaining_len(buff_reader.read_variable_byte_int().unwrap());
-        return PacketType::from(first_byte);
+        self.set_remaining_len(buff_reader.read_variable_byte_int()?);
+        return Ok(PacketType::from(first_byte));
     }
 }

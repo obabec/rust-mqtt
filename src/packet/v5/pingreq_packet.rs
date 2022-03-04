@@ -22,56 +22,52 @@
  * SOFTWARE.
  */
 
-use crate::packet::mqtt_packet::Packet;
+use crate::packet::v5::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
+use crate::utils::types::BufferError;
 
 use super::packet_type::PacketType;
 use super::property::Property;
 
-pub struct PingrespPacket {
-    // 7 - 4 mqtt control packet type, 3-0 flagy
+pub struct PingreqPacket {
     pub fixed_header: u8,
-    // 1 - 4 B lenght of variable header + len of payload
     pub remain_len: u32,
 }
 
-impl<'a> PingrespPacket {
-    pub fn decode_pingresp_packet(&mut self, buff_reader: &mut BuffReader<'a>) {
-        if self.decode_fixed_header(buff_reader) != (PacketType::Pingresp).into() {
-            log::error!("Packet you are trying to decode is not PUBACK packet!");
-            return;
+impl PingreqPacket {}
+
+impl<'a> Packet<'a> for PingreqPacket {
+    fn new() -> Self {
+        Self {
+            fixed_header: PacketType::Pingreq.into(),
+            remain_len: 0,
         }
     }
-}
 
-impl<'a> Packet<'a> for PingrespPacket {
-    fn new() -> Self {
-        todo!()
+    fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
+        let mut buff_writer = BuffWriter::new(buffer, buffer_len);
+        buff_writer.write_u8(self.fixed_header)?;
+        buff_writer.write_variable_byte_int(0 as u32)?;
+        Ok(buff_writer.position)
     }
 
-    fn encode(&mut self, buffer: &mut [u8]) -> usize {
-        let mut buff_writer = BuffWriter::new(buffer);
-        buff_writer.write_u8(self.fixed_header);
-        buff_writer.write_variable_byte_int(0 as u32);
-        return buff_writer.position;
+    fn decode(&mut self, _buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
+        log::error!("Pingreq Packet packet does not support decode funtion on client!");
+        Err(BufferError::WrongPacketToDecode)
     }
 
-    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
-        self.decode_pingresp_packet(buff_reader);
-    }
-
-    fn set_property_len(&mut self, value: u32) {
-        log::error!("PINGRESP packet does not contain any properties!");
+    fn set_property_len(&mut self, _value: u32) {
+        log::error!("PINGREQ packet does not contain any properties!");
     }
 
     fn get_property_len(&mut self) -> u32 {
-        log::error!("PINGRESP packet does not contain any properties!");
+        log::error!("PINGREQ packet does not contain any properties!");
         return 0;
     }
 
-    fn push_to_properties(&mut self, property: Property<'a>) {
-        log::error!("PINGRESP packet does not contain any properties!");
+    fn push_to_properties(&mut self, _property: Property<'a>) {
+        log::error!("PINGREQ packet does not contain any properties!");
     }
 
     fn set_fixed_header(&mut self, header: u8) {
