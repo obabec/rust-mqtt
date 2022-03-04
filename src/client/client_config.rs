@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-use crate::packet::publish_packet::QualityOfService;
+use crate::packet::v5::publish_packet::QualityOfService;
 use crate::utils::types::{BinaryData, EncodedString};
 
 pub struct ClientConfig<'a> {

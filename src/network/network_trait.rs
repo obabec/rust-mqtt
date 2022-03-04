@@ -1,6 +1,6 @@
 use core::future::Future;
 
-use crate::packet::reason_codes::ReasonCode;
+use crate::packet::v5::reason_codes::ReasonCode;
 
 #[derive(Debug)]
 pub enum NetworkError {

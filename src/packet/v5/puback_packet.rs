@@ -25,7 +25,7 @@
 use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
-use crate::packet::mqtt_packet::Packet;
+use crate::packet::v5::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::BufferError;
@@ -33,31 +33,24 @@ use crate::utils::types::BufferError;
 use super::packet_type::PacketType;
 use super::property::Property;
 
-pub struct DisconnectPacket<'a, const MAX_PROPERTIES: usize> {
-    // 7 - 4 mqtt control packet type, 3-0 flagy
+pub struct PubackPacket<'a, const MAX_PROPERTIES: usize> {
     pub fixed_header: u8,
-    // 1 - 4 B lenght of variable header + len of payload
     pub remain_len: u32,
-
-    pub disconnect_reason: u8,
-
+    pub packet_identifier: u16,
+    pub reason_code: u8,
     pub property_len: u32,
-
     pub properties: Vec<Property<'a>, MAX_PROPERTIES>,
 }
 
-impl<'a, const MAX_PROPERTIES: usize> DisconnectPacket<'a, MAX_PROPERTIES> {
-    fn add_reason(&mut self, reason: u8) {
-        self.disconnect_reason = reason;
-    }
-}
+impl<'a, const MAX_PROPERTIES: usize> PubackPacket<'a, MAX_PROPERTIES> {}
 
-impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for DisconnectPacket<'a, MAX_PROPERTIES> {
+impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubackPacket<'a, MAX_PROPERTIES> {
     fn new() -> Self {
         Self {
-            fixed_header: PacketType::Disconnect.into(),
-            remain_len: 5,
-            disconnect_reason: 0x00,
+            fixed_header: PacketType::Puback.into(),
+            remain_len: 0,
+            packet_identifier: 0,
+            reason_code: 0,
             property_len: 0,
             properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
         }
@@ -65,25 +58,36 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for DisconnectPacket<'a, MAX_PR
 
     fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
-        buff_writer.write_u8(self.fixed_header)?;
-        let property_len_enc = VariableByteIntegerEncoder::encode(self.property_len)?;
-        let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
 
-        let rm_len: u32 = 1 + self.property_len + property_len_len as u32;
-        buff_writer.write_variable_byte_int(rm_len)?;
-        buff_writer.write_u8(self.disconnect_reason)?;
+        let mut rm_ln = self.property_len;
+        let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len)?;
+        let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
+        rm_ln = rm_ln + property_len_len as u32 + 3;
+
+        buff_writer.write_u8(self.fixed_header)?;
+        buff_writer.write_variable_byte_int(rm_ln)?;
+        buff_writer.write_u16(self.packet_identifier)?;
+        buff_writer.write_u8(self.reason_code)?;
         buff_writer.write_variable_byte_int(self.property_len)?;
-        buff_writer.encode_properties(&self.properties)?;
+        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
         Ok(buff_writer.position)
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        if self.decode_fixed_header(buff_reader)? != (PacketType::Pingresp).into() {
+        if self.decode_fixed_header(buff_reader)? != (PacketType::Puback).into() {
             log::error!("Packet you are trying to decode is not PUBACK packet!");
-            return Err(BufferError::WrongPacketToDecode);
+            return Err(BufferError::PacketTypeMismatch);
         }
-        self.disconnect_reason = buff_reader.read_u8()?;
-        return self.decode_properties(buff_reader);
+        self.packet_identifier = buff_reader.read_u16()?;
+        if self.remain_len != 2 {
+            self.reason_code = buff_reader.read_u8()?;
+        }
+        if self.remain_len < 4 {
+            self.property_len = 0;
+        } else {
+            self.decode_properties(buff_reader)?;
+        }
+        Ok(())
     }
 
     fn set_property_len(&mut self, value: u32) {

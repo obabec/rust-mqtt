@@ -6,7 +6,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 use crate::network::network_trait::Network;
-use crate::packet::reason_codes::ReasonCode;
+use crate::packet::v5::reason_codes::ReasonCode;
 
 pub struct TokioNetwork {
     ip: [u8; 4],

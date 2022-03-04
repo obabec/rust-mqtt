@@ -25,7 +25,7 @@
 use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerEncoder};
-use crate::packet::property::Property;
+use crate::packet::v5::property::Property;
 use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair, TopicFilter};
 
 pub struct BuffWriter<'a> {

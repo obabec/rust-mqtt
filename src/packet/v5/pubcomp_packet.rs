@@ -24,54 +24,36 @@
 
 use heapless::Vec;
 
-use super::packet_type::PacketType;
-use super::property::Property;
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
-use crate::packet::mqtt_packet::Packet;
-use crate::packet::publish_packet::QualityOfService;
+use crate::packet::v5::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
-use crate::utils::types::{BufferError, TopicFilter};
+use crate::utils::types::BufferError;
 
-pub struct SubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> {
+use super::packet_type::PacketType;
+use super::property::Property;
+
+pub struct PubcompPacket<'a, const MAX_PROPERTIES: usize> {
     pub fixed_header: u8,
     pub remain_len: u32,
     pub packet_identifier: u16,
+    pub reason_code: u8,
     pub property_len: u32,
     pub properties: Vec<Property<'a>, MAX_PROPERTIES>,
-    pub topic_filter_len: u16,
-    pub topic_filters: Vec<TopicFilter<'a>, MAX_FILTERS>,
 }
 
-impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
-    SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
-{
-    pub fn add_new_filter(&mut self, topic_name: &'a str, qos: QualityOfService) {
-        let len = topic_name.len();
-        let mut new_filter = TopicFilter::new();
-        new_filter.filter.string = topic_name;
-        new_filter.filter.len = len as u16;
-        new_filter.sub_options =
-            new_filter.sub_options | (<QualityOfService as Into<u8>>::into(qos) >> 1);
-        self.topic_filters.push(new_filter);
-        self.topic_filter_len = self.topic_filter_len + 1;
-    }
-}
+impl<'a, const MAX_PROPERTIES: usize> PubcompPacket<'a, MAX_PROPERTIES> {}
 
-impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
-    for SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
-{
+impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubcompPacket<'a, MAX_PROPERTIES> {
     fn new() -> Self {
-        let x = Self {
-            fixed_header: PacketType::Subscribe.into(),
+        Self {
+            fixed_header: PacketType::Pubcomp.into(),
             remain_len: 0,
-            packet_identifier: 1,
+            packet_identifier: 0,
+            reason_code: 0,
             property_len: 0,
             properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
-            topic_filter_len: 0,
-            topic_filters: Vec::<TopicFilter<'a>, MAX_FILTERS>::new(),
-        };
-        return x;
+        }
     }
 
     fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
@@ -80,35 +62,28 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         let mut rm_ln = self.property_len;
         let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len)?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
-
-        let mut lt = 0;
-        let mut filters_len = 0;
-        loop {
-            filters_len = filters_len + self.topic_filters.get(lt).unwrap().filter.len + 3;
-            lt = lt + 1;
-            if lt == self.topic_filter_len as usize {
-                break;
-            }
-        }
-        rm_ln = rm_ln + property_len_len as u32 + 2 + filters_len as u32;
+        rm_ln = rm_ln + property_len_len as u32 + 3;
 
         buff_writer.write_u8(self.fixed_header)?;
         buff_writer.write_variable_byte_int(rm_ln)?;
         buff_writer.write_u16(self.packet_identifier)?;
+        buff_writer.write_u8(self.reason_code)?;
         buff_writer.write_variable_byte_int(self.property_len)?;
         buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
-        buff_writer.encode_topic_filters_ref(
-            true,
-            self.topic_filter_len as usize,
-            &self.topic_filters,
-        )?;
         Ok(buff_writer.position)
     }
 
-    fn decode(&mut self, _buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        log::error!("Subscribe packet does not support decode funtion on client!");
-        Err(BufferError::WrongPacketToDecode)
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
+        if self.decode_fixed_header(buff_reader)? != (PacketType::Pubcomp).into() {
+            log::error!("Packet you are trying to decode is not PUBCOMP packet!");
+            return Err(BufferError::PacketTypeMismatch);
+        }
+        self.packet_identifier = buff_reader.read_u16()?;
+        self.reason_code = buff_reader.read_u8()?;
+        self.decode_properties(buff_reader)?;
+        Ok(())
     }
+
     fn set_property_len(&mut self, value: u32) {
         self.property_len = value;
     }

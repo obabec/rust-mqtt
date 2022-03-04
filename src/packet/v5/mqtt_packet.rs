@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-use crate::packet::packet_type::PacketType;
+use crate::packet::v5::packet_type::PacketType;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::types::BufferError;
 

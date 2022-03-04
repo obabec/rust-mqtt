@@ -8,11 +8,11 @@ use tokio::{join, task};
 use rust_mqtt::client::client_config::ClientConfig;
 use rust_mqtt::client::client_v5::MqttClientV5;
 use rust_mqtt::network::network_trait::{Network, NetworkError};
-use rust_mqtt::packet::connect_packet::ConnectPacket;
-use rust_mqtt::packet::mqtt_packet::Packet;
-use rust_mqtt::packet::publish_packet::QualityOfService::QoS1;
-use rust_mqtt::packet::publish_packet::{PublishPacket, QualityOfService};
-use rust_mqtt::packet::subscription_packet::SubscriptionPacket;
+use rust_mqtt::packet::v5::connect_packet::ConnectPacket;
+use rust_mqtt::packet::v5::mqtt_packet::Packet;
+use rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1;
+use rust_mqtt::packet::v5::publish_packet::{PublishPacket, QualityOfService};
+use rust_mqtt::packet::v5::subscription_packet::SubscriptionPacket;
 use rust_mqtt::tokio_network::TokioNetwork;
 
 async fn receive() {
