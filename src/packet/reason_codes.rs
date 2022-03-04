@@ -1,5 +1,4 @@
-use core::fmt::{Display, Formatter, write};
-use crate::packet::reason_codes::ReasonCode::ServerMoved;
+use core::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub enum ReasonCode {
@@ -46,6 +45,7 @@ pub enum ReasonCode {
     MaximumConnectTime,
     SubscriptionIdentifiersNotSupported,
     WildcardSubscriptionNotSupported,
+    BuffError,
     NetworkError,
 }
 
@@ -95,6 +95,7 @@ impl Into<u8> for ReasonCode {
             ReasonCode::MaximumConnectTime => 0xA0,
             ReasonCode::SubscriptionIdentifiersNotSupported => 0xA1,
             ReasonCode::WildcardSubscriptionNotSupported => 0xA2,
+            ReasonCode::BuffError => 0xFE,
             ReasonCode::NetworkError => 0xFF
         }
 
@@ -146,6 +147,7 @@ impl From<u8> for ReasonCode {
             0xA0 => ReasonCode::MaximumConnectTime,
             0xA1 => ReasonCode::SubscriptionIdentifiersNotSupported,
             0xA2 => ReasonCode::WildcardSubscriptionNotSupported,
+            0xFE => ReasonCode::BuffError,
             _ => ReasonCode::NetworkError
         }
     }
@@ -197,6 +199,7 @@ impl Display for ReasonCode {
             ReasonCode::MaximumConnectTime => write!(f, "Maximum connect time exceeded!"),
             ReasonCode::SubscriptionIdentifiersNotSupported => write!(f, "Subscription identifier not supported!"),
             ReasonCode::WildcardSubscriptionNotSupported => write!(f, "Wildcard subscription not supported!"),
+            ReasonCode::BuffError => write!(f , "Error encountered during write / read from packet"),
             ReasonCode::NetworkError => write!(f, "Unknown error!"),
         }
     }

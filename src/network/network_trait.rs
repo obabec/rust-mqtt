@@ -1,8 +1,6 @@
-use core::fmt::Error;
 use core::future::Future;
-use crate::packet::reason_codes::ReasonCode;
-use crate::packet::mqtt_packet::Packet;
 
+use crate::packet::reason_codes::ReasonCode;
 
 #[derive(Debug)]
 pub enum NetworkError {

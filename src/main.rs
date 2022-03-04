@@ -1,15 +1,17 @@
+use std::time::Duration;
+
+use tokio::{join, task};
+use tokio::time::sleep;
+
+use rust_mqtt::client::client_config::ClientConfig;
 use rust_mqtt::client::client_v5::MqttClientV5;
 use rust_mqtt::network::network_trait::{Network, NetworkError};
 use rust_mqtt::packet::connect_packet::ConnectPacket;
 use rust_mqtt::packet::mqtt_packet::Packet;
 use rust_mqtt::packet::publish_packet::{PublishPacket, QualityOfService};
+use rust_mqtt::packet::publish_packet::QualityOfService::QoS1;
 use rust_mqtt::packet::subscription_packet::SubscriptionPacket;
 use rust_mqtt::tokio_network::TokioNetwork;
-use std::time::Duration;
-use tokio::time::sleep;
-use tokio::{join, task};
-use rust_mqtt::client::client_config::ClientConfig;
-use rust_mqtt::packet::publish_packet::QualityOfService::QoS1;
 
 async fn receive() {
     let mut ip: [u8; 4] = [37, 205, 11, 180];
@@ -22,7 +24,7 @@ async fn receive() {
     config.add_password("testPass1");
     let mut res2 = vec![0; 260];
     let mut res3 = vec![0; 260];
-    let mut client = MqttClientV5::<TokioNetwork, 5>::new(&mut tokio_network, &mut res2, & mut res3, config);
+    let mut client = MqttClientV5::<TokioNetwork, 5>::new(&mut tokio_network,  &mut res2, 260,  & mut res3, 260, config);
 
     let mut result = {
         client.connect_to_broker().await
@@ -54,7 +56,7 @@ async fn publish(message: &str) {
     let config = ClientConfig::new();
     let mut res2 = vec![0; 260];
     let mut res3 = vec![0; 260];
-    let mut client = MqttClientV5::<TokioNetwork, 5>::new(&mut tokio_network, &mut res2, & mut res3, config);
+    let mut client = MqttClientV5::<TokioNetwork, 5>::new(&mut tokio_network, &mut res2, 260, & mut res3, 260, config);
 
     let mut result = { client.connect_to_broker().await };
     log::info!("Waiting until send!");

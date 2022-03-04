@@ -29,6 +29,7 @@ use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
+use crate::utils::types::BufferError;
 
 use super::packet_type::PacketType;
 use super::property::Property;
@@ -44,13 +45,6 @@ pub struct AuthPacket<'a, const MAX_PROPERTIES: usize> {
 }
 
 impl<'a, const MAX_PROPERTIES: usize> AuthPacket<'a, MAX_PROPERTIES> {
-    /// Function is decoding auth packet from Byte array (buffer).
-    pub fn decode_auth_packet(&mut self, buff_reader: &mut BuffReader<'a>) {
-        self.decode_fixed_header(buff_reader);
-        self.auth_reason = buff_reader.read_u8().unwrap();
-        self.decode_properties(buff_reader);
-    }
-
     pub fn add_reason_code(&mut self, code: u8) {
         if code != 0 && code != 24 && code != 25 {
             log::error!("Provided reason code is not supported!");
@@ -79,26 +73,28 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTI
         }
     }
 
-    fn encode(&mut self, buffer: &mut [u8]) -> usize {
-        let mut buff_writer = BuffWriter::new(buffer);
+    fn encode(&mut self, buffer: &mut [u8], buff_len: usize) -> Result<usize, BufferError> {
+        let mut buff_writer = BuffWriter::new(buffer, buff_len);
 
         let mut rm_ln = self.property_len;
         let property_len_enc: [u8; 4] =
-            VariableByteIntegerEncoder::encode(self.property_len).unwrap();
+            VariableByteIntegerEncoder::encode(self.property_len) ?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
         rm_ln = rm_ln + property_len_len as u32;
         rm_ln = rm_ln + 1;
 
-        buff_writer.write_u8(self.fixed_header);
-        buff_writer.write_variable_byte_int(rm_ln);
-        buff_writer.write_u8(self.auth_reason);
-        buff_writer.write_variable_byte_int(self.property_len);
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties);
-        return buff_writer.position;
+        buff_writer.write_u8(self.fixed_header) ?;
+        buff_writer.write_variable_byte_int(rm_ln) ?;
+        buff_writer.write_u8(self.auth_reason) ?;
+        buff_writer.write_variable_byte_int(self.property_len) ?;
+        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties) ?;
+        Ok(buff_writer.position)
     }
 
-    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
-        self.decode_auth_packet(buff_reader);
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
+        self.decode_fixed_header(buff_reader) ?;
+        self.auth_reason = buff_reader.read_u8() ?;
+        return self.decode_properties(buff_reader);
     }
 
     fn set_property_len(&mut self, value: u32) {

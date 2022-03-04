@@ -24,7 +24,7 @@
 
 
 use crate::packet::publish_packet::QualityOfService;
-use crate::utils::buffer_reader::{BinaryData, EncodedString};
+use crate::utils::types::{BinaryData, EncodedString};
 
 pub struct ClientConfig<'a> {
     pub qos: QualityOfService,

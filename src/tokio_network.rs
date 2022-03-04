@@ -1,15 +1,11 @@
 use alloc::format;
 use alloc::string::String;
-use core::borrow::BorrowMut;
-use core::fmt::Error;
 use core::future::Future;
-use core::ptr::null;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpStream;
 
-use crate::network::network_trait::{Network};
-use crate::packet::mqtt_packet::Packet;
+use crate::network::network_trait::Network;
 use crate::packet::reason_codes::ReasonCode;
 
 pub struct TokioNetwork {

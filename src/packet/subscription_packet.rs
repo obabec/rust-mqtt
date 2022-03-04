@@ -28,29 +28,18 @@ use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::mqtt_packet::Packet;
 use crate::packet::publish_packet::QualityOfService;
 use crate::utils::buffer_reader::BuffReader;
-use crate::utils::buffer_reader::TopicFilter;
 use crate::utils::buffer_writer::BuffWriter;
-
+use crate::utils::types::{BufferError, TopicFilter};
 use super::packet_type::PacketType;
 use super::property::Property;
 
 pub struct SubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> {
-    // 7 - 4 mqtt control packet type, 3-0 flagy
     pub fixed_header: u8,
-    // 1 - 4 B lenght of variable header + len of payload
     pub remain_len: u32,
-
     pub packet_identifier: u16,
-
     pub property_len: u32,
-
-    // properties
     pub properties: Vec<Property<'a>, MAX_PROPERTIES>,
-
-    // topic filter len
     pub topic_filter_len: u16,
-
-    // payload
     pub topic_filters: Vec<TopicFilter<'a>, MAX_FILTERS>,
 }
 
@@ -72,7 +61,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     for SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
      fn new() -> Self {
-        let mut x = Self {
+        let x = Self {
             fixed_header: PacketType::Subscribe.into(),
             remain_len: 0,
             packet_identifier: 1,
@@ -84,12 +73,12 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         return x;
     }
 
-    fn encode(&mut self, buffer: &mut [u8]) -> usize {
-        let mut buff_writer = BuffWriter::new(buffer);
+    fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
+        let mut buff_writer = BuffWriter::new(buffer, buffer_len);
 
         let mut rm_ln = self.property_len;
         let property_len_enc: [u8; 4] =
-            VariableByteIntegerEncoder::encode(self.property_len).unwrap();
+            VariableByteIntegerEncoder::encode(self.property_len) ?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
 
         let mut lt = 0;
@@ -103,21 +92,22 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         }
         rm_ln = rm_ln + property_len_len as u32 + 2 + filters_len as u32;
 
-        buff_writer.write_u8(self.fixed_header);
-        buff_writer.write_variable_byte_int(rm_ln);
-        buff_writer.write_u16(self.packet_identifier);
-        buff_writer.write_variable_byte_int(self.property_len);
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties);
+        buff_writer.write_u8(self.fixed_header) ?;
+        buff_writer.write_variable_byte_int(rm_ln) ?;
+        buff_writer.write_u16(self.packet_identifier) ?;
+        buff_writer.write_variable_byte_int(self.property_len) ?;
+        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties) ?;
         buff_writer.encode_topic_filters_ref(
             true,
             self.topic_filter_len as usize,
             &self.topic_filters,
-        );
-        return buff_writer.position;
+        ) ?;
+        Ok(buff_writer.position)
     }
 
-    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
+    fn decode(&mut self, _buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
         log::error!("Subscribe packet does not support decode funtion on client!");
+        Err(BufferError::WrongPacketToDecode)
     }
     fn set_property_len(&mut self, value: u32) {
         self.property_len = value;

@@ -28,6 +28,7 @@ use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
+use crate::utils::types::BufferError;
 
 use super::packet_type::PacketType;
 use super::property::Property;
@@ -46,14 +47,6 @@ pub struct DisconnectPacket<'a, const MAX_PROPERTIES: usize> {
 }
 
 impl<'a, const MAX_PROPERTIES: usize> DisconnectPacket<'a, MAX_PROPERTIES> {
-    pub fn decode_auth_packet(&mut self, buff_reader: &mut BuffReader<'a>) {
-        if self.decode_fixed_header(buff_reader) != (PacketType::Pingresp).into() {
-            log::error!("Packet you are trying to decode is not PUBACK packet!");
-            return;
-        }
-        self.disconnect_reason = buff_reader.read_u8().unwrap();
-        self.decode_properties(buff_reader);
-    }
 
     fn add_reason(&mut self, reason: u8) {
         self.disconnect_reason = reason;
@@ -71,22 +64,27 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for DisconnectPacket<'a, MAX_PR
         }
     }
 
-    fn encode(&mut self, buffer: &mut [u8]) -> usize {
-        let mut buff_writer = BuffWriter::new(buffer);
-        buff_writer.write_u8(self.fixed_header);
-        let mut property_len_enc = VariableByteIntegerEncoder::encode(self.property_len).unwrap();
+    fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
+        let mut buff_writer = BuffWriter::new(buffer, buffer_len);
+        buff_writer.write_u8(self.fixed_header) ?;
+        let property_len_enc = VariableByteIntegerEncoder::encode(self.property_len) ?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
 
         let rm_len: u32 = 1 + self.property_len + property_len_len as u32;
-        buff_writer.write_variable_byte_int(rm_len);
-        buff_writer.write_u8(self.disconnect_reason);
-        buff_writer.write_variable_byte_int(self.property_len);
-        buff_writer.encode_properties(&self.properties);
-        return buff_writer.position;
+        buff_writer.write_variable_byte_int(rm_len) ?;
+        buff_writer.write_u8(self.disconnect_reason) ?;
+        buff_writer.write_variable_byte_int(self.property_len) ?;
+        buff_writer.encode_properties(&self.properties) ?;
+        Ok(buff_writer.position)
     }
 
-    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) {
-        self.decode_auth_packet(buff_reader);
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
+        if self.decode_fixed_header(buff_reader) ? != (PacketType::Pingresp).into() {
+            log::error!("Packet you are trying to decode is not PUBACK packet!");
+            return Err(BufferError::WrongPacketToDecode);
+        }
+        self.disconnect_reason = buff_reader.read_u8() ?;
+        return self.decode_properties(buff_reader);
     }
 
     fn set_property_len(&mut self, value: u32) {
