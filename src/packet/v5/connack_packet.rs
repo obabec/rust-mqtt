@@ -43,18 +43,6 @@ pub struct ConnackPacket<'a, const MAX_PROPERTIES: usize> {
 }
 
 impl<'a, const MAX_PROPERTIES: usize> ConnackPacket<'a, MAX_PROPERTIES> {
-    pub fn decode_connack_packet(
-        &mut self,
-        buff_reader: &mut BuffReader<'a>,
-    ) -> Result<(), BufferError> {
-        if self.decode_fixed_header(buff_reader)? != (PacketType::Connack).into() {
-            log::error!("Packet you are trying to decode is not CONNACK packet!");
-            return Err(BufferError::PacketTypeMismatch);
-        }
-        self.ack_flags = buff_reader.read_u8()?;
-        self.connect_reason_code = buff_reader.read_u8()?;
-        self.decode_properties(buff_reader)
-    }
 }
 
 impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for ConnackPacket<'a, MAX_PROPERTIES> {
@@ -80,12 +68,18 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for ConnackPacket<'a, MAX_PROPE
         buff_writer.write_u8(self.ack_flags)?;
         buff_writer.write_u8(self.connect_reason_code)?;
         buff_writer.write_variable_byte_int(self.property_len)?;
-        buff_writer.encode_properties(&self.properties)?;
+        buff_writer.write_properties(&self.properties)?;
         Ok(buff_writer.position)
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        self.decode_connack_packet(buff_reader)
+        if self.decode_fixed_header(buff_reader)? != (PacketType::Connack).into() {
+            log::error!("Packet you are trying to decode is not CONNACK packet!");
+            return Err(BufferError::PacketTypeMismatch);
+        }
+        self.ack_flags = buff_reader.read_u8()?;
+        self.connect_reason_code = buff_reader.read_u8()?;
+        self.decode_properties(buff_reader)
     }
 
     fn set_property_len(&mut self, value: u32) {
@@ -98,6 +92,10 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for ConnackPacket<'a, MAX_PROPE
 
     fn push_to_properties(&mut self, property: Property<'a>) {
         self.properties.push(property);
+    }
+
+    fn property_allowed(&mut self, property: &Property<'a>) -> bool {
+        property.connack_property()
     }
 
     fn set_fixed_header(&mut self, header: u8) {

@@ -23,6 +23,7 @@
  */
 
 use heapless::Vec;
+use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
@@ -47,11 +48,14 @@ impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize>
         &mut self,
         buff_reader: &mut BuffReader<'a>,
     ) -> Result<(), BufferError> {
-        let mut i = 0;
+        let rm_ln_ln = VariableByteIntegerEncoder::len(VariableByteIntegerEncoder::encode(self.remain_len).unwrap());
+        let max = self.remain_len as usize + rm_ln_ln + 1;
+        if buff_reader.position >= max {
+            return Ok(())
+        }
         loop {
             self.reason_codes.push(buff_reader.read_u8()?);
-            i = i + 1;
-            if i == MAX_REASONS {
+            if buff_reader.position == max {
                 break;
             }
         }
@@ -98,6 +102,10 @@ impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize> Packet<'a>
 
     fn push_to_properties(&mut self, property: Property<'a>) {
         self.properties.push(property);
+    }
+
+    fn property_allowed(&mut self, property: &Property<'a>) -> bool {
+        property.suback_property()
     }
 
     fn set_fixed_header(&mut self, header: u8) {

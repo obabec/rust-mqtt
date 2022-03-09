@@ -22,19 +22,17 @@
  * SOFTWARE.
  */
 
-#![feature(in_band_lifetimes)]
-#![macro_use]
-#![cfg_attr(not(feature = "std"), no_std)]
-#![allow(dead_code)]
-#![feature(type_alias_impl_trait)]
-#![feature(generic_associated_types)]
-
-extern crate alloc;
-
-pub mod client;
-pub mod encoding;
-pub mod network;
-pub mod packet;
-pub mod tokio_network;
-pub mod utils;
-pub mod tests;
+pub mod connack_packet_unit;
+pub mod connect_packet_unit;
+pub mod disconnect_packet_unit;
+pub mod pingreq_packet_unit;
+pub mod pingresp_packet_unit;
+pub mod puback_packet_unit;
+pub mod pubcomp_packet_unit;
+pub mod publish_packet_unit;
+pub mod pubrec_packet_unit;
+pub mod pubrel_packet_unit;
+pub mod suback_packet_unit;
+pub mod subscription_packet_unit;
+pub mod unsuback_packet_unit;
+pub mod unsubscription_packet_unit;

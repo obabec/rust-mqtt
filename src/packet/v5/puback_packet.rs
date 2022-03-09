@@ -69,7 +69,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubackPacket<'a, MAX_PROPER
         buff_writer.write_u16(self.packet_identifier)?;
         buff_writer.write_u8(self.reason_code)?;
         buff_writer.write_variable_byte_int(self.property_len)?;
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
+        buff_writer.write_properties::<MAX_PROPERTIES>(&self.properties)?;
         Ok(buff_writer.position)
     }
 
@@ -100,6 +100,10 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubackPacket<'a, MAX_PROPER
 
     fn push_to_properties(&mut self, property: Property<'a>) {
         self.properties.push(property);
+    }
+
+    fn property_allowed(&mut self, property: &Property<'a>) -> bool {
+        property.puback_property()
     }
 
     fn set_fixed_header(&mut self, header: u8) {

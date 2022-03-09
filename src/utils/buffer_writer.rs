@@ -49,7 +49,7 @@ impl<'a> BuffWriter<'a> {
 
     pub fn insert_ref(&mut self, len: usize, array: &[u8]) -> Result<(), BufferError> {
         let mut x: usize = 0;
-        if self.position + 3 >= self.len {
+        if self.position + len > self.len {
             return Err(BufferError::InsufficientBufferSize);
         }
         if len != 0 {
@@ -91,18 +91,7 @@ impl<'a> BuffWriter<'a> {
         return self.insert_ref(str.len as usize, bytes);
     }
 
-    pub fn write_string(&mut self, str: EncodedString<'a>) -> Result<(), BufferError> {
-        self.write_u16(str.len)?;
-        let bytes = str.string.as_bytes();
-        return self.insert_ref(str.len as usize, bytes);
-    }
-
     pub fn write_binary_ref(&mut self, bin: &BinaryData<'a>) -> Result<(), BufferError> {
-        self.write_u16(bin.len)?;
-        return self.insert_ref(bin.len as usize, bin.bin);
-    }
-
-    pub fn write_binary(&mut self, bin: BinaryData<'a>) -> Result<(), BufferError> {
         self.write_u16(bin.len)?;
         return self.insert_ref(bin.len as usize, bin.bin);
     }
@@ -112,24 +101,19 @@ impl<'a> BuffWriter<'a> {
         return self.write_string_ref(&str_pair.value);
     }
 
-    pub fn write_string_pair(&mut self, str_pair: StringPair<'a>) -> Result<(), BufferError> {
-        self.write_string(str_pair.name)?;
-        return self.write_string(str_pair.value);
-    }
-
     pub fn write_variable_byte_int(&mut self, int: u32) -> Result<(), BufferError> {
         let x: VariableByteInteger = VariableByteIntegerEncoder::encode(int)?;
         let len = VariableByteIntegerEncoder::len(x);
         return self.insert_ref(len, &x);
     }
 
-    pub fn encode_property(&mut self, property: &Property<'a>) -> Result<(), BufferError> {
+    fn write_property(&mut self, property: &Property<'a>) -> Result<(), BufferError> {
         let x: u8 = property.into();
         self.write_u8(x)?;
         return property.encode(self);
     }
 
-    pub fn encode_properties<const LEN: usize>(
+    pub fn write_properties<const LEN: usize>(
         &mut self,
         properties: &Vec<Property<'a>, LEN>,
     ) -> Result<(), BufferError> {
@@ -138,7 +122,7 @@ impl<'a> BuffWriter<'a> {
         if len != 0 {
             loop {
                 let prop: &Property = properties.get(i).unwrap_or(&Property::Reserved());
-                self.encode_property(prop)?;
+                self.write_property(prop)?;
                 i = i + 1;
                 if i == len {
                     break;
@@ -148,7 +132,7 @@ impl<'a> BuffWriter<'a> {
         Ok(())
     }
 
-    fn encode_topic_filter_ref(
+    fn write_topic_filter_ref(
         &mut self,
         sub: bool,
         topic_filter: &TopicFilter<'a>,
@@ -160,7 +144,7 @@ impl<'a> BuffWriter<'a> {
         return Ok(());
     }
 
-    pub fn encode_topic_filters_ref<const MAX: usize>(
+    pub fn write_topic_filters_ref<const MAX: usize>(
         &mut self,
         sub: bool,
         len: usize,
@@ -169,7 +153,7 @@ impl<'a> BuffWriter<'a> {
         let mut i = 0;
         loop {
             let topic_filter: &TopicFilter<'a> = filters.get(i).unwrap();
-            self.encode_topic_filter_ref(sub, topic_filter)?;
+            self.write_topic_filter_ref(sub, topic_filter)?;
             i = i + 1;
             if i == len {
                 break;

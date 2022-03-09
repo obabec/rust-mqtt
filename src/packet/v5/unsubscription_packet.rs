@@ -26,6 +26,7 @@ use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::v5::mqtt_packet::Packet;
+use crate::packet::v5::publish_packet::QualityOfService;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BufferError, TopicFilter};
@@ -45,6 +46,16 @@ pub struct UnsubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTI
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
     UnsubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
+    pub fn add_new_filter(&mut self, topic_name: &'a str, qos: QualityOfService) {
+        let len = topic_name.len();
+        let mut new_filter = TopicFilter::new();
+        new_filter.filter.string = topic_name;
+        new_filter.filter.len = len as u16;
+        new_filter.sub_options =
+            new_filter.sub_options | (<QualityOfService as Into<u8>>::into(qos) >> 1);
+        self.topic_filters.push(new_filter);
+        self.topic_filter_len = self.topic_filter_len + 1;
+    }
 }
 
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
@@ -68,15 +79,24 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         let mut rm_ln = self.property_len;
         let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len)?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
-        rm_ln = rm_ln + property_len_len as u32 + 4 + self.topic_filter_len as u32;
+
+        let mut lt = 0;
+        let mut filters_len = 0;
+        loop {
+            filters_len = filters_len + self.topic_filters.get(lt).unwrap().filter.len + 2;
+            lt = lt + 1;
+            if lt == self.topic_filter_len as usize {
+                break;
+            }
+        }
+        rm_ln = rm_ln + property_len_len as u32 + 2 + filters_len as u32;
 
         buff_writer.write_u8(self.fixed_header)?;
         buff_writer.write_variable_byte_int(rm_ln)?;
         buff_writer.write_u16(self.packet_identifier)?;
         buff_writer.write_variable_byte_int(self.property_len)?;
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
-        buff_writer.write_u16(self.topic_filter_len)?;
-        buff_writer.encode_topic_filters_ref(
+        buff_writer.write_properties::<MAX_PROPERTIES>(&self.properties)?;
+        buff_writer.write_topic_filters_ref(
             false,
             self.topic_filter_len as usize,
             &self.topic_filters,
@@ -99,6 +119,10 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
 
     fn push_to_properties(&mut self, property: Property<'a>) {
         self.properties.push(property);
+    }
+
+    fn property_allowed(&mut self, property: &Property<'a>) -> bool {
+        property.unsubscribe_property()
     }
 
     fn set_fixed_header(&mut self, header: u8) {

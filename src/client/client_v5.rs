@@ -25,7 +25,7 @@ pub struct MqttClientV5<'a, T, const MAX_PROPERTIES: usize> {
     recv_buffer: &'a mut [u8],
     recv_buffer_len: usize,
     rng: CountingRng,
-    config: ClientConfig<'a>,
+    config: ClientConfig<'a, MAX_PROPERTIES>,
 }
 
 impl<'a, T, const MAX_PROPERTIES: usize> MqttClientV5<'a, T, MAX_PROPERTIES>
@@ -38,7 +38,7 @@ where
         buffer_len: usize,
         recv_buffer: &'a mut [u8],
         recv_buffer_len: usize,
-        config: ClientConfig<'a>,
+        config: ClientConfig<'a, MAX_PROPERTIES>,
     ) -> Self {
         Self {
             network_driver,
@@ -54,6 +54,7 @@ where
     pub async fn connect_to_broker<'b>(&'b mut self) -> Result<(), ReasonCode> {
         let len = {
             let mut connect = ConnectPacket::<'b, 3, 0>::clean();
+            connect.keep_alive = self.config.keep_alive;
             if self.config.username_flag {
                 connect.add_username(&self.config.username);
             }

@@ -70,6 +70,10 @@ impl<'a> Packet<'a> for PingreqPacket {
         log::error!("PINGREQ packet does not contain any properties!");
     }
 
+    fn property_allowed(&mut self, property: &Property<'a>) -> bool {
+        property.pingreq_property()
+    }
+
     fn set_fixed_header(&mut self, header: u8) {
         self.fixed_header = header;
     }

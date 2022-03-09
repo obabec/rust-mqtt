@@ -22,11 +22,13 @@
  * SOFTWARE.
  */
 
+use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair};
 
 #[derive(Debug)]
+#[derive(Clone)]
 pub enum Property<'a> {
     PayloadFormat(u8),
     MessageExpiryInterval(u32),
@@ -59,6 +61,142 @@ pub enum Property<'a> {
 }
 
 impl<'a> Property<'a> {
+    pub fn connect_property(&self) -> bool {
+        return match self {
+            Property::SessionExpiryInterval(_u) => true,
+            Property::ReceiveMaximum(_u) => true,
+            Property::MaximumPacketSize(_u) => true,
+            Property::TopicAliasMaximum(_u) => true,
+            Property::RequestResponseInformation(_u) => true,
+            Property::RequestProblemInformation(_u) => true,
+            Property::UserProperty(_u) => true,
+            Property::AuthenticationMethod(_u) => true,
+            Property::AuthenticationData(_u) => true,
+            _ => false,
+        };
+    }
+
+    pub fn connack_property(&self) -> bool {
+        return match self {
+            Property::SessionExpiryInterval(_u) => true,
+            Property::ReceiveMaximum(_u) => true,
+            Property::MaximumQoS(_u) => true,
+            Property::MaximumPacketSize(_u) => true,
+            Property::AssignedClientIdentifier(_u) => true,
+            Property::TopicAliasMaximum(_u) => true,
+            Property::ReasonString(_u) => true,
+            Property::UserProperty(_u) => true,
+            Property::WildcardSubscriptionAvailable(_u) => true,
+            Property::SubscriptionIdentifierAvailable(_u) => true,
+            Property::SharedSubscriptionAvailable(_u) => true,
+            Property::ServerKeepAlive(_u) => true,
+            Property::ResponseInformation(_u) => true,
+            Property::ServerReference(_u) => true,
+            Property::AuthenticationMethod(_u) => true,
+            Property::AuthenticationData(_u) => true,
+            _ => false,
+        };
+    }
+
+    pub fn publish_property(&self) -> bool {
+        return match self {
+            Property::PayloadFormat(_u) => true,
+            Property::MessageExpiryInterval(_u) => true,
+            Property::TopicAlias(_u) => true,
+            Property::ResponseTopic(_u) => true,
+            Property::CorrelationData(_u) => true,
+            Property::UserProperty(_u) => true,
+            Property::SubscriptionIdentifier(_u) => true,
+            Property::ContentType(_u) => true,
+            _ => false,
+        };
+    }
+
+    pub fn puback_property(&self) -> bool {
+        return match self {
+            Property::ReasonString(_u) => true,
+            Property::UserProperty(_u) => true,
+            _ => false,
+        };
+    }
+
+    pub fn pubrec_property(&self) -> bool {
+        return match self {
+            Property::ReasonString(_u) => true,
+            Property::UserProperty(_u) => true,
+            _ => false,
+        };
+    }
+
+    pub fn pubrel_property(&self) -> bool {
+        return match self {
+            Property::ReasonString(_u) => true,
+            Property::UserProperty(_u) => true,
+            _ => false,
+        };
+    }
+
+    pub fn pubcomp_property(&self) -> bool {
+        return match self {
+            Property::ReasonString(_u) => true,
+            Property::UserProperty(_u) => true,
+            _ => false,
+        };
+    }
+
+    pub fn subscribe_property(&self) -> bool {
+        return match self {
+            Property::SubscriptionIdentifier(_u) => true,
+            Property::UserProperty(_u) => true,
+            _ => false,
+        };
+    }
+
+    pub fn suback_property(&self) -> bool {
+        return match self {
+            Property::ReasonString(_u) => true,
+            Property::UserProperty(_u) => true,
+            _ => false,
+        };
+    }
+
+    pub fn unsubscribe_property(&self) -> bool {
+        return match self {
+            Property::UserProperty(_u) => true,
+            _ => false,
+        };
+    }
+
+    pub fn unsuback_property(&self) -> bool {
+        return match self {
+            Property::ReasonString(_u) => true,
+            Property::UserProperty(_u) => true,
+            _ => false,
+        };
+    }
+
+    pub fn pingreq_property(&self) -> bool {
+        return match self {
+            _ => false,
+        };
+    }
+
+    pub fn pingresp_property(&self) -> bool {
+        return match self {
+            _ => false,
+        };
+    }
+
+    pub fn disconnect_property(&self) -> bool {
+        return match self {
+            Property::SessionExpiryInterval(_u) => true,
+            Property::ReasonString(_u) => true,
+            Property::UserProperty(_u) => true,
+            Property::ServerReference(_u) => true,
+            _ => false,
+        };
+    }
+
     pub fn auth_property(&self) -> bool {
         return match self {
             Property::AuthenticationMethod(_u) => true,
@@ -76,7 +214,7 @@ impl<'a> Property<'a> {
             Property::ContentType(u) => u.len(),
             Property::ResponseTopic(u) => u.len(),
             Property::CorrelationData(u) => u.len(),
-            Property::SubscriptionIdentifier(_u) => 4,
+            Property::SubscriptionIdentifier(u) => VariableByteIntegerEncoder::len(VariableByteIntegerEncoder::encode(*u).unwrap()) as u16,
             Property::SessionExpiryInterval(_u) => 4,
             Property::AssignedClientIdentifier(u) => u.len(),
             Property::ServerKeepAlive(_u) => 2,

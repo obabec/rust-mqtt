@@ -48,7 +48,7 @@ impl<'a> Packet<'a> for PingrespPacket {
     fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
         buff_writer.write_u8(self.fixed_header)?;
-        buff_writer.write_variable_byte_int(0 as u32)?;
+        buff_writer.write_variable_byte_int(self.remain_len)?;
         Ok(buff_writer.position)
     }
 
@@ -76,6 +76,10 @@ impl<'a> Packet<'a> for PingrespPacket {
 
     fn push_to_properties(&mut self, _property: Property<'a>) {
         log::error!("PINGRESP packet does not contain any properties!");
+    }
+
+    fn property_allowed(&mut self, property: &Property<'a>) -> bool {
+        property.pingresp_property()
     }
 
     fn set_fixed_header(&mut self, header: u8) {

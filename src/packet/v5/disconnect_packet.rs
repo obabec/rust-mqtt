@@ -73,13 +73,13 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for DisconnectPacket<'a, MAX_PR
         buff_writer.write_variable_byte_int(rm_len)?;
         buff_writer.write_u8(self.disconnect_reason)?;
         buff_writer.write_variable_byte_int(self.property_len)?;
-        buff_writer.encode_properties(&self.properties)?;
+        buff_writer.write_properties(&self.properties)?;
         Ok(buff_writer.position)
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        if self.decode_fixed_header(buff_reader)? != (PacketType::Pingresp).into() {
-            log::error!("Packet you are trying to decode is not PUBACK packet!");
+        if self.decode_fixed_header(buff_reader)? != (PacketType::Disconnect).into() {
+            log::error!("Packet you are trying to decode is not DISCONNECT packet!");
             return Err(BufferError::WrongPacketToDecode);
         }
         self.disconnect_reason = buff_reader.read_u8()?;
@@ -96,6 +96,10 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for DisconnectPacket<'a, MAX_PR
 
     fn push_to_properties(&mut self, property: Property<'a>) {
         self.properties.push(property);
+    }
+
+    fn property_allowed(&mut self, property: &Property<'a>) -> bool {
+        property.disconnect_property()
     }
 
     fn set_fixed_header(&mut self, header: u8) {

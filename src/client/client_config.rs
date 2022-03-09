@@ -22,25 +22,33 @@
  * SOFTWARE.
  */
 
+use heapless::Vec;
+use crate::packet::v5::property::Property;
 use crate::packet::v5::publish_packet::QualityOfService;
 use crate::utils::types::{BinaryData, EncodedString};
 
-pub struct ClientConfig<'a> {
+pub struct ClientConfig<'a, const MAX_PROPERTIES: usize> {
     pub qos: QualityOfService,
+    pub keep_alive: u16,
+    pub client_id: EncodedString<'a>,
     pub username_flag: bool,
     pub username: EncodedString<'a>,
     pub password_flag: bool,
     pub password: BinaryData<'a>,
+    pub properties: Vec<Property<'a>, MAX_PROPERTIES>,
 }
 
-impl ClientConfig<'a> {
+impl<'a, const MAX_PROPERTIES: usize> ClientConfig<'a, MAX_PROPERTIES> {
     pub fn new() -> Self {
         Self {
             qos: QualityOfService::QoS0,
+            keep_alive: 60,
+            client_id: EncodedString::new(),
             username_flag: false,
             username: EncodedString::new(),
             password_flag: false,
             password: BinaryData::new(),
+            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new()
         }
     }
 
@@ -62,5 +70,11 @@ impl ClientConfig<'a> {
         password_s.len = password_s.bin.len() as u16;
         self.password = password_s;
         self.password_flag = true;
+    }
+
+    pub fn add_property(&mut self, prop: Property<'a>) {
+        if self.properties.len() < MAX_PROPERTIES {
+            self.properties.push(prop);
+        }
     }
 }

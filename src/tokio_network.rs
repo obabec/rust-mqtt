@@ -1,9 +1,11 @@
 use alloc::format;
 use alloc::string::String;
 use core::future::Future;
+use core::time::Duration;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio::time::sleep;
 
 use crate::network::network_trait::Network;
 use crate::packet::v5::reason_codes::ReasonCode;
@@ -34,10 +36,16 @@ impl Network for TokioNetwork {
     where
         Self: 'm,
     = impl Future<Output = Result<(), ReasonCode>> + 'm;
+
     type ReadFuture<'m>
     where
         Self: 'm,
     = impl Future<Output = Result<usize, ReasonCode>> + 'm;
+
+    type TimerFuture<'m>
+    where
+        Self: 'm,
+    = impl Future<Output = ()>;
 
     fn new(ip: [u8; 4], port: u16) -> Self {
         return Self {
@@ -80,6 +88,13 @@ impl Network for TokioNetwork {
             } else {
                 Err(ReasonCode::NetworkError)
             };
+        }
+    }
+
+    fn count_down(&'m mut self, time_in_secs: u64) -> Self::TimerFuture<'m> {
+        async move {
+            return sleep(Duration::from_secs(time_in_secs))
+                .await
         }
     }
 }

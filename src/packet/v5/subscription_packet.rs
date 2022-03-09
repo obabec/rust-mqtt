@@ -96,8 +96,8 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         buff_writer.write_variable_byte_int(rm_ln)?;
         buff_writer.write_u16(self.packet_identifier)?;
         buff_writer.write_variable_byte_int(self.property_len)?;
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
-        buff_writer.encode_topic_filters_ref(
+        buff_writer.write_properties::<MAX_PROPERTIES>(&self.properties)?;
+        buff_writer.write_topic_filters_ref(
             true,
             self.topic_filter_len as usize,
             &self.topic_filters,
@@ -119,6 +119,10 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
 
     fn push_to_properties(&mut self, property: Property<'a>) {
         self.properties.push(property);
+    }
+
+    fn property_allowed(&mut self, property: &Property<'a>) -> bool {
+        property.subscribe_property()
     }
 
     fn set_fixed_header(&mut self, header: u8) {

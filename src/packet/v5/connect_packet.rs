@@ -68,11 +68,13 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize>
             property_len: 3,
             properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
             client_id: EncodedString::new(),
+            /// Will is not supported as it is un-necessary load for embedded
             will_property_len: 0,
             will_properties: Vec::<Property<'a>, MAX_WILL_PROPERTIES>::new(),
             will_topic: EncodedString::new(),
             will_payload: BinaryData::new(),
             username: EncodedString::new(),
+
             password: BinaryData::new(),
         };
 
@@ -95,6 +97,10 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize>
     pub fn add_password(&mut self, password: &BinaryData<'a>) {
         self.password = (*password).clone();
         self.connect_flags = self.connect_flags | 0x40;
+    }
+
+    pub fn add_client_id(& mut self, id: &EncodedString<'a>) {
+        self.client_id = (*id).clone();
     }
 }
 
@@ -159,12 +165,12 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
         buff_writer.write_u8(self.connect_flags)?;
         buff_writer.write_u16(self.keep_alive)?;
         buff_writer.write_variable_byte_int(self.property_len)?;
-        buff_writer.encode_properties::<MAX_PROPERTIES>(&self.properties)?;
+        buff_writer.write_properties::<MAX_PROPERTIES>(&self.properties)?;
         buff_writer.write_string_ref(&self.client_id)?;
 
         if self.connect_flags & 0x04 != 0 {
             buff_writer.write_variable_byte_int(self.will_property_len)?;
-            buff_writer.encode_properties(&self.will_properties)?;
+            buff_writer.write_properties(&self.will_properties)?;
             buff_writer.write_string_ref(&self.will_topic)?;
             buff_writer.write_binary_ref(&self.will_payload)?;
         }
@@ -195,6 +201,10 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
 
     fn push_to_properties(&mut self, property: Property<'a>) {
         self.properties.push(property);
+    }
+
+    fn property_allowed(&mut self, property: &Property<'a>) -> bool {
+        property.connect_property()
     }
 
     fn set_fixed_header(&mut self, header: u8) {

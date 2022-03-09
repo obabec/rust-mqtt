@@ -100,6 +100,10 @@ impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         self.properties.push(property);
     }
 
+    fn property_allowed(&mut self, property: &Property<'a>) -> bool {
+        property.unsuback_property()
+    }
+
     fn set_fixed_header(&mut self, header: u8) {
         self.fixed_header = header;
     }

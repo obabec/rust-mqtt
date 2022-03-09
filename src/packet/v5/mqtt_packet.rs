@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+use heapless::Vec;
 use crate::packet::v5::packet_type::PacketType;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::types::BufferError;
@@ -43,6 +44,26 @@ pub trait Packet<'a> {
     fn get_property_len(&mut self) -> u32;
     /// Method enables pushing new property into packet properties
     fn push_to_properties(&mut self, property: Property<'a>);
+    /// Returns if property is allowed for packet
+    fn property_allowed(& mut self, property: & Property<'a>) -> bool;
+    /// Method enables adding properties from client config - each packet decides if property can be used with that or not
+    fn add_properties<const MAX_PROPERTIES: usize>(& mut self, properties: &Vec<Property<'a>, MAX_PROPERTIES>) -> u32 {
+        let mut i = 0;
+        let max = properties.len();
+        let mut res: u32 = 0;
+        loop {
+            let prop = properties.get(i).unwrap();
+            if self.property_allowed(prop) {
+                self.push_to_properties((*prop).clone());
+                res = res + prop.len() as u32 + 1;
+            }
+            i = i + 1;
+            if i == max {
+                break;
+            }
+        }
+        return res;
+    }
 
     /// Setter for packet fixed header
     fn set_fixed_header(&mut self, header: u8);

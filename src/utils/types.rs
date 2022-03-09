@@ -25,6 +25,7 @@
 use core::fmt::{Display, Formatter};
 
 #[derive(core::fmt::Debug, Clone)]
+#[derive(PartialEq)]
 pub enum BufferError {
     Utf8Error,
     InsufficientBufferSize,
@@ -65,6 +66,7 @@ impl EncodedString<'_> {
     pub fn new() -> Self {
         Self { string: "", len: 0 }
     }
+
     /// Return length of string
     pub fn len(&self) -> u16 {
         return self.len + 2;
@@ -89,13 +91,19 @@ impl BinaryData<'_> {
 }
 
 /// String pair struct represents `String pair` in MQTTv5 (2 UTF-8 encoded strings name-value)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StringPair<'a> {
     pub name: EncodedString<'a>,
     pub value: EncodedString<'a>,
 }
 
 impl StringPair<'_> {
+    pub fn new() -> Self {
+        Self {
+            name: EncodedString::new(),
+            value: EncodedString::new()
+        }
+    }
     /// Returns length which is equal to sum of the lenghts of UTF-8 encoded strings in pair
     pub fn len(&self) -> u16 {
         let ln = self.name.len() + self.value.len();

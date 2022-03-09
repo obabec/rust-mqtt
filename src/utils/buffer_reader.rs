@@ -52,22 +52,36 @@ impl<'a> BuffReader<'a> {
     /// Variable byte integer can be 1-4 Bytes long. Buffer reader takes all 4 Bytes at first and
     /// than check what is true length of varbyteint and increment cursor by that
     pub fn read_variable_byte_int(&mut self) -> Result<u32, BufferError> {
-        let variable_byte_integer: [u8; 4] = [
-            self.buffer[self.position],
-            self.buffer[self.position + 1],
-            self.buffer[self.position + 2],
-            self.buffer[self.position + 3],
-        ];
+        let mut variable_byte_integer: [u8; 4] = [0; 4];
         let mut len: usize = 1;
-        // Everytime checking first bit of Byte which determines whenever there is continous Byte
-        if variable_byte_integer[0] & 0x80 == 1 {
-            len = len + 1;
-            if variable_byte_integer[1] & 0x80 == 1 {
-                len = len + 1;
-                if variable_byte_integer[2] & 0x80 == 1 {
-                    len = len + 1;
+
+        // Everytime checking first bit of Byte which determines whenever there is continuous Byte
+        let mut x = 0;
+        loop {
+            if x >= 4 {
+                break;
+            }
+            if self.position + x >= self.len {
+                return Err(BufferError::InsufficientBufferSize);
+            }
+            if self.buffer[self.position + x] & 0x80 != 0 {
+                variable_byte_integer[x] = self.buffer[self.position + x];
+                len = len + 1
+            } else {
+                variable_byte_integer[x] = self.buffer[self.position + x];
+                x = x + 1;
+                if x != 4 {
+                    loop {
+                        variable_byte_integer[x] = 0;
+                        x = x + 1;
+                        if x == 4 {
+                            break
+                        }
+                    }
+                    break;
                 }
             }
+            x = x + 1;
         }
         self.increment_position(len);
         return VariableByteIntegerDecoder::decode(variable_byte_integer);
@@ -75,6 +89,9 @@ impl<'a> BuffReader<'a> {
 
     /// Reading u32 from buffer as `Big endian`
     pub fn read_u32(&mut self) -> Result<u32, BufferError> {
+        if self.position + 4 > self.len {
+            return Err(BufferError::InsufficientBufferSize);
+        }
         let (int_bytes, _rest) = self.buffer[self.position..].split_at(mem::size_of::<u32>());
         let ret: u32 = u32::from_be_bytes(int_bytes.try_into().unwrap());
         self.increment_position(4);
@@ -83,6 +100,9 @@ impl<'a> BuffReader<'a> {
 
     /// Reading u16 from buffer as `Big endinan`
     pub fn read_u16(&mut self) -> Result<u16, BufferError> {
+        if self.position + 2 > self.len {
+            return Err(BufferError::InsufficientBufferSize);
+        }
         let (int_bytes, _rest) = self.buffer[self.position..].split_at(mem::size_of::<u16>());
         let ret: u16 = u16::from_be_bytes(int_bytes.try_into().unwrap());
         self.increment_position(2);
@@ -91,6 +111,9 @@ impl<'a> BuffReader<'a> {
 
     /// Reading one byte from buffer as `Big endian`
     pub fn read_u8(&mut self) -> Result<u8, BufferError> {
+        if self.position >= self.len {
+            return Err(BufferError::InsufficientBufferSize);
+        }
         let ret: u8 = self.buffer[self.position];
         self.increment_position(1);
         return Ok(ret);
@@ -98,50 +121,47 @@ impl<'a> BuffReader<'a> {
 
     /// Reading UTF-8 encoded string from buffer
     pub fn read_string(&mut self) -> Result<EncodedString<'a>, BufferError> {
-        let len = self.read_u16();
-        match len {
-            Err(err) => return Err(err),
-            _ => {}
+        let len = self.read_u16() ? as usize;
+
+        if self.position + len - 1 >= self.len {
+            return Err(BufferError::InsufficientBufferSize);
         }
-        let len_res = len.unwrap();
+
         let res_str =
-            str::from_utf8(&(self.buffer[self.position..(self.position + len_res as usize)]));
+            str::from_utf8(&(self.buffer[self.position..(self.position + len)]));
         if res_str.is_err() {
             log::error!("Could not parse utf-8 string");
             return Err(BufferError::Utf8Error);
         }
-        self.increment_position(len_res as usize);
+        self.increment_position(len);
         return Ok(EncodedString {
             string: res_str.unwrap(),
-            len: len_res,
+            len: len as u16,
         });
     }
 
     /// Read Binary data from buffer
     pub fn read_binary(&mut self) -> Result<BinaryData<'a>, BufferError> {
-        let len = self.read_u16()?;
+        let len = self.read_u16() ?;
+
+        if self.position + len as usize - 1 >= self.len {
+            return Err(BufferError::InsufficientBufferSize);
+        }
+
         let res_bin = &(self.buffer[self.position..(self.position + len as usize)]);
         return Ok(BinaryData {
             bin: res_bin,
-            len: len,
+            len,
         });
     }
 
     /// Read string pair from buffer
     pub fn read_string_pair(&mut self) -> Result<StringPair<'a>, BufferError> {
-        let name = self.read_string();
-        match name {
-            Err(err) => return Err(err),
-            _ => log::debug!("[String pair] name not parsed"),
-        }
-        let value = self.read_string();
-        match value {
-            Err(err) => return Err(err),
-            _ => log::debug!("[String pair] value not parsed"),
-        }
+        let name = self.read_string() ?;
+        let value = self.read_string() ?;
         return Ok(StringPair {
-            name: name.unwrap(),
-            value: value.unwrap(),
+            name,
+            value,
         });
     }
 
