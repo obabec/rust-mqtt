@@ -36,11 +36,12 @@ pub struct ClientConfig<'a, const MAX_PROPERTIES: usize> {
     pub password_flag: bool,
     pub password: BinaryData<'a>,
     pub properties: Vec<Property<'a>, MAX_PROPERTIES>,
+    pub max_packet_size: u32,
 }
 
 impl<'a, const MAX_PROPERTIES: usize> ClientConfig<'a, MAX_PROPERTIES> {
     pub fn new() -> Self {
-        Self {
+       Self {
             qos: QualityOfService::QoS0,
             keep_alive: 60,
             client_id: EncodedString::new(),
@@ -48,7 +49,8 @@ impl<'a, const MAX_PROPERTIES: usize> ClientConfig<'a, MAX_PROPERTIES> {
             username: EncodedString::new(),
             password_flag: false,
             password: BinaryData::new(),
-            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new()
+            properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
+            max_packet_size: 265_000,
         }
     }
 
@@ -76,5 +78,14 @@ impl<'a, const MAX_PROPERTIES: usize> ClientConfig<'a, MAX_PROPERTIES> {
         if self.properties.len() < MAX_PROPERTIES {
             self.properties.push(prop);
         }
+    }
+
+    pub fn add_max_packet_size_as_prop(& mut self) -> u32 {
+        if self.properties.len() < MAX_PROPERTIES {
+            let prop = Property::MaximumPacketSize(self.max_packet_size);
+            self.properties.push(prop);
+            return 5;
+        }
+        return 0;
     }
 }

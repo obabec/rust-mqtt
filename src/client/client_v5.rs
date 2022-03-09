@@ -1,3 +1,4 @@
+use drogue_device::drogue::config;
 use crate::client::client_config::ClientConfig;
 use crate::network::network_trait::Network;
 use crate::packet::v5::connack_packet::ConnackPacket;
@@ -17,6 +18,7 @@ use crate::utils::rng_generator::CountingRng;
 use crate::utils::types::BufferError;
 use heapless::Vec;
 use rand_core::RngCore;
+use crate::packet::v5::property::Property;
 
 pub struct MqttClientV5<'a, T, const MAX_PROPERTIES: usize> {
     network_driver: &'a mut T,
@@ -53,8 +55,10 @@ where
 
     pub async fn connect_to_broker<'b>(&'b mut self) -> Result<(), ReasonCode> {
         let len = {
-            let mut connect = ConnectPacket::<'b, 3, 0>::clean();
+            let mut connect = ConnectPacket::<'b, MAX_PROPERTIES, 0>::new();
             connect.keep_alive = self.config.keep_alive;
+            self.config.add_max_packet_size_as_prop();
+            connect.property_len = connect.add_properties(&self.config.properties);
             if self.config.username_flag {
                 connect.add_username(&self.config.username);
             }

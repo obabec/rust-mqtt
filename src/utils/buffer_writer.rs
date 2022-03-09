@@ -87,8 +87,11 @@ impl<'a> BuffWriter<'a> {
 
     pub fn write_string_ref(&mut self, str: &EncodedString<'a>) -> Result<(), BufferError> {
         self.write_u16(str.len)?;
-        let bytes = str.string.as_bytes();
-        return self.insert_ref(str.len as usize, bytes);
+        if str.len != 0 {
+            let bytes = str.string.as_bytes();
+            return self.insert_ref(str.len as usize, bytes);
+        }
+        return Ok(())
     }
 
     pub fn write_binary_ref(&mut self, bin: &BinaryData<'a>) -> Result<(), BufferError> {

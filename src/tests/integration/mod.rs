@@ -22,4 +22,4 @@
  * SOFTWARE.
  */
 
-pub mod client_v5_unit;
+pub mod integration_test_single;

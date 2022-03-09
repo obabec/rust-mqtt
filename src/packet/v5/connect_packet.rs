@@ -136,8 +136,8 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
         let mut rm_ln = self.property_len;
         let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len)?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
-        // Number 12 => protocol_name_len + protocol_name + protocol_version + connect_flags + keep_alive + client_id_len
-        rm_ln = rm_ln + property_len_len as u32 + 12;
+        // Number 12 => protocol_name_len + protocol_name (6) + protocol_version (1)+ connect_flags (1) + keep_alive (2) + client_id_len (2)
+        rm_ln = rm_ln + property_len_len as u32 + 10 + self.client_id.len as u32 + 2;
 
         if self.connect_flags & 0x04 != 0 {
             let wil_prop_len_enc = VariableByteIntegerEncoder::encode(self.will_property_len)?;
