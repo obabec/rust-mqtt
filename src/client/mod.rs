@@ -22,5 +22,6 @@
  * SOFTWARE.
  */
 
+#[allow(unused_must_use)]
 pub mod client_config;
 pub mod client_v5;

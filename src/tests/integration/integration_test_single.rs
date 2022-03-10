@@ -24,7 +24,6 @@
 
 use alloc::string::String;
 use core::time::Duration;
-use heapless::Vec;
 use tokio::{join, task};
 use tokio::time::sleep;
 use crate::client::client_config::ClientConfig;
@@ -169,7 +168,7 @@ async fn receive_with_wrong_cred(qos: QualityOfService) {
     );
 
     log::info!("[Receiver] Connection to broker with username {} and password {}", "xyz", PASSWORD);
-    let mut result = {client.connect_to_broker().await};
+    let result = {client.connect_to_broker().await};
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), NotAuthorized);
 }

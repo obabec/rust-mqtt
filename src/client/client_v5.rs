@@ -17,8 +17,6 @@ use crate::utils::rng_generator::CountingRng;
 use crate::utils::types::BufferError;
 use heapless::Vec;
 use rand_core::RngCore;
-use crate::packet::v5::property::Property;
-use crate::packet::v5::reason_codes::ReasonCode::BuffError;
 
 pub struct MqttClientV5<'a, T, const MAX_PROPERTIES: usize> {
     network_driver: &'a mut T,
