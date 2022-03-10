@@ -211,7 +211,7 @@ async fn simple_publish_recv_qos() {
 #[tokio::test]
 async fn simple_publish_recv_wrong_cred() {
     init();
-    log::info!("Running simple integration test with Quality of Service 1");
+    log::info!("Running simple integration test wrong credentials");
 
     let recv = task::spawn(async move {
         receive_with_wrong_cred(QualityOfService::QoS1)

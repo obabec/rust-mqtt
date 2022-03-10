@@ -10,6 +10,10 @@ jobs:
       - name: Git checkout
         uses: actions/checkout@v2
 
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+        - run: cargo build
       - name: Start Mosquitto
         uses: namoshek/mosquitto-github-action@v1
         with:
@@ -17,7 +21,4 @@ jobs:
           ports: '1883:1883 8883:8883'
           config: ${{ github.workspace }}/.ci/mosquitto.conf
           container-name: 'mqtt'
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - run: cargo test integration
+        - run: cargo test integration
