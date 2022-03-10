@@ -1,6 +1,7 @@
 use core::fmt::{Display, Formatter};
 
 #[derive(Debug)]
+#[derive(PartialEq)]
 pub enum ReasonCode {
     Success,
     GrantedQoS1,

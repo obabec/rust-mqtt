@@ -1,4 +1,3 @@
-use drogue_device::drogue::config;
 use crate::client::client_config::ClientConfig;
 use crate::network::network_trait::Network;
 use crate::packet::v5::connack_packet::ConnackPacket;
@@ -19,6 +18,7 @@ use crate::utils::types::BufferError;
 use heapless::Vec;
 use rand_core::RngCore;
 use crate::packet::v5::property::Property;
+use crate::packet::v5::reason_codes::ReasonCode::BuffError;
 
 pub struct MqttClientV5<'a, T, const MAX_PROPERTIES: usize> {
     network_driver: &'a mut T,
@@ -53,6 +53,7 @@ where
         }
     }
 
+    // Muze prijit disconnect kvuli male velikosti packetu
     pub async fn connect_to_broker<'b>(&'b mut self) -> Result<(), ReasonCode> {
         let len = {
             let mut connect = ConnectPacket::<'b, MAX_PROPERTIES, 0>::new();
@@ -79,6 +80,13 @@ where
             self.network_driver.receive(self.buffer).await?;
             let mut packet = ConnackPacket::<'b, 5>::new();
             if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, self.buffer_len)) {
+                if err == BufferError::PacketTypeMismatch {
+                    let mut disc = DisconnectPacket::<'b, 5>::new();
+                    if disc.decode(&mut BuffReader::new(self.buffer, self.buffer_len)).is_ok() {
+                        log::error!("Client was disconnected with reason: ");
+                        return Err(ReasonCode::from(disc.disconnect_reason));
+                    }
+                }
                 Err(err)
             } else {
                 Ok(packet.connect_reason_code)
@@ -207,7 +215,7 @@ where
             if i == TOPICS {
                 break;
             }
-            if *reasons.get(i).unwrap() != self.config.qos.into() {
+            if *reasons.get(i).unwrap() != QualityOfService::into(self.config.qos) {
                 return Err(ReasonCode::from(*reasons.get(i).unwrap()));
             }
             i = i + 1;
@@ -262,6 +270,13 @@ where
         if let Err(err) =
             packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len))
         {
+            if err == BufferError::PacketTypeMismatch {
+                let mut disc = DisconnectPacket::<'b, 5>::new();
+                if disc.decode(&mut BuffReader::new(self.buffer, self.buffer_len)).is_ok() {
+                    log::error!("Client was disconnected with reason: ");
+                    return Err(ReasonCode::from(disc.disconnect_reason));
+                }
+            }
             log::error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         }

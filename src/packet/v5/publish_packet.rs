@@ -34,7 +34,7 @@ use crate::utils::types::{BufferError, EncodedString};
 use super::packet_type::PacketType;
 use super::property::Property;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum QualityOfService {
     QoS0,
     QoS1,
