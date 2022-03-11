@@ -1,4 +1,4 @@
-/*/*
+/*
  * MIT License
  *
  * Copyright (c) [2022] [Ondrej Babec <ond.babec@gmail.com>]
@@ -22,27 +22,44 @@
  * SOFTWARE.
  */
 
-use alloc::format;
-use alloc::string::String;
-use core::future::Future;
-use core::time::Duration;
-use drogue_device::traits::ip::IpAddressV4;
 
+use core::future::Future;
+use drogue_device::traits::ip::{IpAddress, IpAddressV4, IpProtocol, SocketAddress};
 use rust_mqtt::network::network_trait::Network;
 use rust_mqtt::packet::v5::reason_codes::ReasonCode;
 
-pub struct DrogueNetwork {
+use drogue_device::traits::tcp;
+use drogue_device::traits::tcp::TcpStack;
+use embassy::io::{AsyncBufReadExt, AsyncWriteExt};
+use embassy_traits::delay::Delay;
+
+pub struct DrogueNetwork<T, D> {
     ip: IpAddressV4,
     port: u16,
-    socket: Option<SocketHandle>,
+    socket: Option<T>,
+    timer: Option<D>
 }
 
-impl DrogueNetwork {
+impl DrogueNetwork<T, D>
+where
+    T: TcpStack,
+    D: Delay
+{
+    fn new(ip: [u8; 4], port: u16, stack: T, timer: D) -> Self {
+        Self {
+            ip: IpAddressV4(ip[0], ip[1], ip[2], ip[3]),
+            port,
+            socket: Some(stack),
+            timer: Some(timer)
+        }
+    }
 }
 
-impl Embassy {}
-
-impl Network for DrogueNetwork {
+impl Network for DrogueNetwork<T, D>
+where
+    T: TcpStack,
+    D: Delay
+{
     type ConnectionFuture<'m>
         where
             Self: 'm,
@@ -60,30 +77,54 @@ impl Network for DrogueNetwork {
     type TimerFuture<'m>
         where
             Self: 'm,
-    = impl Future<Output = ()>;
+    = impl Future<Output = ()> + 'm;
 
     fn new(ip: [u8; 4], port: u16) -> Self {
         Self {
             ip: IpAddressV4(ip[0], ip[1], ip[2], ip[3]),
             port,
-            socket: None
+            socket: None,
+            timer: None
         }
     }
 
-    fn create_connection(&'m mut self) -> Self::ConnectionFuture<'m> {
-        todo!()
+    fn create_connection<T: TcpStack>(&'m mut self) -> Self::ConnectionFuture<'m> {
+        async move {
+            return if let Some(ref mut stack) = self.socket {
+                stack.connect(stack, IpProtocol::Tcp, SocketAddress::new(IpAddress::V4(self.ip), self.port))
+            } else {
+                Err(ReasonCode::NetworkError);
+            }
+        }
     }
 
     fn send(&'m mut self, buffer: &'m mut [u8], len: usize) -> Self::WriteFuture<'m> {
-        todo!()
+        async move {
+            return if let Some(ref mut stack) = self.socket {
+                stack.write(stack, &buffer[0..len])
+            } else {
+                Err(ReasonCode::NetworkError);
+            }
+        }
     }
 
     fn receive(&'m mut self, buffer: &'m mut [u8]) -> Self::ReadFuture<'m> {
-        todo!()
+        async move {
+            return if let Some(ref mut stack) = self.socket {
+                stack.read(stack, & mut buffer[0..len])
+            } else {
+                Err(ReasonCode::NetworkError);
+            }
+        }
     }
 
     fn count_down(&'m mut self, time_in_secs: u64) -> Self::TimerFuture<'m> {
-        todo!()
+        async move {
+            return if let Some(time) = self.timer {
+                time.delay_ms(time_in_secs * 1000);
+            } else {
+                Err(ReasonCode::TimerNotSupported);
+            }
+        }
     }
 }
-*/
