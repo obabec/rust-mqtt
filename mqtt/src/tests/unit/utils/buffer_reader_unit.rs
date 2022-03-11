@@ -22,9 +22,6 @@
  * SOFTWARE.
  */
 
-use core::str;
-
-use log::info;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::types::BufferError;
 

@@ -1,0 +1,24 @@
+[package]
+name = "rust-mqtt"
+version = "0.0.1"
+authors = ["Ondrej Babec <ond.babec@gmail.com>"]
+edition = "2021"
+resolver = "2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+env_logger = "0.9.0"
+log = "0.4.14"
+heapless = "0.7.10"
+rand_core = "0.6.0"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+embassy = { version = "0.1.0", default-features = false, features = ["std"] }
+drogue-device = { version = "0.1.0", default-features = false, features = ["log", "std"] }
+tokio-network = { path = "../examples/tokio" }
+
+[patch.crates-io]
+embassy = { git = "https://github.com/embassy-rs/embassy.git", rev = "d76cd5ceaf5140c48ef97180beae156c0c0e07c8" }
+drogue-device = { git = "https://github.com/drogue-iot/drogue-device.git", rev = "ce915ad027880992789a73bfc53094e8b155c66b" }

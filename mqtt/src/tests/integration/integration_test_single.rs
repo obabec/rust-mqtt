@@ -24,15 +24,17 @@
 
 use alloc::string::String;
 use core::time::Duration;
+
 use tokio::{join, task};
 use tokio::time::sleep;
+
 use crate::client::client_config::ClientConfig;
 use crate::client::client_v5::MqttClientV5;
 use crate::network::network_trait::Network;
 use crate::packet::v5::property::Property;
 use crate::packet::v5::publish_packet::QualityOfService;
 use crate::packet::v5::reason_codes::ReasonCode::NotAuthorized;
-use crate::tokio_network::TokioNetwork;
+
 
 static IP: [u8; 4] = [127, 0, 0, 1];
 static PORT: u16 = 1883;

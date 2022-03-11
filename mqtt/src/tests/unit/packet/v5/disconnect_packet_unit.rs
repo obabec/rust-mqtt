@@ -22,47 +22,41 @@
  * SOFTWARE.
  */
 
+
 use heapless::Vec;
+use crate::packet::v5::disconnect_packet::DisconnectPacket;
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::packet_type::PacketType;
 use crate::packet::v5::property::Property;
-use crate::packet::v5::puback_packet::PubackPacket;
 use crate::utils::buffer_reader::BuffReader;
-use crate::utils::types::EncodedString;
 
 #[test]
 fn test_encode() {
-    let mut buffer: [u8; 14] = [0; 14];
-    let mut packet = PubackPacket::<1>::new();
-    packet.packet_identifier = 35420;
-    packet.reason_code = 0x00;
-    let mut str = EncodedString::new();
-    str.string = "Hello";
-    str.len = 5;
+    let mut buffer: [u8; 10] = [0; 10];
+    let mut packet = DisconnectPacket::<1>::new();
+    let prop: Property = Property::SessionExpiryInterval(512);
     let mut props = Vec::<Property, 1>::new();
-    props.push(Property::ReasonString(str));
+    props.push(prop);
     packet.property_len = packet.add_properties(&props);
-    let res = packet.encode(& mut buffer, 14);
+    let res = packet.encode(& mut buffer, 100);
     assert!(res.is_ok());
-    assert_eq!(res.unwrap(), 14);
-    assert_eq!(buffer, [0x40, 0x0C, 0x8A, 0x5C, 0x00, 0x08, 0x1F, 0x00, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f])
+    assert_eq!(buffer[0..res.unwrap()], [0xE0, 0x07, 0x00, 0x05, 0x11, 0x00, 0x00, 0x02, 0x00])
 }
 
 #[test]
 fn test_decode() {
-    let mut buffer: [u8; 14] = [0x40, 0x0C, 0x8A, 0x5E, 0x15, 0x08, 0x1F, 0x00, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f];
-    let mut packet = PubackPacket::<1>::new();
-    let res = packet.decode(& mut BuffReader::new(&buffer, 14));
+    let buffer: [u8; 10] = [0xE0, 0x07, 0x00, 0x05, 0x11, 0x00, 0x00, 0x04, 0x00, 0x00];
+    let mut packet = DisconnectPacket::<1>::new();
+    let res = packet.decode(& mut BuffReader::new(&buffer, 10));
     assert!(res.is_ok());
-    assert_eq!(packet.fixed_header, PacketType::Puback.into());
-    assert_eq!(packet.remain_len, 12);
-    assert_eq!(packet.packet_identifier, 35422);
-    assert_eq!(packet.reason_code, 0x15);
-    assert_eq!(packet.property_len, 8);
+    assert_eq!(packet.fixed_header, PacketType::Disconnect.into());
+    assert_eq!(packet.remain_len, 7);
+    assert_eq!(packet.disconnect_reason, 0x00);
+    assert_eq!(packet.property_len, 5);
     let prop = packet.properties.get(0);
     assert!(prop.is_some());
-    assert_eq!(<&Property as Into<u8>>::into(prop.unwrap()), 0x1F);
-    if let Property::ReasonString(u) = (*prop.unwrap()).clone() {
-        assert_eq!(u.string, "Hello");
+    assert_eq!(<&Property as Into<u8>>::into(prop.unwrap()), 0x11);
+    if let Property::SessionExpiryInterval(u) = *prop.unwrap() {
+        assert_eq!(u, 1024);
     }
 }

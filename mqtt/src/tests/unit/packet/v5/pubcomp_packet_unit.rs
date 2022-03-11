@@ -26,46 +26,43 @@ use heapless::Vec;
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::packet_type::PacketType;
 use crate::packet::v5::property::Property;
-use crate::packet::v5::puback_packet::PubackPacket;
-use crate::packet::v5::pubrec_packet::PubrecPacket;
-use crate::packet::v5::pubrel_packet::PubrelPacket;
-use crate::packet::v5::suback_packet::SubackPacket;
+use crate::packet::v5::pubcomp_packet::PubcompPacket;
 use crate::utils::buffer_reader::BuffReader;
-use crate::utils::types::{EncodedString, StringPair};
+use crate::utils::types::EncodedString;
+
+#[test]
+fn test_encode() {
+    let mut buffer: [u8; 14] = [0; 14];
+    let mut packet = PubcompPacket::<1>::new();
+    packet.fixed_header = PacketType::Pubcomp.into();
+    packet.packet_identifier = 35420;
+    packet.reason_code = 0x00;
+    let mut str = EncodedString::new();
+    str.string = "Wheel";
+    str.len = 5;
+    let mut props = Vec::<Property, 1>::new();
+    props.push(Property::ReasonString(str));
+    packet.property_len = packet.add_properties(& props);
+    let res = packet.encode(& mut buffer, 14);
+    assert!(res.is_ok());
+    assert_eq!(res.unwrap(), 14);
+    assert_eq!(buffer, [0x70, 0x0C, 0x8A, 0x5C, 0x00, 0x08, 0x1F, 0x00, 0x05, 0x57, 0x68, 0x65, 0x65, 0x6c])
+}
 
 #[test]
 fn test_decode() {
-    let mut buffer: [u8; 23] = [0x90, 0x15, 0xCC, 0x08, 0x0F, 0x1F, 0x00, 0x0C,
-        0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x53, 0x74, 0x72, 0x69, 0x6e, 0x67,
-        0x12, 0x34, 0x56];
-    let mut packet = SubackPacket::<3, 1>::new();
-    let res = packet.decode(& mut BuffReader::new(&buffer, 23));
+    let buffer: [u8; 14] = [0x70, 0x0C, 0x8A, 0x5C, 0x00, 0x08, 0x1F, 0x00, 0x05, 0x57, 0x68, 0x65, 0x65, 0x6c];
+    let mut packet = PubcompPacket::<1>::new();
+    let res = packet.decode(& mut BuffReader::new(&buffer, 14));
     assert!(res.is_ok());
-    assert_eq!(packet.fixed_header, PacketType::Suback.into());
-    assert_eq!(packet.remain_len, 21);
-    assert_eq!(packet.packet_identifier, 52232);
-    assert_eq!(packet.property_len, 15);
+    assert_eq!(packet.fixed_header, PacketType::Pubcomp.into());
+    assert_eq!(packet.packet_identifier, 35420);
+    assert_eq!(packet.reason_code, 0x00);
+    assert_eq!(packet.property_len, 8);
     let prop = packet.properties.get(0);
     assert!(prop.is_some());
     assert_eq!(<&Property as Into<u8>>::into(prop.unwrap()), 0x1F);
     if let Property::ReasonString(u) = (*prop.unwrap()).clone() {
-        assert_eq!(u.len, 12);
-        assert_eq!(u.string, "reasonString");
-    }
-    assert_eq!(packet.reason_codes.len(), 3);
-    let res1 = packet.reason_codes.get(0);
-    assert!(res1.is_some());
-    if let Some(r) = res1 {
-        assert_eq!(*r, 0x12);
-    }
-    let res2 = packet.reason_codes.get(1);
-    assert!(res2.is_some());
-    if let Some(r) = res2 {
-        assert_eq!(*r, 0x34);
-    }
-    let res3 = packet.reason_codes.get(2);
-    assert!(res3.is_some());
-    if let Some(r) = res3 {
-        assert_eq!(*r, 0x56);
+        assert_eq!(u.string, "Wheel");
     }
 }

@@ -22,19 +22,3 @@
  * SOFTWARE.
  */
 
-#![feature(in_band_lifetimes)]
-#![macro_use]
-#![cfg_attr(not(feature = "std"), no_std)]
-#![allow(dead_code)]
-#![feature(type_alias_impl_trait)]
-#![feature(generic_associated_types)]
-
-extern crate alloc;
-
-pub mod client;
-pub mod encoding;
-pub mod network;
-pub mod packet;
-pub mod tokio_network;
-pub mod utils;
-pub mod tests;

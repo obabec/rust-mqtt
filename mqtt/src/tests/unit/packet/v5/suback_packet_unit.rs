@@ -22,28 +22,22 @@
  * SOFTWARE.
  */
 
-use heapless::Vec;
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::packet_type::PacketType;
 use crate::packet::v5::property::Property;
-use crate::packet::v5::puback_packet::PubackPacket;
-use crate::packet::v5::pubrec_packet::PubrecPacket;
-use crate::packet::v5::pubrel_packet::PubrelPacket;
 use crate::packet::v5::suback_packet::SubackPacket;
-use crate::packet::v5::unsuback_packet::UnsubackPacket;
 use crate::utils::buffer_reader::BuffReader;
-use crate::utils::types::{EncodedString, StringPair};
 
 #[test]
 fn test_decode() {
-    let mut buffer: [u8; 22] = [0xB0, 0x14, 0xCC, 0x08, 0x0F, 0x1F, 0x00, 0x0C,
+    let buffer: [u8; 23] = [0x90, 0x15, 0xCC, 0x08, 0x0F, 0x1F, 0x00, 0x0C,
         0x72, 0x65, 0x61, 0x73, 0x6f, 0x6e, 0x53, 0x74, 0x72, 0x69, 0x6e, 0x67,
-        0x77, 0x55];
-    let mut packet = UnsubackPacket::<2, 1>::new();
-    let res = packet.decode(& mut BuffReader::new(&buffer, 22));
+        0x12, 0x34, 0x56];
+    let mut packet = SubackPacket::<3, 1>::new();
+    let res = packet.decode(& mut BuffReader::new(&buffer, 23));
     assert!(res.is_ok());
-    assert_eq!(packet.fixed_header, PacketType::Unsuback.into());
-    assert_eq!(packet.remain_len, 20);
+    assert_eq!(packet.fixed_header, PacketType::Suback.into());
+    assert_eq!(packet.remain_len, 21);
     assert_eq!(packet.packet_identifier, 52232);
     assert_eq!(packet.property_len, 15);
     let prop = packet.properties.get(0);
@@ -53,15 +47,20 @@ fn test_decode() {
         assert_eq!(u.len, 12);
         assert_eq!(u.string, "reasonString");
     }
-    assert_eq!(packet.reason_codes.len(), 2);
+    assert_eq!(packet.reason_codes.len(), 3);
     let res1 = packet.reason_codes.get(0);
     assert!(res1.is_some());
     if let Some(r) = res1 {
-        assert_eq!(*r, 0x77);
+        assert_eq!(*r, 0x12);
     }
     let res2 = packet.reason_codes.get(1);
     assert!(res2.is_some());
     if let Some(r) = res2 {
-        assert_eq!(*r, 0x55);
+        assert_eq!(*r, 0x34);
+    }
+    let res3 = packet.reason_codes.get(2);
+    assert!(res3.is_some());
+    if let Some(r) = res3 {
+        assert_eq!(*r, 0x56);
     }
 }

@@ -266,6 +266,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "embassy-network"
+version = "0.0.1"
+dependencies = [
+ "env_logger",
+ "rust-mqtt",
+ "tokio",
+]
+
+[[package]]
 name = "embassy-traits"
 version = "0.1.0"
 source = "git+https://github.com/embassy-rs/embassy.git?rev=d76cd5ceaf5140c48ef97180beae156c0c0e07c8#d76cd5ceaf5140c48ef97180beae156c0c0e07c8"
@@ -748,6 +757,7 @@ dependencies = [
  "log",
  "rand_core",
  "tokio",
+ "tokio-network",
 ]
 
 [[package]]
@@ -928,6 +938,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "tokio-network"
+version = "0.0.1"
+dependencies = [
+ "env_logger",
+ "rust-mqtt",
+ "tokio",
 ]
 
 [[package]]

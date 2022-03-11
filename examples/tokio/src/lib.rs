@@ -22,9 +22,11 @@
  * SOFTWARE.
  */
 
-#[cfg(test)]
-pub mod unit;
-#[allow(dead_code)]
-#[allow(unused_must_use)]
-#[allow(unused_imports)]
-pub mod integration;
+#![feature(in_band_lifetimes)]
+#![macro_use]
+#![allow(dead_code)]
+#![feature(type_alias_impl_trait)]
+#![feature(generic_associated_types)]
+
+extern crate alloc;
+pub mod tokio_network;
