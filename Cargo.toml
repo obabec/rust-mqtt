@@ -1,8 +1,8 @@
 [workspace]
 members = [
-    "mqtt",
     "examples/tokio",
-    "examples/embassy"
+    "examples/embassy",
+    "mqtt",
 ]
 resolver = "2"
 

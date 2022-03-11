@@ -23,4 +23,6 @@ jobs:
           ports: '1883:1883 8883:8883'
           config: ${{ github.workspace }}/.ci/mosquitto.conf
           container-name: 'mqtt'
-      - run: cargo test integration
+
+      - name: Run integration tests
+        run: cargo test integration

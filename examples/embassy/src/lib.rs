@@ -1,3 +1,5 @@
+#![feature(generic_associated_types)]
+#![feature(in_band_lifetimes)]
 /*
  * MIT License
  *
@@ -22,3 +24,5 @@
  * SOFTWARE.
  */
 
+#![no_std]
+pub mod embassy_network;

@@ -269,6 +269,8 @@ dependencies = [
 name = "embassy-network"
 version = "0.0.1"
 dependencies = [
+ "drogue-device",
+ "embassy",
  "env_logger",
  "rust-mqtt",
  "tokio",
@@ -750,8 +752,6 @@ checksum = "3e52c148ef37f8c375d49d5a73aa70713125b7f19095948a923f80afdeb22ec2"
 name = "rust-mqtt"
 version = "0.0.1"
 dependencies = [
- "drogue-device",
- "embassy",
  "env_logger",
  "heapless",
  "log",
