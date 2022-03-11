@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "examples/tokio",
     "examples/embassy",
     "mqtt",
 ]

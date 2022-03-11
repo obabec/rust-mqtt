@@ -27,6 +27,5 @@
 #![allow(dead_code)]
 #![feature(type_alias_impl_trait)]
 #![feature(generic_associated_types)]
-
-extern crate alloc;
+#[cfg(feature = "tokio")]
 pub mod tokio_network;

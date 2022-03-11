@@ -24,15 +24,21 @@
 extern crate alloc;
 use alloc::string::String;
 use core::time::Duration;
+use std::future::Future;
+use tokio::{join, task};
 use tokio::time::sleep;
+use tokio_test::assert_ok;
 
 use crate::client::client_config::ClientConfig;
 use crate::client::client_v5::MqttClientV5;
 use crate::packet::v5::property::Property;
 use crate::packet::v5::publish_packet::QualityOfService;
 use crate::packet::v5::reason_codes::ReasonCode::NotAuthorized;
+use crate::tokio_net::tokio_network::TokioNetwork;
+use crate::network::network_trait::Network;
+use crate::packet::v5::reason_codes::ReasonCode;
+use crate::utils::types::BufferError;
 
-use tokio_ne
 
 static IP: [u8; 4] = [127, 0, 0, 1];
 static PORT: u16 = 1883;
@@ -48,13 +54,12 @@ fn init() {
         .try_init();
 }
 
-async fn publish_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) {
+async fn publish_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) -> Result<(), ReasonCode> {
     log::info!("[Publisher] Connection to broker with username {} and password {}", USERNAME, PASSWORD);
     let mut result = {
         client.connect_to_broker().await
     };
-    assert!(result.is_ok());
-
+    assert_ok!(result);
     log::info!("[Publisher] Waiting {} seconds before sending", 5);
     sleep(Duration::from_secs(5)).await;
 
@@ -62,18 +67,19 @@ async fn publish_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) {
     result = {
         client.send_message(TOPIC, MSG).await
     };
-    assert!(result.is_ok());
+    assert_ok!(result);
 
     log::info!("[Publisher] Disconnecting!");
     result = {
         client.disconnect().await
     };
-    assert!(result.is_ok());
+    assert_ok!(result);
+    Ok(())
 }
 
-async fn publish(qos: QualityOfService) {
+async fn publish(qos: QualityOfService) -> Result<(), ReasonCode> {
     let mut tokio_network: TokioNetwork = TokioNetwork::new(IP, PORT);
-    tokio_network.create_connection().await;
+    tokio_network.create_connection().await ?;
     let mut config = ClientConfig::new();
     config.add_qos(qos);
     config.add_username(USERNAME);
@@ -91,26 +97,25 @@ async fn publish(qos: QualityOfService) {
         config,
     );
     publish_core(& mut client)
-        .await;
+        .await
 }
 
-async fn receive_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) {
+async fn receive_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) -> Result<(), ReasonCode> {
     log::info!("[Receiver] Connection to broker with username {} and password {}", USERNAME, PASSWORD);
     let mut result = {client.connect_to_broker().await};
-    assert!(result.is_ok());
+    assert_ok!(result);
 
     log::info!("[Receiver] Subscribing to topic {}", TOPIC);
     result = {
         client.subscribe_to_topic(TOPIC).await
     };
-    assert!(result.is_ok());
-
+    assert_ok!(result);
     log::info!("[Receiver] Waiting for new message!");
     let msg = {
         client.receive_message().await
     };
-    assert!(msg.is_ok());
-    let act_message = String::from_utf8_lossy(msg.unwrap());
+    assert_ok!(msg);
+    let act_message = String::from_utf8_lossy(msg?);
     log::info!("[Receiver] Got new message: {}", act_message);
     assert_eq!(act_message, MSG);
 
@@ -118,10 +123,11 @@ async fn receive_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) {
     result = {
         client.disconnect().await
     };
-    assert!(result.is_ok());
+    assert_ok!(result);
+    Ok(())
 }
 
-async fn receive(qos: QualityOfService) {
+async fn receive(qos: QualityOfService) -> Result<(), ReasonCode> {
     let mut tokio_network: TokioNetwork = TokioNetwork::new(IP, PORT);
     tokio_network.create_connection().await;
     let mut config = ClientConfig::new();
@@ -141,8 +147,9 @@ async fn receive(qos: QualityOfService) {
         100,
         config,
     );
+
     receive_core(& mut client)
-        .await;
+        .await
 }
 
 
@@ -179,16 +186,17 @@ async fn simple_publish_recv() {
     log::info!("Running simple integration test");
 
     let recv = task::spawn(async move {
-        receive(QualityOfService::QoS0)
-            .await;
+        receive(QualityOfService::QoS0).await
     });
 
     let publ = task::spawn(async move {
         publish(QualityOfService::QoS0)
-            .await;
+            .await
     });
 
-    join!(recv, publ);
+    let (r, p) = join!(recv, publ);
+    assert_ok!(r.unwrap());
+    assert_ok!(p.unwrap());
 }
 
 #[tokio::test]
@@ -198,14 +206,16 @@ async fn simple_publish_recv_qos() {
 
     let recv = task::spawn(async move {
         receive(QualityOfService::QoS1)
-            .await;
+            .await
     });
 
     let publ = task::spawn(async move {
         publish(QualityOfService::QoS1)
-            .await;
+            .await
     });
-    join!(recv, publ);
+    let (r, p) = join!(recv, publ);
+    assert_ok!(r.unwrap());
+    assert_ok!(p.unwrap());
 }
 
 #[tokio::test]
@@ -215,17 +225,19 @@ async fn simple_publish_recv_wrong_cred() {
 
     let recv = task::spawn(async move {
         receive_with_wrong_cred(QualityOfService::QoS1)
-            .await;
+            .await
     });
 
     let recv_right = task::spawn(async move {
         receive(QualityOfService::QoS0)
-            .await;
+            .await
     });
 
     let publ = task::spawn(async move {
         publish(QualityOfService::QoS1)
-            .await;
+            .await
     });
-    join!(recv, recv_right, publ);
+    let (r, rv, p) = join!(recv, recv_right, publ);
+    assert_ok!(rv.unwrap());
+    assert_ok!(p.unwrap());
 }

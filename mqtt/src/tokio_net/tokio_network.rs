@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-
+extern crate alloc;
 use alloc::format;
 use alloc::string::String;
 use core::future::Future;
@@ -30,8 +30,8 @@ use core::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::sleep;
-use rust_mqtt::network::network_trait::Network;
-use rust_mqtt::packet::v5::reason_codes::ReasonCode;
+use crate::network::network_trait::Network;
+use crate::packet::v5::reason_codes::ReasonCode;
 
 pub struct TokioNetwork {
     ip: [u8; 4],
