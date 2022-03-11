@@ -24,14 +24,15 @@
 
 
 use core::future::Future;
+use core::ops::Range;
 use drogue_device::traits::ip::{IpAddress, IpAddressV4, IpProtocol, SocketAddress};
 use rust_mqtt::network::network_trait::Network;
 use rust_mqtt::packet::v5::reason_codes::ReasonCode;
 
 use drogue_device::traits::tcp;
 use drogue_device::traits::tcp::TcpStack;
-use embassy::io::{AsyncBufReadExt, AsyncWriteExt};
-use embassy_traits::delay::Delay;
+use embedded_hal_async::delay::DelayUs;
+
 
 pub struct DrogueNetwork<T, D> {
     ip: IpAddressV4,
@@ -40,14 +41,14 @@ pub struct DrogueNetwork<T, D> {
     timer: Option<D>
 }
 
-impl DrogueNetwork<T, D>
+impl<T, D> DrogueNetwork<T, D>
 where
     T: TcpStack,
-    D: Delay
+    D: DelayUs
 {
     fn new(ip: [u8; 4], port: u16, stack: T, timer: D) -> Self {
         Self {
-            ip: IpAddressV4(ip[0], ip[1], ip[2], ip[3]),
+            ip: IpAddressV4::new(ip[0], ip[1], ip[2], ip[3]),
             port,
             socket: Some(stack),
             timer: Some(timer)
@@ -55,10 +56,10 @@ where
     }
 }
 
-impl Network for DrogueNetwork<T, D>
+impl<T: TcpStack, D: DelayUs> Network for DrogueNetwork<T, D>
 where
     T: TcpStack,
-    D: Delay
+    D: DelayUs
 {
     type ConnectionFuture<'m>
         where
@@ -77,23 +78,23 @@ where
     type TimerFuture<'m>
         where
             Self: 'm,
-    = impl Future<Output = ()> + 'm;
+    = impl Future<Output = Result<(), ReasonCode>> + 'm;
 
     fn new(ip: [u8; 4], port: u16) -> Self {
         Self {
-            ip: IpAddressV4(ip[0], ip[1], ip[2], ip[3]),
+            ip: IpAddressV4::new(ip[0], ip[1], ip[2], ip[3]),
             port,
             socket: None,
             timer: None
         }
     }
 
-    fn create_connection<T: TcpStack>(&'m mut self) -> Self::ConnectionFuture<'m> {
+    fn create_connection(&'m mut self) -> Self::ConnectionFuture<'m> {
         async move {
             return if let Some(ref mut stack) = self.socket {
-                stack.connect(stack, IpProtocol::Tcp, SocketAddress::new(IpAddress::V4(self.ip), self.port))
+                stack.connect(stack.handle, IpProtocol::Tcp, SocketAddress::new(IpAddress::V4(self.ip), self.port))
             } else {
-                Err(ReasonCode::NetworkError);
+                Err(ReasonCode::NetworkError)
             }
         }
     }
@@ -101,9 +102,12 @@ where
     fn send(&'m mut self, buffer: &'m mut [u8], len: usize) -> Self::WriteFuture<'m> {
         async move {
             return if let Some(ref mut stack) = self.socket {
-                stack.write(stack, &buffer[0..len])
+                stack.write(stack.handle, &buffer[0..len])
+                    .await
+                    .map_err(|x| ReasonCode::NetworkError)
+                    .map(())
             } else {
-                Err(ReasonCode::NetworkError);
+                Err(ReasonCode::NetworkError)
             }
         }
     }
@@ -111,19 +115,21 @@ where
     fn receive(&'m mut self, buffer: &'m mut [u8]) -> Self::ReadFuture<'m> {
         async move {
             return if let Some(ref mut stack) = self.socket {
-                stack.read(stack, & mut buffer[0..len])
+                stack.read(stack.handle, buffer)
+                    .await
             } else {
-                Err(ReasonCode::NetworkError);
+                Err(ReasonCode::NetworkError)
             }
         }
     }
 
     fn count_down(&'m mut self, time_in_secs: u64) -> Self::TimerFuture<'m> {
         async move {
-            return if let Some(time) = self.timer {
-                time.delay_ms(time_in_secs * 1000);
+            return if let Some(ref mut time) = self.timer {
+                time.delay_ms(time_in_secs as u32 * 1000)
+                    .await
             } else {
-                Err(ReasonCode::TimerNotSupported);
+                Err(ReasonCode::TimerNotSupported)
             }
         }
     }

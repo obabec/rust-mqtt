@@ -11,9 +11,10 @@ resolver = "2"
 env_logger = "0.9.0"
 rust-mqtt = { path = "../../mqtt"}
 embassy = { version = "0.1.0", features = ["std"] }
-embassy-traits = "0.0.2"
-drogue-device = { version = "0.1.0", features = ["log", "std"] }
 
-[patch.crates-io]
-embassy = { git = "https://github.com/embassy-rs/embassy.git", rev = "d76cd5ceaf5140c48ef97180beae156c0c0e07c8" }
-drogue-device = { git = "https://github.com/drogue-iot/drogue-device.git", rev = "ce915ad027880992789a73bfc53094e8b155c66b" }
+embedded-hal = { version = "0.2", features = ["unproven"] }
+embedded-hal-1 = { package = "embedded-hal", version = "1.0.0-alpha.6", git = "https://github.com/embassy-rs/embedded-hal", branch = "embassy" }
+embedded-hal-async = { version = "0.0.1", git = "https://github.com/embassy-rs/embedded-hal", branch = "embassy"}
+
+
+drogue-device = { version = "0.1.0", features = ["std"]  }
