@@ -18,7 +18,7 @@ jobs:
 
       - name: Start Mosquitto
         run: |
-          apt-get install mosquitto
+          sudo apt-get install mosquitto
           mosquitto -c .ci/mosquitto.conf -d
 
       - name: "Debug"
