@@ -21,12 +21,5 @@ jobs:
           sudo apt-get install mosquitto
           mosquitto -c .ci/mosquitto.conf -d
 
-      - name: "Debug"
-        run: |
-          echo $PWD
-
       - name: Run integration tests
         run: cargo test integration
-
-      - name: Get logs mqtt
-        run: docker logs mqtt
