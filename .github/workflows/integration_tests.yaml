@@ -24,5 +24,9 @@ jobs:
           config: ${{ github.workspace }}/.ci/mosquitto.conf
           container-name: 'mqtt'
 
+      - name: "Debug"
+        run: |
+          docker ps
+
       - name: Run integration tests
         run: cargo test integration
