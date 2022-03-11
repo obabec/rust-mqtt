@@ -19,7 +19,7 @@ jobs:
       - name: Start Mosquitto
         uses: namoshek/mosquitto-github-action@v1
         with:
-          version: '1.6'
+          version: '2.0'
           ports: '1883:1883 8883:8883'
           config: ${{ github.workspace }}/.ci/mosquitto.conf
           container-name: 'mqtt'
@@ -30,3 +30,6 @@ jobs:
 
       - name: Run integration tests
         run: cargo test integration
+
+      - name: Get logs mqtt
+        run: docker logs mqtt
