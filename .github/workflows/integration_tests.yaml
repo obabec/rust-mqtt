@@ -17,17 +17,12 @@ jobs:
       - run: cargo build
 
       - name: Start Mosquitto
-        uses: namoshek/mosquitto-github-action@v1
-        with:
-          version: '2.0'
-          ports: '1883:1883 8883:8883'
-          config: ${{ github.workspace }}/.ci/mosquitto.conf
-          container-name: 'mqtt'
+        run: |
+          apt-get install mosquitto
+          mosquitto -c .ci/mosquitto.conf -d
 
       - name: "Debug"
         run: |
-          docker ps
-          docker logs mqtt
           echo $PWD
 
       - name: Run integration tests
