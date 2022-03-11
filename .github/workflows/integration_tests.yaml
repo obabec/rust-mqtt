@@ -27,6 +27,7 @@ jobs:
       - name: "Debug"
         run: |
           docker ps
+          docker logs mqtt
 
       - name: Run integration tests
         run: cargo test integration
