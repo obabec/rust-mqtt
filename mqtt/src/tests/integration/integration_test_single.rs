@@ -80,6 +80,7 @@ async fn publish_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) -> Re
 
 async fn publish(qos: QualityOfService) -> Result<(), ReasonCode> {
     let mut tokio_network: TokioNetwork = TokioNetwork::new(IP, PORT);
+    log::error!("Tady jsem mrtvej");
     tokio_network.create_connection().await ?;
     let mut config = ClientConfig::new();
     config.add_qos(qos);
@@ -130,6 +131,7 @@ async fn receive_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) -> Re
 
 async fn receive(qos: QualityOfService) -> Result<(), ReasonCode> {
     let mut tokio_network: TokioNetwork = TokioNetwork::new(IP, PORT);
+    log::error!("Tady jsem mrtvej");
     tokio_network.create_connection().await;
     let mut config = ClientConfig::new();
     config.add_qos(qos);
