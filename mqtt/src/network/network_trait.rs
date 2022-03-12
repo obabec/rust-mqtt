@@ -64,5 +64,5 @@ pub trait NetworkConnection {
 
     fn receive(&'m mut self, buffer: &'m mut [u8]) -> Self::ReadFuture<'m>;
 
-    fn close(&'m mut self) -> Self::CloseFuture<'m>;
+    fn close(self) -> Self::CloseFuture<'m>;
 }

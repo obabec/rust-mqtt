@@ -100,7 +100,7 @@ impl NetworkConnection for TokioNetwork {
         }
     }
 
-    fn close<'m>(&'m mut self) -> Self::CloseFuture<'m> {
+    fn close<'m>(mut self) -> Self::CloseFuture<'m> {
         async move {
             return if let Some(ref mut stream) = self.stream {
                 stream.shutdown()

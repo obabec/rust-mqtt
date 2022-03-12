@@ -94,12 +94,11 @@ where
         }
     }
 
-    fn close(&'m mut self) -> Self::CloseFuture<'m> {
-        /*async move {
-            self.
-        }*/
+    fn close(mut self) -> Self::CloseFuture<'m> {
         async move {
-            Ok(())
+            self.socket.close()
+                .await
+                .map_err(|_| ReasonCode::NetworkError)
         }
     }
 }
