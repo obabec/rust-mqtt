@@ -56,13 +56,7 @@ pub trait NetworkConnection {
     where
         Self: 'm;
 
-    type TimerFuture<'m>: Future<Output = ()>
-    where
-    Self: 'm;
-
     fn send(&'m mut self, buffer: &'m mut [u8], len: usize) -> Self::WriteFuture<'m>;
 
     fn receive(&'m mut self, buffer: &'m mut [u8]) -> Self::ReadFuture<'m>;
-
-    fn count_down(&'m mut self, time_in_secs: u64) -> Self::TimerFuture<'m>;
 }

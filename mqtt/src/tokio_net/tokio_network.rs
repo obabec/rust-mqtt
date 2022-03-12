@@ -64,10 +64,10 @@ impl NetworkConnection for TokioNetwork {
             Self: 'm,
     = impl Future<Output = Result<usize, ReasonCode>> + 'm;
 
-    type TimerFuture<'m>
+    /*type TimerFuture<'m>
         where
             Self: 'm,
-    = impl Future<Output = ()>;
+    = impl Future<Output = ()>;*/
 
     fn send<'m>(&'m mut self, buffer: &'m mut [u8], len: usize) -> Self::WriteFuture<'m> {
         async move {
@@ -95,12 +95,12 @@ impl NetworkConnection for TokioNetwork {
         }
     }
 
-    fn count_down(&'m mut self, time_in_secs: u64) -> Self::TimerFuture<'m> {
+    /*fn count_down(&'m mut self, time_in_secs: u64) -> Self::TimerFuture<'m> {
         async move {
             return sleep(Duration::from_secs(time_in_secs))
                 .await
         }
-    }
+    }*/
 }
 
 pub struct TokioNetworkFactory {
