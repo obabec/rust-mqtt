@@ -34,6 +34,7 @@ use rust_mqtt::packet::v5::reason_codes::ReasonCode;
 
 use drogue_device::traits::tcp;
 use drogue_device::traits::tcp::TcpStack;
+use embassy::io::{AsyncBufReadExt, AsyncWriteExt};
 use embassy::time::Delay;
 use embedded_hal_async::delay::DelayUs;
 use rust_mqtt::network::network_trait::{NetworkConnection, NetworkConnectionFactory};
@@ -43,16 +44,16 @@ pub struct DrogueNetwork<A>
 where
     A: TcpActor + 'static
 {
-    socket: Option<Socket<A>>,
+    socket: Socket<A>,
 }
 
 impl<A> DrogueNetwork<A>
 where
     A: TcpActor + 'static,
 {
-    pub fn new(socket: Socket<A>) -> Self {
+    fn new(socket: Socket<A>) -> Self {
         Self {
-            socket: Some(socket)
+            socket
         }
     }
 }
@@ -71,28 +72,34 @@ where
             Self: 'm,
     = impl Future<Output = Result<usize, ReasonCode>> + 'm;
 
+    type CloseFuture<'m>
+        where
+            Self: 'm,
+    = impl Future<Output = Result<(), ReasonCode>> + 'm;
+
     fn send(&'m mut self, buffer: &'m mut [u8], len: usize) -> Self::WriteFuture<'m> {
-        async move {
-            return if let Some(ref mut connection) = self.socket {
-                connection.write(&buffer[0..len])
+            async move {
+                self.socket.write(&buffer[0..len])
                     .await
                     .map_err(|_| ReasonCode::NetworkError)
                     .map(|_| ())
-            } else {
-                Err(ReasonCode::NetworkError)
             }
         }
-    }
 
     fn receive(&'m mut self, buffer: &'m mut [u8]) -> Self::ReadFuture<'m> {
         async move {
-            return if let Some(ref mut connection) = self.socket {
-                connection.read(buffer)
-                    .await
-                    .map_err(|_| ReasonCode::NetworkError)
-            } else {
-                Err(ReasonCode::NetworkError)
-            }
+            self.socket.read(buffer)
+                .await
+                .map_err(|_| ReasonCode::NetworkError)
+        }
+    }
+
+    fn close(&'m mut self) -> Self::CloseFuture<'m> {
+        /*async move {
+            self.
+        }*/
+        async move {
+            Ok(())
         }
     }
 }

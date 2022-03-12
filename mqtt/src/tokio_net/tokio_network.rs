@@ -64,6 +64,11 @@ impl NetworkConnection for TokioNetwork {
             Self: 'm,
     = impl Future<Output = Result<usize, ReasonCode>> + 'm;
 
+    type CloseFuture<'m>
+        where
+            Self: 'm,
+    = impl Future<Output = Result<(), ReasonCode>> + 'm;
+
     /*type TimerFuture<'m>
         where
             Self: 'm,
@@ -92,6 +97,18 @@ impl NetworkConnection for TokioNetwork {
             } else {
                 Err(ReasonCode::NetworkError)
             };
+        }
+    }
+
+    fn close<'m>(&'m mut self) -> Self::CloseFuture<'m> {
+        async move {
+            return if let Some(ref mut stream) = self.stream {
+                stream.shutdown()
+                    .await
+                    .map_err(|_| ReasonCode::NetworkError)
+            } else {
+                Err(ReasonCode::NetworkError)
+            }
         }
     }
 
