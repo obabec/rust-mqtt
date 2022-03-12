@@ -35,8 +35,8 @@ use crate::client::client_v5::MqttClientV5;
 use crate::packet::v5::property::Property;
 use crate::packet::v5::publish_packet::QualityOfService;
 use crate::packet::v5::reason_codes::ReasonCode::NotAuthorized;
-use crate::tokio_net::tokio_network::TokioNetwork;
-use crate::network::network_trait::Network;
+use crate::tokio_net::tokio_network::{TokioNetwork, TokioNetworkFactory};
+use crate::network::network_trait::{NetworkConnection, NetworkConnectionFactory};
 use crate::packet::v5::reason_codes::ReasonCode;
 use crate::utils::types::BufferError;
 
@@ -45,7 +45,6 @@ static IP: [u8; 4] = [127, 0, 0, 1];
 static PORT: u16 = 1883;
 static USERNAME: &str = "test";
 static PASSWORD: &str = "testPass";
-static TOPIC: &str = "test/topic";
 static MSG: &str = "testMessage";
 
 fn init() {
@@ -55,7 +54,7 @@ fn init() {
         .try_init();
 }
 
-async fn publish_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) -> Result<(), ReasonCode> {
+async fn publish_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>, topic: & str) -> Result<(), ReasonCode> {
     log::info!("[Publisher] Connection to broker with username {} and password {}", USERNAME, PASSWORD);
     let mut result = {
         client.connect_to_broker().await
@@ -64,9 +63,9 @@ async fn publish_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) -> Re
     log::info!("[Publisher] Waiting {} seconds before sending", 5);
     sleep(Duration::from_secs(5)).await;
 
-    log::info!("[Publisher] Sending new message {}", MSG);
+    log::info!("[Publisher] Sending new message {} to topic {}", MSG, topic);
     result = {
-        client.send_message(TOPIC, MSG).await
+        client.send_message(topic, MSG).await
     };
     assert_ok!(result);
 
@@ -78,10 +77,9 @@ async fn publish_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) -> Re
     Ok(())
 }
 
-async fn publish(qos: QualityOfService) -> Result<(), ReasonCode> {
-    let mut tokio_network: TokioNetwork = TokioNetwork::new(IP, PORT);
-    log::error!("Tady jsem mrtvej");
-    tokio_network.create_connection().await ?;
+async fn publish(qos: QualityOfService, topic: &str) -> Result<(), ReasonCode> {
+    let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
+    let mut tokio_network: TokioNetwork = tokio_factory.connect(IP, PORT).await ?;
     let mut config = ClientConfig::new();
     config.add_qos(qos);
     config.add_username(USERNAME);
@@ -98,18 +96,18 @@ async fn publish(qos: QualityOfService) -> Result<(), ReasonCode> {
         80,
         config,
     );
-    publish_core(& mut client)
+    publish_core(& mut client, topic)
         .await
 }
 
-async fn receive_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) -> Result<(), ReasonCode> {
+async fn receive_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>, topic: &str) -> Result<(), ReasonCode> {
     log::info!("[Receiver] Connection to broker with username {} and password {}", USERNAME, PASSWORD);
-    let mut result = {client.connect_to_broker().await};
+    let mut result = { client.connect_to_broker().await };
     assert_ok!(result);
 
-    log::info!("[Receiver] Subscribing to topic {}", TOPIC);
+    log::info!("[Receiver] Subscribing to topic {}", topic);
     result = {
-        client.subscribe_to_topic(TOPIC).await
+        client.subscribe_to_topic(topic).await
     };
     assert_ok!(result);
     log::info!("[Receiver] Waiting for new message!");
@@ -129,10 +127,9 @@ async fn receive_core<'b>(client: & mut MqttClientV5<'b, TokioNetwork, 5>) -> Re
     Ok(())
 }
 
-async fn receive(qos: QualityOfService) -> Result<(), ReasonCode> {
-    let mut tokio_network: TokioNetwork = TokioNetwork::new(IP, PORT);
-    log::error!("Tady jsem mrtvej");
-    tokio_network.create_connection().await;
+async fn receive(qos: QualityOfService, topic: &str) -> Result<(), ReasonCode> {
+    let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
+    let mut tokio_network: TokioNetwork = tokio_factory.connect(IP, PORT).await ?;
     let mut config = ClientConfig::new();
     config.add_qos(qos);
     config.add_username(USERNAME);
@@ -151,14 +148,14 @@ async fn receive(qos: QualityOfService) -> Result<(), ReasonCode> {
         config,
     );
 
-    receive_core(& mut client)
+    receive_core(& mut client, topic)
         .await
 }
 
 
-async fn receive_with_wrong_cred(qos: QualityOfService) {
-    let mut tokio_network: TokioNetwork = TokioNetwork::new(IP, PORT);
-    tokio_network.create_connection().await;
+async fn receive_with_wrong_cred(qos: QualityOfService) -> Result<(), ReasonCode> {
+    let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
+    let mut tokio_network: TokioNetwork = tokio_factory.connect( IP, PORT).await ?;
     let mut config = ClientConfig::new();
     config.add_qos(qos);
     config.add_username("xyz");
@@ -181,6 +178,7 @@ async fn receive_with_wrong_cred(qos: QualityOfService) {
     let result = {client.connect_to_broker().await};
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), NotAuthorized);
+    Ok(())
 }
 
 #[tokio::test]
@@ -189,11 +187,12 @@ async fn simple_publish_recv() {
     log::info!("Running simple integration test");
 
     let recv = task::spawn(async move {
-        receive(QualityOfService::QoS0).await
+        receive(QualityOfService::QoS0,"test/recv/simple")
+            .await
     });
 
     let publ = task::spawn(async move {
-        publish(QualityOfService::QoS0)
+        publish(QualityOfService::QoS0, "test/recv/simple")
             .await
     });
 
@@ -208,12 +207,12 @@ async fn simple_publish_recv_qos() {
     log::info!("Running simple integration test with Quality of Service 1");
 
     let recv = task::spawn(async move {
-        receive(QualityOfService::QoS1)
+        receive(QualityOfService::QoS1, "test/recv/qos")
             .await
     });
 
     let publ = task::spawn(async move {
-        publish(QualityOfService::QoS1)
+        publish(QualityOfService::QoS1, "test/recv/qos")
             .await
     });
     let (r, p) = join!(recv, publ);
@@ -232,12 +231,12 @@ async fn simple_publish_recv_wrong_cred() {
     });
 
     let recv_right = task::spawn(async move {
-        receive(QualityOfService::QoS0)
+        receive(QualityOfService::QoS0, "test/recv/wrong")
             .await
     });
 
     let publ = task::spawn(async move {
-        publish(QualityOfService::QoS1)
+        publish(QualityOfService::QoS1, "test/recv/wrong")
             .await
     });
     let (r, rv, p) = join!(recv, recv_right, publ);

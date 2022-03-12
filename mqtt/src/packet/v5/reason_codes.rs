@@ -1,3 +1,27 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) [2022] [Ondrej Babec <ond.babec@gmail.com>]
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 use core::fmt::{Display, Formatter};
 
 #[derive(Debug)]
@@ -46,6 +70,7 @@ pub enum ReasonCode {
     MaximumConnectTime,
     SubscriptionIdentifiersNotSupported,
     WildcardSubscriptionNotSupported,
+    TimerNotSupported,
     BuffError,
     NetworkError,
 }
@@ -96,6 +121,7 @@ impl Into<u8> for ReasonCode {
             ReasonCode::MaximumConnectTime => 0xA0,
             ReasonCode::SubscriptionIdentifiersNotSupported => 0xA1,
             ReasonCode::WildcardSubscriptionNotSupported => 0xA2,
+            ReasonCode::TimerNotSupported => 0xFD,
             ReasonCode::BuffError => 0xFE,
             ReasonCode::NetworkError => 0xFF,
         };
@@ -147,6 +173,7 @@ impl From<u8> for ReasonCode {
             0xA0 => ReasonCode::MaximumConnectTime,
             0xA1 => ReasonCode::SubscriptionIdentifiersNotSupported,
             0xA2 => ReasonCode::WildcardSubscriptionNotSupported,
+            0xFD => ReasonCode::TimerNotSupported,
             0xFE => ReasonCode::BuffError,
             _ => ReasonCode::NetworkError,
         };
@@ -207,6 +234,7 @@ impl Display for ReasonCode {
             ReasonCode::WildcardSubscriptionNotSupported => {
                 write!(f, "Wildcard subscription not supported!")
             }
+            ReasonCode::TimerNotSupported => write!(f, "Timer implementation is not provided"),
             ReasonCode::BuffError => write!(f, "Error encountered during write / read from packet"),
             ReasonCode::NetworkError => write!(f, "Unknown error!"),
         }

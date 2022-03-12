@@ -6,5 +6,7 @@ members = [
 resolver = "2"
 
 [patch.crates-io]
-embassy = { git = "https://github.com/embassy-rs/embassy.git", rev = "d76cd5ceaf5140c48ef97180beae156c0c0e07c8" }
-drogue-device = { git = "https://github.com/drogue-iot/drogue-device.git", rev = "ce915ad027880992789a73bfc53094e8b155c66b" }
+embassy = { git = "https://github.com/embassy-rs/embassy.git", rev = "3d6b8bd9832d5a29cab4aa21434663e6ea6f4488" }
+embassy-traits = { git = "https://github.com/embassy-rs/embassy.git", rev = "3d6b8bd9832d5a29cab4aa21434663e6ea6f4488" }
+embassy-net = { git = "https://github.com/embassy-rs/embassy.git", rev = "3d6b8bd9832d5a29cab4aa21434663e6ea6f4488" }
+drogue-device = { git = "https://github.com/drogue-iot/drogue-device.git", rev = "62ff20e278a6a705056173171714b1bbdc078df5" }

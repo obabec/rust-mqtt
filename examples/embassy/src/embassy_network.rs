@@ -25,46 +25,45 @@
 
 use core::future::Future;
 use core::ops::Range;
+use drogue_device::actors::net::ConnectionFactory;
+use drogue_device::actors::socket::Socket;
+use drogue_device::actors::tcp::TcpActor;
+use drogue_device::Address;
 use drogue_device::traits::ip::{IpAddress, IpAddressV4, IpProtocol, SocketAddress};
-use rust_mqtt::network::network_trait::Network;
 use rust_mqtt::packet::v5::reason_codes::ReasonCode;
 
 use drogue_device::traits::tcp;
 use drogue_device::traits::tcp::TcpStack;
+use embassy::time::Delay;
 use embedded_hal_async::delay::DelayUs;
+use rust_mqtt::network::network_trait::{NetworkConnection, NetworkConnectionFactory};
 
 
-pub struct DrogueNetwork<T, D> {
-    ip: IpAddressV4,
-    port: u16,
-    socket: Option<T>,
+pub struct DrogueNetwork<A, D>
+where
+    A: TcpActor + 'static{
+    socket: Option<Socket<A>>,
     timer: Option<D>
 }
 
-impl<T, D> DrogueNetwork<T, D>
+impl<A, D> DrogueNetwork<A, D>
 where
-    T: TcpStack,
+    A: TcpActor + 'static,
     D: DelayUs
 {
-    fn new(ip: [u8; 4], port: u16, stack: T, timer: D) -> Self {
+    pub fn new(socket: Socket<A>, timer: D) -> Self {
         Self {
-            ip: IpAddressV4::new(ip[0], ip[1], ip[2], ip[3]),
-            port,
-            socket: Some(stack),
+            socket: Some(socket),
             timer: Some(timer)
         }
     }
 }
 
-impl<T: TcpStack, D: DelayUs> Network for DrogueNetwork<T, D>
+impl<A, D> NetworkConnection for DrogueNetwork<A, D>
 where
-    T: TcpStack,
+    A: TcpActor + 'static,
     D: DelayUs
 {
-    type ConnectionFuture<'m>
-        where
-            Self: 'm,
-    = impl Future<Output = Result<(), ReasonCode>> + 'm;
     type WriteFuture<'m>
         where
             Self: 'm,
@@ -78,34 +77,15 @@ where
     type TimerFuture<'m>
         where
             Self: 'm,
-    = impl Future<Output = Result<(), ReasonCode>> + 'm;
-
-    fn new(ip: [u8; 4], port: u16) -> Self {
-        Self {
-            ip: IpAddressV4::new(ip[0], ip[1], ip[2], ip[3]),
-            port,
-            socket: None,
-            timer: None
-        }
-    }
-
-    fn create_connection(&'m mut self) -> Self::ConnectionFuture<'m> {
-        async move {
-            return if let Some(ref mut stack) = self.socket {
-                stack.connect(stack.handle, IpProtocol::Tcp, SocketAddress::new(IpAddress::V4(self.ip), self.port))
-            } else {
-                Err(ReasonCode::NetworkError)
-            }
-        }
-    }
+    = impl Future<Output = ()> + 'm;
 
     fn send(&'m mut self, buffer: &'m mut [u8], len: usize) -> Self::WriteFuture<'m> {
         async move {
-            return if let Some(ref mut stack) = self.socket {
-                stack.write(stack.handle, &buffer[0..len])
+            return if let Some(ref mut connection) = self.socket {
+                connection.write(&buffer[0..len])
                     .await
-                    .map_err(|x| ReasonCode::NetworkError)
-                    .map(())
+                    .map_err(|_| ReasonCode::NetworkError)
+                    .map(|_| ())
             } else {
                 Err(ReasonCode::NetworkError)
             }
@@ -114,9 +94,10 @@ where
 
     fn receive(&'m mut self, buffer: &'m mut [u8]) -> Self::ReadFuture<'m> {
         async move {
-            return if let Some(ref mut stack) = self.socket {
-                stack.read(stack.handle, buffer)
+            return if let Some(ref mut connection) = self.socket {
+                connection.read(buffer)
                     .await
+                    .map_err(|_| ReasonCode::NetworkError)
             } else {
                 Err(ReasonCode::NetworkError)
             }
@@ -128,8 +109,65 @@ where
             return if let Some(ref mut time) = self.timer {
                 time.delay_ms(time_in_secs as u32 * 1000)
                     .await
-            } else {
-                Err(ReasonCode::TimerNotSupported)
+                    .map_err(|_| ReasonCode::TimerNotSupported)
+                    .unwrap()
+            }
+        }
+    }
+}
+
+pub struct DrogueConnectionFactory<A, D>
+where
+    A: TcpActor + 'static,
+    D: DelayUs
+{
+    network: Address<A>,
+    delay: D
+}
+
+impl<A, D> DrogueConnectionFactory<A, D>
+where
+    A: TcpActor + 'static,
+    D: DelayUs
+{
+    pub fn new(network: Address<A>, delay: D) -> Self {
+        Self {
+            network,
+            delay
+        }
+    }
+}
+
+impl<A, D> NetworkConnectionFactory for DrogueConnectionFactory<A, D>
+where
+    A: TcpActor + 'static,
+    D: DelayUs
+{
+    type Connection = DrogueNetwork<A, D>;
+
+    type ConnectionFuture<'m>
+        where
+            Self: 'm,
+    = impl Future<Output = Result<Self::Connection, ReasonCode>> + 'm;
+
+    fn connect<'m>(&'m mut self, ip: [u8; 4], port: u16) -> Self::ConnectionFuture<'m> {
+        async move {
+            let mut socket = Socket::new(self.network.clone(), self.network.open().await.unwrap());
+
+            match socket
+                .connect(IpProtocol::Tcp, SocketAddress::new(IpAddress::new_v4(ip[0],
+                                                               ip[1], ip[2], ip[3]), port))
+                .await
+            {
+                Ok(_) => {
+                    log::trace!("Connection established");
+                    Ok(DrogueNetwork::new(socket, &self.delay))
+                }
+                Err(e) => {
+                    log::warn!("Error creating connection: {:?}", e);
+                    socket.close().await.map_err(|e| ReasonCode::NetworkError)?;
+                    Err(ReasonCode::NetworkError)
+                }
             }
         }
     }
