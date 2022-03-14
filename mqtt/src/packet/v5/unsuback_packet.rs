@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+
 use heapless::Vec;
 
 use crate::packet::v5::mqtt_packet::Packet;
@@ -74,13 +75,13 @@ impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     }
 
     fn encode(&mut self, _buffer: &mut [u8], _buffer_len: usize) -> Result<usize, BufferError> {
-        log::error!("UNSUBACK packet does not support encoding!");
+        error!("UNSUBACK packet does not support encoding!");
         Err(BufferError::WrongPacketToEncode)
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
         if self.decode_fixed_header(buff_reader)? != (PacketType::Unsuback).into() {
-            log::error!("Packet you are trying to decode is not UNSUBACK packet!");
+            error!("Packet you are trying to decode is not UNSUBACK packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
         self.packet_identifier = buff_reader.read_u16()?;

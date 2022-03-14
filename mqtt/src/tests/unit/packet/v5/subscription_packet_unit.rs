@@ -27,6 +27,7 @@ use crate::packet::v5::packet_type::PacketType;
 use crate::packet::v5::property::Property;
 use crate::packet::v5::publish_packet::QualityOfService::{QoS0, QoS1};
 use crate::packet::v5::subscription_packet::SubscriptionPacket;
+
 use heapless::Vec;
 
 #[test]

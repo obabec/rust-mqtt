@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+
 use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
@@ -73,7 +74,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for ConnackPacket<'a, MAX_PROPE
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
         if self.decode_fixed_header(buff_reader)? != (PacketType::Connack).into() {
-            log::error!("Packet you are trying to decode is not CONNACK packet!");
+            error!("Packet you are trying to decode is not CONNACK packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
         self.ack_flags = buff_reader.read_u8()?;

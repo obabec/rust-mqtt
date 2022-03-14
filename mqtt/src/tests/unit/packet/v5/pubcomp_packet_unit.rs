@@ -28,6 +28,7 @@ use crate::packet::v5::property::Property;
 use crate::packet::v5::pubcomp_packet::PubcompPacket;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::types::EncodedString;
+
 use heapless::Vec;
 
 #[test]

@@ -33,14 +33,11 @@ use rust_mqtt::packet::v5::reason_codes::ReasonCode;
 
 use drogue_device::traits::tcp;
 use drogue_device::traits::tcp::TcpStack;
-use embassy::io::{AsyncBufReadExt, AsyncWriteExt};
-use embassy::time::Delay;
-use embedded_hal_async::delay::DelayUs;
 use rust_mqtt::network::network_trait::{NetworkConnection, NetworkConnectionFactory};
 
 pub struct DrogueNetwork<A>
-where
-    A: TcpActor + 'static,
+    where
+        A: TcpActor + 'static,
 {
     socket: Socket<A>,
 }
@@ -92,10 +89,9 @@ where
         }
     }
 
-    fn close(mut self) -> Self::CloseFuture<'m> {
+    fn close<'m>(mut self) -> Self::CloseFuture<'m> {
         async move {
-            self.socket
-                .close()
+            self.socket.close()
                 .await
                 .map_err(|_| ReasonCode::NetworkError)
         }
@@ -141,11 +137,11 @@ where
                 .await
             {
                 Ok(_) => {
-                    log::trace!("Connection established");
+                    trace!("Connection established");
                     Ok(DrogueNetwork::new(socket))
                 }
                 Err(e) => {
-                    log::warn!("Error creating connection: {:?}", e);
+                    warn!("Error creating connection:");
                     socket.close().await.map_err(|e| ReasonCode::NetworkError)?;
                     Err(ReasonCode::NetworkError)
                 }

@@ -28,6 +28,7 @@ use crate::packet::v5::property::Property;
 use crate::packet::v5::publish_packet::QualityOfService::{QoS0, QoS1};
 use crate::packet::v5::unsubscription_packet::UnsubscriptionPacket;
 use crate::utils::types::{EncodedString, StringPair};
+
 use heapless::Vec;
 
 #[test]

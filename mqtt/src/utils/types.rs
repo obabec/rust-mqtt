@@ -25,6 +25,7 @@
 use core::fmt::{Display, Formatter};
 
 #[derive(core::fmt::Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum BufferError {
     Utf8Error,
     InsufficientBufferSize,

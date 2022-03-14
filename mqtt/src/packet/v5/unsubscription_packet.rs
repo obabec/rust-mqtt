@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+
 use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
@@ -105,7 +106,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     }
 
     fn decode(&mut self, _buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        log::error!("Unsubscribe packet does not support decode funtion on client!");
+        error!("Unsubscribe packet does not support decode funtion on client!");
         Err(BufferError::WrongPacketToDecode)
     }
 

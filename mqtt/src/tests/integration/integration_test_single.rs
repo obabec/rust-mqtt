@@ -25,6 +25,7 @@ extern crate alloc;
 use alloc::string::String;
 use core::time::Duration;
 use std::future::Future;
+use log::LevelFilter;
 use tokio::time::sleep;
 use tokio::{join, task};
 use tokio_test::assert_ok;
@@ -38,6 +39,7 @@ use crate::packet::v5::reason_codes::ReasonCode;
 use crate::packet::v5::reason_codes::ReasonCode::NotAuthorized;
 use crate::tokio_net::tokio_network::{TokioNetwork, TokioNetworkFactory};
 use crate::utils::types::BufferError;
+use std::sync::Once;
 
 static IP: [u8; 4] = [127, 0, 0, 1];
 static PORT: u16 = 1883;
@@ -45,32 +47,33 @@ static USERNAME: &str = "test";
 static PASSWORD: &str = "testPass";
 static MSG: &str = "testMessage";
 
-fn init() {
-    let _ = env_logger::builder()
-        .filter_level(log::LevelFilter::Info)
-        .format_timestamp_nanos()
-        .try_init();
+static INIT: Once = Once::new();
+
+fn setup() {
+    INIT.call_once(|| {
+        env_logger::init();
+    });
 }
 
 async fn publish_core<'b>(
     client: &mut MqttClientV5<'b, TokioNetwork, 5>,
     topic: &str,
 ) -> Result<(), ReasonCode> {
-    log::info!(
+    info!(
         "[Publisher] Connection to broker with username {} and password {}",
         USERNAME,
         PASSWORD
     );
     let mut result = { client.connect_to_broker().await };
     assert_ok!(result);
-    log::info!("[Publisher] Waiting {} seconds before sending", 5);
+    info!("[Publisher] Waiting {} seconds before sending", 5);
     sleep(Duration::from_secs(5)).await;
 
-    log::info!("[Publisher] Sending new message {} to topic {}", MSG, topic);
+    info!("[Publisher] Sending new message {} to topic {}", MSG, topic);
     result = { client.send_message(topic, MSG).await };
     assert_ok!(result);
 
-    log::info!("[Publisher] Disconnecting!");
+    info!("[Publisher] Disconnecting!");
     result = { client.disconnect().await };
     assert_ok!(result);
     Ok(())
@@ -88,7 +91,7 @@ async fn publish(qos: QualityOfService, topic: &str) -> Result<(), ReasonCode> {
     let mut write_buffer = [0; 80];
 
     let mut client = MqttClientV5::<TokioNetwork, 5>::new(
-        &mut tokio_network,
+        tokio_network,
         &mut write_buffer,
         80,
         &mut recv_buffer,
@@ -102,7 +105,7 @@ async fn receive_core<'b>(
     client: &mut MqttClientV5<'b, TokioNetwork, 5>,
     topic: &str,
 ) -> Result<(), ReasonCode> {
-    log::info!(
+    info!(
         "[Receiver] Connection to broker with username {} and password {}",
         USERNAME,
         PASSWORD
@@ -110,17 +113,17 @@ async fn receive_core<'b>(
     let mut result = { client.connect_to_broker().await };
     assert_ok!(result);
 
-    log::info!("[Receiver] Subscribing to topic {}", topic);
+    info!("[Receiver] Subscribing to topic {}", topic);
     result = { client.subscribe_to_topic(topic).await };
     assert_ok!(result);
-    log::info!("[Receiver] Waiting for new message!");
+    info!("[Receiver] Waiting for new message!");
     let msg = { client.receive_message().await };
     assert_ok!(msg);
     let act_message = String::from_utf8_lossy(msg?);
-    log::info!("[Receiver] Got new message: {}", act_message);
+    info!("[Receiver] Got new message: {}", act_message);
     assert_eq!(act_message, MSG);
 
-    log::info!("[Receiver] Disconnecting");
+    info!("[Receiver] Disconnecting");
     result = { client.disconnect().await };
     assert_ok!(result);
     Ok(())
@@ -139,7 +142,7 @@ async fn receive(qos: QualityOfService, topic: &str) -> Result<(), ReasonCode> {
     let mut write_buffer = [0; 100];
 
     let mut client = MqttClientV5::<TokioNetwork, 5>::new(
-        &mut tokio_network,
+        tokio_network,
         &mut write_buffer,
         100,
         &mut recv_buffer,
@@ -163,7 +166,7 @@ async fn receive_with_wrong_cred(qos: QualityOfService) -> Result<(), ReasonCode
     let mut write_buffer = [0; 100];
 
     let mut client = MqttClientV5::<TokioNetwork, 5>::new(
-        &mut tokio_network,
+        tokio_network,
         &mut write_buffer,
         100,
         &mut recv_buffer,
@@ -171,7 +174,7 @@ async fn receive_with_wrong_cred(qos: QualityOfService) -> Result<(), ReasonCode
         config,
     );
 
-    log::info!(
+    info!(
         "[Receiver] Connection to broker with username {} and password {}",
         "xyz",
         PASSWORD
@@ -184,8 +187,8 @@ async fn receive_with_wrong_cred(qos: QualityOfService) -> Result<(), ReasonCode
 
 #[tokio::test]
 async fn simple_publish_recv() {
-    init();
-    log::info!("Running simple integration test");
+    setup();
+    info!("Running simple integration test");
 
     let recv =
         task::spawn(async move { receive(QualityOfService::QoS0, "test/recv/simple").await });
@@ -200,8 +203,8 @@ async fn simple_publish_recv() {
 
 #[tokio::test]
 async fn simple_publish_recv_qos() {
-    init();
-    log::info!("Running simple integration test with Quality of Service 1");
+    setup();
+    info!("Running simple integration test with Quality of Service 1");
 
     let recv = task::spawn(async move { receive(QualityOfService::QoS1, "test/recv/qos").await });
 
@@ -213,8 +216,8 @@ async fn simple_publish_recv_qos() {
 
 #[tokio::test]
 async fn simple_publish_recv_wrong_cred() {
-    init();
-    log::info!("Running simple integration test wrong credentials");
+    setup();
+    info!("Running simple integration test wrong credentials");
 
     let recv = task::spawn(async move { receive_with_wrong_cred(QualityOfService::QoS1).await });
 

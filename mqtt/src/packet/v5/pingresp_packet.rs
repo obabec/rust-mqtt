@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
@@ -55,27 +56,27 @@ impl<'a> Packet<'a> for PingrespPacket {
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
         let x = self.decode_fixed_header(buff_reader)?;
         if x != (PacketType::Pingresp).into() {
-            log::error!("Packet you are trying to decode is not PINGRESP packet!");
+            error!("Packet you are trying to decode is not PINGRESP packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
         if self.remain_len != 0 {
-            log::error!("PINGRESP packet does not have 0 lenght!");
+            error!("PINGRESP packet does not have 0 lenght!");
             return Err(BufferError::PacketTypeMismatch);
         }
         Ok(())
     }
 
     fn set_property_len(&mut self, _value: u32) {
-        log::error!("PINGRESP packet does not contain any properties!");
+        error!("PINGRESP packet does not contain any properties!");
     }
 
     fn get_property_len(&mut self) -> u32 {
-        log::error!("PINGRESP packet does not contain any properties!");
+        error!("PINGRESP packet does not contain any properties!");
         return 0;
     }
 
     fn push_to_properties(&mut self, _property: Property<'a>) {
-        log::error!("PINGRESP packet does not contain any properties!");
+        error!("PINGRESP packet does not contain any properties!");
     }
 
     fn property_allowed(&mut self, property: &Property<'a>) -> bool {

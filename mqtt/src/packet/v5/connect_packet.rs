@@ -187,7 +187,7 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
     }
 
     fn decode(&mut self, _buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        log::error!("Decode function is not available for control packet!");
+        error!("Decode function is not available for control packet!");
         Err(BufferError::WrongPacketToDecode)
     }
 

@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
@@ -53,21 +54,21 @@ impl<'a> Packet<'a> for PingreqPacket {
     }
 
     fn decode(&mut self, _buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        log::error!("Pingreq Packet packet does not support decode funtion on client!");
+        error!("Pingreq Packet packet does not support decode funtion on client!");
         Err(BufferError::WrongPacketToDecode)
     }
 
     fn set_property_len(&mut self, _value: u32) {
-        log::error!("PINGREQ packet does not contain any properties!");
+        error!("PINGREQ packet does not contain any properties!");
     }
 
     fn get_property_len(&mut self) -> u32 {
-        log::error!("PINGREQ packet does not contain any properties!");
+        error!("PINGREQ packet does not contain any properties!");
         return 0;
     }
 
     fn push_to_properties(&mut self, _property: Property<'a>) {
-        log::error!("PINGREQ packet does not contain any properties!");
+        error!("PINGREQ packet does not contain any properties!");
     }
 
     fn property_allowed(&mut self, property: &Property<'a>) -> bool {

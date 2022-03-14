@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+
 use heapless::Vec;
 
 use super::packet_type::PacketType;
@@ -106,7 +107,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     }
 
     fn decode(&mut self, _buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        log::error!("Subscribe packet does not support decode funtion on client!");
+        error!("Subscribe packet does not support decode funtion on client!");
         Err(BufferError::WrongPacketToDecode)
     }
     fn set_property_len(&mut self, value: u32) {

@@ -28,6 +28,7 @@ use crate::packet::v5::property::Property;
 use crate::packet::v5::publish_packet::{PublishPacket, QualityOfService};
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::types::EncodedString;
+
 use heapless::Vec;
 
 #[test]
