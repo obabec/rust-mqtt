@@ -14,7 +14,6 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          override: true
 
       - name: Build embedded
         run: cargo build --target thumbv7em-none-eabihf --features "no_std" --no-default-features
