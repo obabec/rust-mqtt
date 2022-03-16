@@ -247,7 +247,7 @@ async fn receive_with_wrong_cred(qos: QualityOfService) -> Result<(), ReasonCode
     let result = { client.connect_to_broker().await };
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), NotAuthorized);
-    Err(NotAuthorized)
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
@@ -335,7 +335,6 @@ async fn simple_publish_recv_wrong_cred() {
 
     let publ = task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/recv/wrong").await });
     let (r, rv, p) = join3(recv, recv_right, publ).await;
-    assert_err!(r.unwrap());
     assert_ok!(rv.unwrap());
     assert_ok!(p.unwrap());
 }
