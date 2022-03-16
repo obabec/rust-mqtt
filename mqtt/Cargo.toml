@@ -11,7 +11,7 @@ resolver = "2"
 heapless = "0.7.10"
 rand_core = "0.6.0"
 defmt = { version = "0.3", optional = true }
-futures = { version = "0.3.21"}
+futures = { version = "0.3.21", optional = true, default-features = false}
 log = { version = "0.4.14", optional = true }
 tokio = { version = "1", features = ["full"], optional = true, default-features = false }
 
@@ -24,6 +24,6 @@ log = { version = "0.4.14"}
 
 [features]
 default = ["testing"]
-testing = ["tokio", "std", "log"]
+testing = ["tokio", "std", "log", "futures"]
 std = []
 no_std = ["defmt"]
