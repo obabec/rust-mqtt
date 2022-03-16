@@ -12,9 +12,7 @@ jobs:
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
-          profile: minimal
           toolchain: stable
-          override: true
 
       - name: Run Unit tests
         run: RUST_LOG=trace cargo test unit
