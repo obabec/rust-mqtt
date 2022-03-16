@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-use std::io::Write;
 use crate::client::client_config::ClientConfig;
 use crate::network::NetworkConnection;
 use crate::packet::v5::connack_packet::ConnackPacket;
