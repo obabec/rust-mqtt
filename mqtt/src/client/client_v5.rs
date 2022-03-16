@@ -272,7 +272,7 @@ where
             if i == TOPICS {
                 break;
             }
-            if *reasons.get(i).unwrap() != QualityOfService::into(self.config.qos) {
+            if *reasons.get(i).unwrap() != (<QualityOfService as Into<u8>>::into(self.config.qos) >> 1) {
                 return Err(ReasonCode::from(*reasons.get(i).unwrap()));
             }
             i = i + 1;
