@@ -27,7 +27,7 @@ use core::time::Duration;
 use std::future::Future;
 use log::LevelFilter;
 use tokio::time::sleep;
-use tokio::{join, task};
+use tokio::task;
 use tokio_test::{assert_err, assert_ok};
 use heapless::Vec;
 use crate::client::client_config::ClientConfig;
@@ -59,6 +59,7 @@ fn setup() {
 
 async fn publish_core<'b>(
     client: &mut MqttClientV5<'b, TokioNetwork, 5>,
+    wait: u64,
     topic: &str,
 ) -> Result<(), ReasonCode> {
     info!(
@@ -68,8 +69,8 @@ async fn publish_core<'b>(
     );
     let mut result = { client.connect_to_broker().await };
     assert_ok!(result);
-    info!("[Publisher] Waiting {} seconds before sending", 5);
-    sleep(Duration::from_secs(5)).await;
+    info!("[Publisher] Waiting {} seconds before sending", wait);
+    sleep(Duration::from_secs(wait)).await;
 
     info!("[Publisher] Sending new message {} to topic {}", MSG, topic);
     result = { client.send_message(topic, MSG).await };
@@ -81,7 +82,7 @@ async fn publish_core<'b>(
     Ok(())
 }
 
-async fn publish(ip: [u8; 4], qos: QualityOfService, topic: &str) -> Result<(), ReasonCode> {
+async fn publish(ip: [u8; 4], wait: u64, qos: QualityOfService, topic: &str) -> Result<(), ReasonCode> {
     let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
     let mut tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
     let mut config = ClientConfig::new();
@@ -100,7 +101,7 @@ async fn publish(ip: [u8; 4], qos: QualityOfService, topic: &str) -> Result<(), 
         80,
         config,
     );
-    publish_core(&mut client, topic).await
+    publish_core(&mut client, wait, topic).await
 }
 
 async fn receive_core<'b>(
@@ -258,7 +259,7 @@ async fn simple_publish_recv() {
         task::spawn(async move { receive(IP, QualityOfService::QoS0, "test/recv/simple").await });
 
     let publ =
-        task::spawn(async move { publish(IP, QualityOfService::QoS0, "test/recv/simple").await });
+        task::spawn(async move { publish(IP, 5, QualityOfService::QoS0, "test/recv/simple").await });
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -276,10 +277,10 @@ async fn simple_publish_recv_multiple() {
         task::spawn(async move { receive_multiple(QualityOfService::QoS0, &topic_names).await });
 
     let publ =
-        task::spawn(async move { publish(IP, QualityOfService::QoS0, "test/topic1").await });
+        task::spawn(async move { publish(IP, 5,QualityOfService::QoS0, "test/topic1").await });
 
     let publ2 =
-        task::spawn(async move { publish(IP, QualityOfService::QoS0, "test/topic2").await });
+        task::spawn(async move { publish(IP, 10, QualityOfService::QoS0, "test/topic2").await });
 
     let (r, p, p2) = join3(recv, publ, publ2).await;
     assert_ok!(r.unwrap());
@@ -298,10 +299,10 @@ async fn simple_publish_recv_multiple_qos() {
        task::spawn(async move { receive_multiple(QualityOfService::QoS1, &topic_names).await });
 
     let publ =
-        task::spawn(async move { publish(IP, QualityOfService::QoS1, "test/topic3").await });
+        task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/topic3").await });
 
     let publ2 =
-        task::spawn(async move { publish(IP, QualityOfService::QoS1, "test/topic4").await });
+        task::spawn(async move { publish(IP, 10, QualityOfService::QoS1, "test/topic4").await });
 
     let ( r, p, p2) = join3(recv, publ, publ2).await;
     assert_ok!(r.unwrap());
@@ -316,7 +317,7 @@ async fn simple_publish_recv_qos() {
 
     let recv = task::spawn(async move { receive(IP, QualityOfService::QoS1, "test/recv/qos").await });
 
-    let publ = task::spawn(async move { publish(IP, QualityOfService::QoS1, "test/recv/qos").await });
+    let publ = task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/recv/qos").await });
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
     assert_ok!(p.unwrap());
@@ -332,7 +333,7 @@ async fn simple_publish_recv_wrong_cred() {
     let recv_right =
         task::spawn(async move { receive(IP, QualityOfService::QoS0, "test/recv/wrong").await });
 
-    let publ = task::spawn(async move { publish(IP, QualityOfService::QoS1, "test/recv/wrong").await });
+    let publ = task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/recv/wrong").await });
     let (r, rv, p) = join3(recv, recv_right, publ).await;
     assert_err!(r.unwrap());
     assert_ok!(rv.unwrap());
