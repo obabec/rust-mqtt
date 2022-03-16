@@ -28,7 +28,7 @@ use alloc::string::String;
 use core::future::Future;
 use core::time::Duration;
 
-use crate::network::network_trait::{NetworkConnection, NetworkConnectionFactory};
+use crate::network::{NetworkConnection, NetworkConnectionFactory};
 use crate::packet::v5::reason_codes::ReasonCode;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -52,12 +52,12 @@ impl TokioNetwork {
 }
 
 impl NetworkConnection for TokioNetwork {
-    type WriteFuture<'m>
+    type SendFuture<'m>
     where
         Self: 'm,
     = impl Future<Output = Result<(), ReasonCode>> + 'm;
 
-    type ReadFuture<'m>
+    type ReceiveFuture<'m>
     where
         Self: 'm,
     = impl Future<Output = Result<usize, ReasonCode>> + 'm;
@@ -72,16 +72,16 @@ impl NetworkConnection for TokioNetwork {
             Self: 'm,
     = impl Future<Output = ()>;*/
 
-    fn send<'m>(&'m mut self, buffer: &'m mut [u8], len: usize) -> Self::WriteFuture<'m> {
+    fn send<'m>(&'m mut self, buffer: &'m [u8]) -> Self::SendFuture<'m> {
         async move {
             self.stream
-                .write_all(&buffer[0..len])
+                .write_all(buffer)
                 .await
                 .map_err(|_| ReasonCode::NetworkError)
         }
     }
 
-    fn receive<'m>(&'m mut self, buffer: &'m mut [u8]) -> Self::ReadFuture<'m> {
+    fn receive<'m>(&'m mut self, buffer: &'m mut [u8]) -> Self::ReceiveFuture<'m> {
         async move {
             self.stream
                 .read(buffer)

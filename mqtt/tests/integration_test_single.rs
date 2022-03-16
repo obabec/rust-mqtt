@@ -25,20 +25,20 @@ extern crate alloc;
 use alloc::string::String;
 use core::time::Duration;
 use std::future::Future;
-use log::LevelFilter;
+use log::{info, LevelFilter};
 use tokio::time::sleep;
 use tokio::task;
 use tokio_test::{assert_err, assert_ok};
 use heapless::Vec;
-use crate::client::client_config::ClientConfig;
-use crate::client::client_v5::MqttClientV5;
-use crate::network::network_trait::{NetworkConnection, NetworkConnectionFactory};
-use crate::packet::v5::property::Property;
-use crate::packet::v5::publish_packet::QualityOfService;
-use crate::packet::v5::reason_codes::ReasonCode;
-use crate::packet::v5::reason_codes::ReasonCode::NotAuthorized;
-use crate::tokio_net::tokio_network::{TokioNetwork, TokioNetworkFactory};
-use crate::utils::types::BufferError;
+use rust_mqtt::client::client_config::ClientConfig;
+use rust_mqtt::client::client_v5::MqttClientV5;
+use rust_mqtt::network::{NetworkConnection, NetworkConnectionFactory};
+use rust_mqtt::packet::v5::property::Property;
+use rust_mqtt::packet::v5::publish_packet::QualityOfService;
+use rust_mqtt::packet::v5::reason_codes::ReasonCode;
+use rust_mqtt::packet::v5::reason_codes::ReasonCode::NotAuthorized;
+use rust_mqtt::tokio_net::tokio_network::{TokioNetwork, TokioNetworkFactory};
+use rust_mqtt::utils::types::BufferError;
 use std::sync::Once;
 use futures::future::{join, join3};
 
@@ -251,9 +251,9 @@ async fn receive_with_wrong_cred(qos: QualityOfService) -> Result<(), ReasonCode
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn simple_publish_recv() {
+async fn integration_simple_publish_recv() {
     setup();
-    info!("Running simple integration test");
+    info!("Running simple tests test");
 
     let recv =
         task::spawn(async move { receive(IP, QualityOfService::QoS0, "test/recv/simple").await });
@@ -267,9 +267,9 @@ async fn simple_publish_recv() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn simple_publish_recv_multiple() {
+async fn integration_simple_publish_recv_multiple() {
     setup();
-    info!("Running simple integration test");
+    info!("Running simple tests test");
     let mut topic_names = Vec::<&str, 2>::new();
     topic_names.push("test/topic1");
     topic_names.push("test/topic2");
@@ -289,9 +289,9 @@ async fn simple_publish_recv_multiple() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn simple_publish_recv_multiple_qos() {
+async fn integration_simple_publish_recv_multiple_qos() {
     setup();
-    info!("Running simple integration test");
+    info!("Running simple tests test");
     let mut topic_names = Vec::<&str, 2>::new();
     topic_names.push("test/topic3");
     topic_names.push("test/topic4");
@@ -311,9 +311,9 @@ async fn simple_publish_recv_multiple_qos() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn simple_publish_recv_qos() {
+async fn integration_simple_publish_recv_qos() {
     setup();
-    info!("Running simple integration test with Quality of Service 1");
+    info!("Running simple tests test with Quality of Service 1");
 
     let recv = task::spawn(async move { receive(IP, QualityOfService::QoS1, "test/recv/qos").await });
 
@@ -324,9 +324,9 @@ async fn simple_publish_recv_qos() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn simple_publish_recv_wrong_cred() {
+async fn integration_simple_publish_recv_wrong_cred() {
     setup();
-    info!("Running simple integration test wrong credentials");
+    info!("Running simple tests test wrong credentials");
 
     let recv = task::spawn(async move { receive_with_wrong_cred(QualityOfService::QoS1).await });
 

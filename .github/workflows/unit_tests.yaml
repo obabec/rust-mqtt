@@ -14,4 +14,4 @@ jobs:
           toolchain: stable
 
       - name: Run Unit tests
-        run: RUST_LOG=trace cargo test unit --features "testing"
+        run: RUST_LOG=trace cargo test unit

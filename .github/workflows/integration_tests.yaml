@@ -22,5 +22,5 @@ jobs:
           sudo apt-get install mosquitto
           mosquitto -c .ci/mosquitto.conf -d
 
-      - name: Run integration tests
-        run: RUST_LOG=trace cargo test integration --features "testing"
+      - name: Run integration-tests tests
+        run: RUST_LOG=trace cargo test integration
