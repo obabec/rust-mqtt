@@ -201,7 +201,8 @@ where
         {
             let reason: Result<[u16; 2], BufferError> = {
                 trace!("Waiting for ack");
-                let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn) }.await?;
+                let read = receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await?;
+                trace!("[PUBACK] Received packet with len");
                 let mut packet = PubackPacket::<'b, MAX_PROPERTIES>::new();
                 if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read))
                 {
@@ -406,14 +407,19 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
     let mut target_len = 0;
     let mut rem_len: VariableByteInteger = [0; 4];
     let mut rem_len_len: usize = 0;
+    let mut complete_len: bool = false;
     let mut writer = BuffWriter::new(buffer, buffer_len);
     loop {
         let len: usize = conn.receive(recv_buffer).await?;
         if len > 0 {
             writer.insert_ref(len, &recv_buffer);
 
-            if writer.position >= 5 {
-                rem_len = writer.get_rem_len();
+            if writer.position >= 1 && target_len == 0 {
+                let tmp_rem_len = writer.get_rem_len();
+                if tmp_rem_len.is_err() {
+                    continue;
+                }
+                rem_len = tmp_rem_len.unwrap();
                 rem_len_len = VariableByteIntegerEncoder::len(rem_len);
                 if let Ok(res) = VariableByteIntegerDecoder::decode(rem_len) {
                     target_len = res as usize;
@@ -421,10 +427,9 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
                     return Err(ReasonCode::BuffError);
                 }
             }
-            if writer.position == 2 && writer.get_second_byte() == 0x00 {
-                return Ok(2);
-            }
+
             if target_len != 0 && (target_len + rem_len_len + 1) >= writer.position {
+                trace!("Just read packet with len {}", (target_len + rem_len_len + 1));
                 return Ok(target_len + rem_len_len + 1);
             }
         }
