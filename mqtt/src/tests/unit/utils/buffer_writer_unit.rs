@@ -25,6 +25,7 @@
 use crate::packet::v5::property::Property;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair, TopicFilter};
+
 use heapless::Vec;
 
 #[test]

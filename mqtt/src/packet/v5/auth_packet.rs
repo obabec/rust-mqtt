@@ -46,7 +46,7 @@ pub struct AuthPacket<'a, const MAX_PROPERTIES: usize> {
 impl<'a, const MAX_PROPERTIES: usize> AuthPacket<'a, MAX_PROPERTIES> {
     pub fn add_reason_code(&mut self, code: u8) {
         if code != 0 && code != 24 && code != 25 {
-            log::error!("Provided reason code is not supported!");
+            error!("Provided reason code is not supported!");
             return;
         }
         self.auth_reason = code;
@@ -56,7 +56,7 @@ impl<'a, const MAX_PROPERTIES: usize> AuthPacket<'a, MAX_PROPERTIES> {
         if p.auth_property() {
             self.push_to_properties(p);
         } else {
-            log::error!("Provided property is not correct AUTH packet property!");
+            error!("Provided property is not correct AUTH packet property!");
         }
     }
 }

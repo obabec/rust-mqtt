@@ -25,8 +25,11 @@
 use crate::packet::v5::property::Property;
 use crate::packet::v5::publish_packet::QualityOfService;
 use crate::utils::types::{BinaryData, EncodedString};
+
 use heapless::Vec;
 
+
+#[derive(Clone)]
 pub struct ClientConfig<'a, const MAX_PROPERTIES: usize> {
     pub qos: QualityOfService,
     pub keep_alive: u16,

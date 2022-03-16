@@ -25,6 +25,7 @@
 use core::mem;
 use core::str;
 
+
 use crate::encoding::variable_byte_integer::VariableByteIntegerDecoder;
 use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair};
 
@@ -129,7 +130,7 @@ impl<'a> BuffReader<'a> {
 
         let res_str = str::from_utf8(&(self.buffer[self.position..(self.position + len)]));
         if res_str.is_err() {
-            log::error!("Could not parse utf-8 string");
+            error!("Could not parse utf-8 string");
             return Err(BufferError::Utf8Error);
         }
         self.increment_position(len);

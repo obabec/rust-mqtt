@@ -25,6 +25,7 @@
 use core::fmt::{Display, Formatter};
 
 #[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ReasonCode {
     Success,
     GrantedQoS1,

@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+
 use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
@@ -75,7 +76,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubrelPacket<'a, MAX_PROPER
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
         if self.decode_fixed_header(buff_reader)? != (PacketType::Pubrel).into() {
-            log::error!("Packet you are trying to decode is not PUBREL packet!");
+            error!("Packet you are trying to decode is not PUBREL packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
         self.packet_identifier = buff_reader.read_u16()?;

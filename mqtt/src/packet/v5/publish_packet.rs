@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+
 use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
@@ -136,7 +137,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PublishPacket<'a, MAX_PROPE
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
         if self.decode_fixed_header(buff_reader)? != (PacketType::Publish).into() {
-            log::error!("Packet you are trying to decode is not PUBLISH packet!");
+            error!("Packet you are trying to decode is not PUBLISH packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
         self.topic_name = buff_reader.read_string()?;

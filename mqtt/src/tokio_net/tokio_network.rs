@@ -34,14 +34,15 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::sleep;
 
+
 pub struct TokioNetwork {
-    stream: Option<TcpStream>,
+    stream: TcpStream,
 }
 
 impl TokioNetwork {
     pub fn new(stream: TcpStream) -> Self {
         Self {
-            stream: Some(stream),
+            stream,
         }
     }
 
@@ -73,49 +74,30 @@ impl NetworkConnection for TokioNetwork {
 
     fn send<'m>(&'m mut self, buffer: &'m mut [u8], len: usize) -> Self::WriteFuture<'m> {
         async move {
-            return if let Some(ref mut stream) = self.stream {
-                stream
-                    .write_all(&buffer[0..len])
-                    .await
-                    .map_err(|_| ReasonCode::NetworkError)
-            } else {
-                Err(ReasonCode::NetworkError)
-            };
+            self.stream
+                .write_all(&buffer[0..len])
+                .await
+                .map_err(|_| ReasonCode::NetworkError)
         }
     }
 
     fn receive<'m>(&'m mut self, buffer: &'m mut [u8]) -> Self::ReadFuture<'m> {
         async move {
-            return if let Some(ref mut stream) = self.stream {
-                stream
-                    .read(buffer)
-                    .await
-                    .map_err(|_| ReasonCode::NetworkError)
-            } else {
-                Err(ReasonCode::NetworkError)
-            };
+            self.stream
+                .read(buffer)
+                .await
+                .map_err(|_| ReasonCode::NetworkError)
         }
     }
 
     fn close<'m>(mut self) -> Self::CloseFuture<'m> {
         async move {
-            return if let Some(ref mut stream) = self.stream {
-                stream
-                    .shutdown()
-                    .await
-                    .map_err(|_| ReasonCode::NetworkError)
-            } else {
-                Err(ReasonCode::NetworkError)
-            };
+            self.stream
+                .shutdown()
+                .await
+                .map_err(|_| ReasonCode::NetworkError)
         }
     }
-
-    /*fn count_down(&'m mut self, time_in_secs: u64) -> Self::TimerFuture<'m> {
-        async move {
-            return sleep(Duration::from_secs(time_in_secs))
-                .await
-        }
-    }*/
 }
 
 pub struct TokioNetworkFactory {}

@@ -39,11 +39,13 @@ use crate::packet::v5::subscription_packet::SubscriptionPacket;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::rng_generator::CountingRng;
 use crate::utils::types::BufferError;
+
 use heapless::Vec;
 use rand_core::RngCore;
+use crate::network::network_trait::NetworkError::Connection;
 
 pub struct MqttClientV5<'a, T, const MAX_PROPERTIES: usize> {
-    network_driver: &'a mut T,
+    connection: Option<T>,
     buffer: &'a mut [u8],
     buffer_len: usize,
     recv_buffer: &'a mut [u8],
@@ -57,7 +59,7 @@ where
     T: NetworkConnection,
 {
     pub fn new(
-        network_driver: &'a mut T,
+        network_driver: T,
         buffer: &'a mut [u8],
         buffer_len: usize,
         recv_buffer: &'a mut [u8],
@@ -65,7 +67,7 @@ where
         config: ClientConfig<'a, MAX_PROPERTIES>,
     ) -> Self {
         Self {
-            network_driver,
+            connection: Some(network_driver),
             buffer,
             buffer_len,
             recv_buffer,
@@ -75,8 +77,10 @@ where
         }
     }
 
-    // Muze prijit disconnect kvuli male velikosti packetu
     pub async fn connect_to_broker<'b>(&'b mut self) -> Result<(), ReasonCode> {
+        if self.connection.is_none() {
+            return Err(ReasonCode::NetworkError);
+        }
         let len = {
             let mut connect = ConnectPacket::<'b, MAX_PROPERTIES, 0>::new();
             connect.keep_alive = self.config.keep_alive;
@@ -92,23 +96,26 @@ where
         };
 
         if let Err(err) = len {
-            log::error!("[DECODE ERR]: {}", err);
+            error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         }
-        self.network_driver.send(self.buffer, len.unwrap()).await?;
+        let mut conn = self.connection.as_mut().unwrap();
+        trace!("Sending connect");
+        conn.send(self.buffer, len.unwrap()).await?;
 
         //connack
         let reason: Result<u8, BufferError> = {
-            self.network_driver.receive(self.buffer).await?;
-            let mut packet = ConnackPacket::<'b, 5>::new();
-            if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, self.buffer_len)) {
+            trace!("Waiting for connack");
+            conn.receive(self.recv_buffer).await?;
+            let mut packet = ConnackPacket::<'b, MAX_PROPERTIES>::new();
+            if let Err(err) = packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len)) {
                 if err == BufferError::PacketTypeMismatch {
-                    let mut disc = DisconnectPacket::<'b, 5>::new();
+                    let mut disc = DisconnectPacket::<'b, MAX_PROPERTIES>::new();
                     if disc
-                        .decode(&mut BuffReader::new(self.buffer, self.buffer_len))
+                        .decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len))
                         .is_ok()
                     {
-                        log::error!("Client was disconnected with reason: ");
+                        error!("Client was disconnected with reason: ");
                         return Err(ReasonCode::from(disc.disconnect_reason));
                     }
                 }
@@ -119,7 +126,7 @@ where
         };
 
         if let Err(err) = reason {
-            log::error!("[DECODE ERR]: {}", err);
+            error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         }
         let res = reason.unwrap();
@@ -131,13 +138,29 @@ where
     }
 
     pub async fn disconnect<'b>(&'b mut self) -> Result<(), ReasonCode> {
-        let mut disconnect = DisconnectPacket::<'b, 5>::new();
+        if self.connection.is_none() {
+            return Err(ReasonCode::NetworkError);
+        }
+        let conn = self.connection.as_mut().unwrap();
+        trace!("Creating disconnect packet!");
+        let mut disconnect = DisconnectPacket::<'b, MAX_PROPERTIES>::new();
         let len = disconnect.encode(self.buffer, self.buffer_len);
         if let Err(err) = len {
-            log::error!("[DECODE ERR]: {}", err);
+            warn!("[DECODE ERR]: {}", err);
+            self.connection.take().unwrap().close().await?;
             return Err(ReasonCode::BuffError);
         }
-        self.network_driver.send(self.buffer, len.unwrap()).await?;
+
+        if let Err(e) = conn.send(self.buffer, len.unwrap()).await {
+            warn!("Could not send DISCONNECT packet");
+        }
+
+        if let Err(e) = self.connection.take().unwrap().close().await {
+            warn!("Could not close the TCP handle");
+            return Err(e);
+        } else {
+            trace!("Closed TCP handle");
+        }
         Ok(())
     }
 
@@ -146,9 +169,13 @@ where
         topic_name: &'b str,
         message: &'b str,
     ) -> Result<(), ReasonCode> {
+        if self.connection.is_none() {
+            return Err(ReasonCode::NetworkError);
+        }
+        let mut conn = self.connection.as_mut().unwrap();
         let identifier: u16 = self.rng.next_u32() as u16;
         let len = {
-            let mut packet = PublishPacket::<'b, 5>::new();
+            let mut packet = PublishPacket::<'b, MAX_PROPERTIES>::new();
             packet.add_topic_name(topic_name);
             packet.add_qos(self.config.qos);
             packet.add_identifier(identifier);
@@ -157,20 +184,21 @@ where
         };
 
         if let Err(err) = len {
-            log::error!("[DECODE ERR]: {}", err);
+            error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         }
+        trace!("Sending message");
+        conn.send(self.buffer, len.unwrap()).await?;
 
-        self.network_driver.send(self.buffer, len.unwrap()).await?;
-
-        //QoS1
+        // QoS1
         if <QualityOfService as Into<u8>>::into(self.config.qos)
             == <QualityOfService as Into<u8>>::into(QoS1)
         {
             let reason: Result<[u16; 2], BufferError> = {
-                self.network_driver.receive(self.buffer).await?;
-                let mut packet = PubackPacket::<'b, 5>::new();
-                if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, self.buffer_len))
+                trace!("Waiting for ack");
+                conn.receive(self.recv_buffer).await?;
+                let mut packet = PubackPacket::<'b, MAX_PROPERTIES>::new();
+                if let Err(err) = packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len))
                 {
                     Err(err)
                 } else {
@@ -179,7 +207,7 @@ where
             };
 
             if let Err(err) = reason {
-                log::error!("[DECODE ERR]: {}", err);
+                error!("[DECODE ERR]: {}", err);
                 return Err(ReasonCode::BuffError);
             }
 
@@ -199,8 +227,12 @@ where
         &'b mut self,
         topic_names: &'b Vec<&'b str, TOPICS>,
     ) -> Result<(), ReasonCode> {
+        if self.connection.is_none() {
+            return Err(ReasonCode::NetworkError);
+        }
+        let mut conn = self.connection.as_mut().unwrap();
         let len = {
-            let mut subs = SubscriptionPacket::<'b, TOPICS, 1>::new();
+            let mut subs = SubscriptionPacket::<'b, TOPICS, MAX_PROPERTIES>::new();
             let mut i = 0;
             loop {
                 if i == TOPICS {
@@ -213,17 +245,17 @@ where
         };
 
         if let Err(err) = len {
-            log::error!("[DECODE ERR]: {}", err);
+            error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         }
 
-        self.network_driver.send(self.buffer, len.unwrap()).await?;
+        conn.send(self.buffer, len.unwrap()).await?;
 
         let reason: Result<Vec<u8, TOPICS>, BufferError> = {
-            self.network_driver.receive(self.buffer).await?;
+            conn.receive(self.recv_buffer).await?;
 
-            let mut packet = SubackPacket::<'b, TOPICS, 5>::new();
-            if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, self.buffer_len)) {
+            let mut packet = SubackPacket::<'b, TOPICS, MAX_PROPERTIES>::new();
+            if let Err(err) = packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len)) {
                 Err(err)
             } else {
                 Ok(packet.reason_codes)
@@ -231,7 +263,7 @@ where
         };
 
         if let Err(err) = reason {
-            log::error!("[DECODE ERR]: {}", err);
+            error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         }
         let reasons = reason.unwrap();
@@ -252,24 +284,28 @@ where
         &'b mut self,
         topic_name: &'b str,
     ) -> Result<(), ReasonCode> {
+        if self.connection.is_none() {
+            return Err(ReasonCode::NetworkError);
+        }
+        let mut conn = self.connection.as_mut().unwrap();
         let len = {
-            let mut subs = SubscriptionPacket::<'b, 1, 1>::new();
+            let mut subs = SubscriptionPacket::<'b, 1, MAX_PROPERTIES>::new();
             subs.add_new_filter(topic_name, self.config.qos);
             subs.encode(self.buffer, self.buffer_len)
         };
 
         if let Err(err) = len {
-            log::error!("[DECODE ERR]: {}", err);
+            error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         }
 
-        self.network_driver.send(self.buffer, len.unwrap()).await?;
+        conn.send(self.buffer, len.unwrap()).await?;
 
         let reason: Result<u8, BufferError> = {
-            self.network_driver.receive(self.buffer).await?;
+            conn.receive(self.recv_buffer).await?;
 
-            let mut packet = SubackPacket::<'b, 5, 5>::new();
-            if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, self.buffer_len)) {
+            let mut packet = SubackPacket::<'b, 5, MAX_PROPERTIES>::new();
+            if let Err(err) = packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len)) {
                 Err(err)
             } else {
                 Ok(*packet.reason_codes.get(0).unwrap())
@@ -277,7 +313,7 @@ where
         };
 
         if let Err(err) = reason {
-            log::error!("[DECODE ERR]: {}", err);
+            error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         }
 
@@ -290,7 +326,11 @@ where
     }
 
     pub async fn receive_message<'b>(&'b mut self) -> Result<&'b [u8], ReasonCode> {
-        self.network_driver.receive(self.recv_buffer).await?;
+        if self.connection.is_none() {
+            return Err(ReasonCode::NetworkError);
+        }
+        let mut conn = self.connection.as_mut().unwrap();
+        conn.receive(self.recv_buffer).await?;
         let mut packet = PublishPacket::<'b, 5>::new();
         if let Err(err) =
             packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len))
@@ -298,30 +338,30 @@ where
             if err == BufferError::PacketTypeMismatch {
                 let mut disc = DisconnectPacket::<'b, 5>::new();
                 if disc
-                    .decode(&mut BuffReader::new(self.buffer, self.buffer_len))
+                    .decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len))
                     .is_ok()
                 {
-                    log::error!("Client was disconnected with reason: ");
+                    error!("Client was disconnected with reason: ");
                     return Err(ReasonCode::from(disc.disconnect_reason));
                 }
             }
-            log::error!("[DECODE ERR]: {}", err);
+            error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         }
 
         if (packet.fixed_header & 0x06)
             == <QualityOfService as Into<u8>>::into(QualityOfService::QoS1)
         {
-            let mut puback = PubackPacket::<'b, 5>::new();
+            let mut puback = PubackPacket::<'b, MAX_PROPERTIES>::new();
             puback.packet_identifier = packet.packet_identifier;
             puback.reason_code = 0x00;
             {
                 let len = puback.encode(self.buffer, self.buffer_len);
                 if let Err(err) = len {
-                    log::error!("[DECODE ERR]: {}", err);
+                    error!("[DECODE ERR]: {}", err);
                     return Err(ReasonCode::BuffError);
                 }
-                self.network_driver.send(self.buffer, len.unwrap()).await?;
+                conn.send(self.buffer, len.unwrap()).await?;
             }
         }
 
@@ -329,22 +369,26 @@ where
     }
 
     pub async fn send_ping<'b>(&'b mut self) -> Result<(), ReasonCode> {
+        if self.connection.is_none() {
+            return Err(ReasonCode::NetworkError);
+        }
+        let mut conn = self.connection.as_mut().unwrap();
         let len = {
             let mut packet = PingreqPacket::new();
             packet.encode(self.buffer, self.buffer_len)
         };
 
         if let Err(err) = len {
-            log::error!("[DECODE ERR]: {}", err);
+            error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         }
 
-        self.network_driver.send(self.buffer, len.unwrap()).await?;
+        conn.send(self.buffer, len.unwrap()).await?;
 
-        self.network_driver.receive(self.buffer).await?;
+        conn.receive(self.recv_buffer).await?;
         let mut packet = PingrespPacket::new();
-        if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, self.buffer_len)) {
-            log::error!("[DECODE ERR]: {}", err);
+        if let Err(err) = packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len)) {
+            error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         } else {
             Ok(())

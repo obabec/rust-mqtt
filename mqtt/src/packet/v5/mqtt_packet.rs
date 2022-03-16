@@ -82,7 +82,7 @@ pub trait Packet<'a> {
         if self.get_property_len() != 0 {
             loop {
                 prop = Property::decode(buff_reader)?;
-                log::debug!("Parsed property {:?}", prop);
+                //debug!("Parsed property {:?}", prop);
                 x = x + prop.len() as u32 + 1;
                 self.push_to_properties(prop);
 
@@ -100,6 +100,7 @@ pub trait Packet<'a> {
         buff_reader: &mut BuffReader,
     ) -> Result<PacketType, BufferError> {
         let first_byte: u8 = buff_reader.read_u8()?;
+        trace!("First byte of accepted packet: {:02X}", first_byte);
         self.set_fixed_header(first_byte);
         self.set_remaining_len(buff_reader.read_variable_byte_int()?);
         return Ok(PacketType::from(first_byte));
