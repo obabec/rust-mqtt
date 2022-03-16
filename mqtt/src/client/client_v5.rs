@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+use std::io::Write;
 use crate::client::client_config::ClientConfig;
 use crate::network::NetworkConnection;
 use crate::packet::v5::connack_packet::ConnackPacket;
@@ -42,7 +43,9 @@ use crate::utils::types::BufferError;
 
 use heapless::Vec;
 use rand_core::RngCore;
+use crate::encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerDecoder, VariableByteIntegerEncoder};
 use crate::network::NetworkError::Connection;
+use crate::utils::buffer_writer::BuffWriter;
 
 pub struct MqttClientV5<'a, T, const MAX_PROPERTIES: usize> {
     connection: Option<T>,
@@ -106,13 +109,15 @@ where
         //connack
         let reason: Result<u8, BufferError> = {
             trace!("Waiting for connack");
-            conn.receive(self.recv_buffer).await?;
+
+            let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
+
             let mut packet = ConnackPacket::<'b, MAX_PROPERTIES>::new();
-            if let Err(err) = packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len)) {
+            if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
                 if err == BufferError::PacketTypeMismatch {
                     let mut disc = DisconnectPacket::<'b, MAX_PROPERTIES>::new();
                     if disc
-                        .decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len))
+                        .decode(&mut BuffReader::new(self.buffer, read))
                         .is_ok()
                     {
                         error!("Client was disconnected with reason: ");
@@ -196,9 +201,9 @@ where
         {
             let reason: Result<[u16; 2], BufferError> = {
                 trace!("Waiting for ack");
-                conn.receive(self.recv_buffer).await?;
+                let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn) }.await?;
                 let mut packet = PubackPacket::<'b, MAX_PROPERTIES>::new();
-                if let Err(err) = packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len))
+                if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read))
                 {
                     Err(err)
                 } else {
@@ -252,10 +257,10 @@ where
         conn.send(&self.buffer[0..len.unwrap()]).await?;
 
         let reason: Result<Vec<u8, TOPICS>, BufferError> = {
-            conn.receive(self.recv_buffer).await?;
+            let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
 
             let mut packet = SubackPacket::<'b, TOPICS, MAX_PROPERTIES>::new();
-            if let Err(err) = packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len)) {
+            if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
                 Err(err)
             } else {
                 Ok(packet.reason_codes)
@@ -302,10 +307,10 @@ where
         conn.send(&self.buffer[0..len.unwrap()]).await?;
 
         let reason: Result<u8, BufferError> = {
-            conn.receive(self.recv_buffer).await?;
+            let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
 
             let mut packet = SubackPacket::<'b, 5, MAX_PROPERTIES>::new();
-            if let Err(err) = packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len)) {
+            if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
                 Err(err)
             } else {
                 Ok(*packet.reason_codes.get(0).unwrap())
@@ -330,15 +335,16 @@ where
             return Err(ReasonCode::NetworkError);
         }
         let mut conn = self.connection.as_mut().unwrap();
-        conn.receive(self.recv_buffer).await?;
+        let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
         let mut packet = PublishPacket::<'b, 5>::new();
-        if let Err(err) =
-            packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len))
+        if let Err(err) = {
+            packet.decode(&mut BuffReader::new(self.buffer, read))
+        }
+
         {
             if err == BufferError::PacketTypeMismatch {
                 let mut disc = DisconnectPacket::<'b, 5>::new();
-                if disc
-                    .decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len))
+                if disc.decode(&mut BuffReader::new(self.buffer, read))
                     .is_ok()
                 {
                     error!("Client was disconnected with reason: ");
@@ -356,12 +362,12 @@ where
             puback.packet_identifier = packet.packet_identifier;
             puback.reason_code = 0x00;
             {
-                let len = puback.encode(self.buffer, self.buffer_len);
+                let len = { puback.encode(self.recv_buffer, self.recv_buffer_len) };
                 if let Err(err) = len {
                     error!("[DECODE ERR]: {}", err);
                     return Err(ReasonCode::BuffError);
                 }
-                conn.send(&self.buffer[0..len.unwrap()]).await?;
+                conn.send(&self.recv_buffer[0..len.unwrap()]).await?;
             }
         }
 
@@ -385,13 +391,42 @@ where
 
         conn.send(&self.buffer[0..len.unwrap()]).await?;
 
-        conn.receive(self.recv_buffer).await?;
+        let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
         let mut packet = PingrespPacket::new();
-        if let Err(err) = packet.decode(&mut BuffReader::new(self.recv_buffer, self.recv_buffer_len)) {
+        if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
             error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         } else {
             Ok(())
+        }
+    }
+}
+
+async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: usize, recv_buffer: & mut [u8], conn: &'c mut T) -> Result<usize, ReasonCode> {
+    let mut target_len = 0;
+    let mut rem_len: VariableByteInteger = [0; 4];
+    let mut rem_len_len: usize = 0;
+    let mut writer = BuffWriter::new(buffer, buffer_len);
+    loop {
+        let len: usize = conn.receive(recv_buffer).await?;
+        if len > 0 {
+            writer.insert_ref(len, &recv_buffer);
+
+            if writer.position >= 5 {
+                rem_len = writer.get_rem_len();
+                rem_len_len = VariableByteIntegerEncoder::len(rem_len);
+                if let Ok(res) = VariableByteIntegerDecoder::decode(rem_len) {
+                    target_len = res as usize;
+                } else {
+                    return Err(ReasonCode::BuffError);
+                }
+            }
+            if writer.position == 2 && writer.get_second_byte() == 0x00 {
+                return Ok(2);
+            }
+            if target_len != 0 && (target_len + rem_len_len + 1) >= writer.position {
+                return Ok(target_len + rem_len_len + 1);
+            }
         }
     }
 }
