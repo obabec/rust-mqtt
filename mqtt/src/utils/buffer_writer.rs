@@ -56,7 +56,7 @@ impl<'a> BuffWriter<'a> {
     }
 
     pub fn get_rem_len(& mut self) -> Result<VariableByteInteger, ()> {
-        let mut max = if self.position >= 5 {5} else {self.position};
+        let mut max = if self.position >= 5 {4} else {self.position};
         let mut i = 1;
         let mut len: VariableByteInteger = [0; 4];
         loop {
@@ -64,7 +64,7 @@ impl<'a> BuffWriter<'a> {
             if len[i - 1] & 0x80 == 0 {
                 return Ok(len);
             }
-            if len[i - 1] & 0x80 != 0 && i == max {
+            if len[i - 1] & 0x80 != 0 && i == max && i != 4 {
                 return Err(());
             }
             if i == max {

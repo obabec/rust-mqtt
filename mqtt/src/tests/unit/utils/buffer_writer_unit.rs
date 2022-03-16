@@ -27,6 +27,8 @@ use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair, TopicFilter};
 
 use heapless::Vec;
+use tokio_test::assert_ok;
+use crate::encoding::variable_byte_integer::VariableByteInteger;
 
 #[test]
 fn buffer_write_ref() {
@@ -379,4 +381,103 @@ fn buffer_write_filters_oob() {
     let test_write = writer.write_topic_filters_ref(true, 2, &filters);
     assert!(test_write.is_err());
     assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize)
+}
+
+#[test]
+fn buffer_get_rem_len_one() {
+    static BUFFER: [u8; 5] = [0x82, 0x02, 0x03, 0x85, 0x84];
+    static REF: VariableByteInteger = [0x02, 0x00, 0x00, 0x00];
+    let mut res_buffer: [u8; 5] = [0; 5];
+
+    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let test_write = writer.insert_ref(5, &BUFFER);
+    let rm_len = writer.get_rem_len();
+    assert_ok!(test_write);
+    assert_ok!(rm_len);
+    assert_eq!(rm_len.unwrap(), REF);
+}
+
+#[test]
+fn buffer_get_rem_len_two() {
+    static BUFFER: [u8; 5] = [0x82, 0x82, 0x03, 0x85, 0x84];
+    static REF: VariableByteInteger = [0x82, 0x03, 0x00, 0x00];
+    let mut res_buffer: [u8; 5] = [0; 5];
+
+    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let test_write = writer.insert_ref(5, &BUFFER);
+    let rm_len = writer.get_rem_len();
+    assert_ok!(test_write);
+    assert_ok!(rm_len);
+    assert_eq!(rm_len.unwrap(), REF);
+}
+
+
+#[test]
+fn buffer_get_rem_len_three() {
+    static BUFFER: [u8; 5] = [0x82, 0x82, 0x83, 0x05, 0x84];
+    static REF: VariableByteInteger = [0x82, 0x83, 0x05, 0x00];
+    let mut res_buffer: [u8; 5] = [0; 5];
+
+    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let test_write = writer.insert_ref(5, &BUFFER);
+    let rm_len = writer.get_rem_len();
+    assert_ok!(test_write);
+    assert_ok!(rm_len);
+    assert_eq!(rm_len.unwrap(), REF);
+}
+
+#[test]
+fn buffer_get_rem_len_all() {
+    static BUFFER: [u8; 5] = [0x82, 0x82, 0x83, 0x85, 0x04];
+    static REF: VariableByteInteger = [0x82, 0x83, 0x85, 0x04];
+    let mut res_buffer: [u8; 5] = [0; 5];
+
+    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let test_write = writer.insert_ref(5, &BUFFER);
+    let rm_len = writer.get_rem_len();
+    assert_ok!(test_write);
+    assert_ok!(rm_len);
+    assert_eq!(rm_len.unwrap(), REF);
+}
+
+#[test]
+fn buffer_get_rem_len_over() {
+    static BUFFER: [u8; 6] = [0x82, 0x82, 0x83, 0x85, 0x84, 0x34];
+    static REF: VariableByteInteger = [0x82, 0x83, 0x85, 0x84];
+    let mut res_buffer: [u8; 6] = [0; 6];
+
+    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 6);
+    let test_write = writer.insert_ref(6, &BUFFER);
+    let rm_len = writer.get_rem_len();
+    assert_ok!(test_write);
+    assert_ok!(rm_len);
+    assert_eq!(rm_len.unwrap(), REF);
+}
+
+#[test]
+fn buffer_get_rem_len_zero_end() {
+    static BUFFER: [u8; 6] = [0x82, 0x82, 0x83, 0x85, 0x04, 0x34];
+    static REF: VariableByteInteger = [0x82, 0x83, 0x85, 0x04];
+    let mut res_buffer: [u8; 6] = [0; 6];
+
+    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 6);
+    let test_write = writer.insert_ref(6, &BUFFER);
+    let rm_len = writer.get_rem_len();
+    assert_ok!(test_write);
+    assert_ok!(rm_len);
+    assert_eq!(rm_len.unwrap(), REF);
+}
+
+#[test]
+fn buffer_get_rem_len_zero() {
+    static BUFFER: [u8; 6] = [0x82, 0x00, 0x83, 0x85, 0x04, 0x34];
+    static REF: VariableByteInteger = [0x00, 0x00, 0x00, 0x00];
+    let mut res_buffer: [u8; 6] = [0; 6];
+
+    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 6);
+    let test_write = writer.insert_ref(6, &BUFFER);
+    let rm_len = writer.get_rem_len();
+    assert_ok!(test_write);
+    assert_ok!(rm_len);
+    assert_eq!(rm_len.unwrap(), REF);
 }
