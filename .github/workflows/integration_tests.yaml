@@ -10,9 +10,12 @@ jobs:
       - name: Git checkout
         uses: actions/checkout@v2
 
-      - uses: actions-rs/toolchain@v1
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
         with:
+          profile: minimal
           toolchain: stable
+          override: true
 
       - name: Build embedded
         run: cargo build --target thumbv7em-none-eabihf --features "no_std" --no-default-features
