@@ -9,9 +9,10 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: actions-rs/toolchain@v1
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
 
       - name: Run Unit tests
-        run: RUST_LOG=trace cargo test unit --features "testing"
+        run: RUST_LOG=trace cargo test unit

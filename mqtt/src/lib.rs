@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-#![feature(in_band_lifetimes)]
 #![macro_use]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code)]

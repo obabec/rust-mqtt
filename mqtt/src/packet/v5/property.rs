@@ -320,7 +320,7 @@ impl<'a> Property<'a> {
     }
 }
 
-impl Into<u8> for &Property<'a> {
+impl<'a> Into<u8> for &Property<'a> {
     fn into(self) -> u8 {
         return match &*self {
             Property::PayloadFormat(_u) => 0x01,
@@ -355,7 +355,7 @@ impl Into<u8> for &Property<'a> {
     }
 }
 
-impl From<u8> for Property<'a> {
+impl<'a> From<u8> for Property<'a> {
     fn from(_orig: u8) -> Self {
         return match _orig {
             _ => Property::Reserved(),

@@ -23,7 +23,7 @@
  */
 
 use crate::client::client_config::ClientConfig;
-use crate::network::network_trait::NetworkConnection;
+use crate::network::NetworkConnection;
 use crate::packet::v5::connack_packet::ConnackPacket;
 use crate::packet::v5::connect_packet::ConnectPacket;
 use crate::packet::v5::disconnect_packet::DisconnectPacket;
@@ -42,7 +42,7 @@ use crate::utils::types::BufferError;
 
 use heapless::Vec;
 use rand_core::RngCore;
-use crate::network::network_trait::NetworkError::Connection;
+use crate::network::NetworkError::Connection;
 
 pub struct MqttClientV5<'a, T, const MAX_PROPERTIES: usize> {
     connection: Option<T>,
@@ -101,7 +101,7 @@ where
         }
         let mut conn = self.connection.as_mut().unwrap();
         trace!("Sending connect");
-        conn.send(self.buffer, len.unwrap()).await?;
+        conn.send(&self.buffer[0..len.unwrap()]).await?;
 
         //connack
         let reason: Result<u8, BufferError> = {
@@ -151,7 +151,7 @@ where
             return Err(ReasonCode::BuffError);
         }
 
-        if let Err(e) = conn.send(self.buffer, len.unwrap()).await {
+        if let Err(e) = conn.send(&self.buffer[0..len.unwrap()]).await {
             warn!("Could not send DISCONNECT packet");
         }
 
@@ -188,7 +188,7 @@ where
             return Err(ReasonCode::BuffError);
         }
         trace!("Sending message");
-        conn.send(self.buffer, len.unwrap()).await?;
+        conn.send(&self.buffer[0..len.unwrap()]).await?;
 
         // QoS1
         if <QualityOfService as Into<u8>>::into(self.config.qos)
@@ -249,7 +249,7 @@ where
             return Err(ReasonCode::BuffError);
         }
 
-        conn.send(self.buffer, len.unwrap()).await?;
+        conn.send(&self.buffer[0..len.unwrap()]).await?;
 
         let reason: Result<Vec<u8, TOPICS>, BufferError> = {
             conn.receive(self.recv_buffer).await?;
@@ -299,7 +299,7 @@ where
             return Err(ReasonCode::BuffError);
         }
 
-        conn.send(self.buffer, len.unwrap()).await?;
+        conn.send(&self.buffer[0..len.unwrap()]).await?;
 
         let reason: Result<u8, BufferError> = {
             conn.receive(self.recv_buffer).await?;
@@ -361,7 +361,7 @@ where
                     error!("[DECODE ERR]: {}", err);
                     return Err(ReasonCode::BuffError);
                 }
-                conn.send(self.buffer, len.unwrap()).await?;
+                conn.send(&self.buffer[0..len.unwrap()]).await?;
             }
         }
 
@@ -383,7 +383,7 @@ where
             return Err(ReasonCode::BuffError);
         }
 
-        conn.send(self.buffer, len.unwrap()).await?;
+        conn.send(&self.buffer[0..len.unwrap()]).await?;
 
         conn.receive(self.recv_buffer).await?;
         let mut packet = PingrespPacket::new();

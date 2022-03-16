@@ -26,8 +26,3 @@
 #[allow(unused_must_use)]
 pub mod unit;
 
-#[allow(dead_code)]
-#[allow(unused_must_use)]
-#[allow(unused_imports)]
-#[cfg(feature = "testing")]
-pub mod integration;
