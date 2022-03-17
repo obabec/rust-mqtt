@@ -74,6 +74,7 @@ async fn publish_core<'b>(
 
     info!("[Publisher] Sending new message {} to topic {}", MSG, topic);
     result = { client.send_message(topic, MSG).await };
+    info!("[PUBLISHER] sent");
     assert_ok!(result);
 
     info!("[Publisher] Disconnecting!");

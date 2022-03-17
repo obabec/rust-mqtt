@@ -48,6 +48,32 @@ impl<'a> BuffWriter<'a> {
         self.position = self.position + increment;
     }
 
+    pub fn get_n_byte(& mut self, n: usize) -> u8 {
+        if self.position >= n {
+            return self.buffer[n]
+        }
+        return 0
+    }
+
+    pub fn get_rem_len(& mut self) -> Result<VariableByteInteger, ()> {
+        let mut max = if self.position >= 5 {4} else {self.position - 1};
+        let mut i = 1;
+        let mut len: VariableByteInteger = [0; 4];
+        loop {
+            len[i - 1] = self.buffer[i];
+            if len[i - 1] & 0x80 == 0 {
+                return Ok(len);
+            }
+            if len[i - 1] & 0x80 != 0 && i == max && i != 4 {
+                return Err(());
+            }
+            if i == max {
+                return Ok(len);
+            }
+            i = i + 1;
+        }
+    }
+
     pub fn insert_ref(&mut self, len: usize, array: &[u8]) -> Result<(), BufferError> {
         let mut x: usize = 0;
         if self.position + len > self.len {
