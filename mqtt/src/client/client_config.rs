@@ -28,6 +28,11 @@ use crate::utils::types::{BinaryData, EncodedString};
 
 use heapless::Vec;
 
+#[derive(Clone, PartialEq)]
+pub enum MqttVersion {
+    MQTTv3,
+    MQTTv5
+}
 
 #[derive(Clone)]
 pub struct ClientConfig<'a, const MAX_PROPERTIES: usize> {
@@ -40,10 +45,11 @@ pub struct ClientConfig<'a, const MAX_PROPERTIES: usize> {
     pub password: BinaryData<'a>,
     pub properties: Vec<Property<'a>, MAX_PROPERTIES>,
     pub max_packet_size: u32,
+    pub mqtt_version: MqttVersion,
 }
 
 impl<'a, const MAX_PROPERTIES: usize> ClientConfig<'a, MAX_PROPERTIES> {
-    pub fn new() -> Self {
+    pub fn new(version: MqttVersion) -> Self {
         Self {
             qos: QualityOfService::QoS0,
             keep_alive: 60,
@@ -54,6 +60,7 @@ impl<'a, const MAX_PROPERTIES: usize> ClientConfig<'a, MAX_PROPERTIES> {
             password: BinaryData::new(),
             properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
             max_packet_size: 265_000,
+            mqtt_version: version
         }
     }
 
