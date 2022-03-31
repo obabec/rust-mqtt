@@ -45,7 +45,7 @@ jobs:
         run: |
           curl -LO https://github.com/hivemq/hivemq-community-edition/releases/download/2021.3/hivemq-ce-2021.3.zip
           unzip hivemq-ce-2021.3.zip
-          curl -LO https://www.hivemq.com/releases/extensions/hivemq-file-rbac-extension-4.4.0.zi
+          curl -LO https://www.hivemq.com/releases/extensions/hivemq-file-rbac-extension-4.4.0.zip
           unzip hivemq-file-rbac-extension-4.4.0.zip
           mv hivemq-file-rbac-extension hivemq-ce-2021.3/extensions
           cp .ci/hive_cred.xml hivemq-ce-2021.3/extensions/hivemq-file-rbac-extension/credentials.xml
