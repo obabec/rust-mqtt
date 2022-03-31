@@ -143,10 +143,9 @@ where
     }
 
     pub async fn connect_to_broker<'b>(&'b mut self) -> Result<(), ReasonCode> {
-        if self.config.mqtt_version == MqttVersion::MQTTv5 {
-            self.connect_to_broker_v5().await
-        } else {
-            Err(ReasonCode::UnsupportedProtocolVersion)
+        match self.config.mqtt_version {
+            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
+            MqttVersion::MQTTv5 => {self.connect_to_broker_v5().await}
         }
     }
 
@@ -178,12 +177,10 @@ where
     }
 
     pub async fn disconnect<'b>(&'b mut self) -> Result<(), ReasonCode> {
-        if self.config.mqtt_version == MqttVersion::MQTTv5 {
-            self.disconnect_v5().await
-        } else {
-            Err(ReasonCode::UnsupportedProtocolVersion)
+        match self.config.mqtt_version {
+            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
+            MqttVersion::MQTTv5 => {self.disconnect_v5().await}
         }
-
     }
 
     async fn send_message_v5<'b>(
@@ -251,10 +248,9 @@ where
         topic_name: &'b str,
         message: &'b str,
     ) -> Result<(), ReasonCode> {
-        if self.config.mqtt_version == MqttVersion::MQTTv5 {
-            self.send_message_v5(topic_name, message).await
-        } else {
-            Err(ReasonCode::UnsupportedProtocolVersion)
+        match self.config.mqtt_version {
+            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
+            MqttVersion::MQTTv5 => {self.send_message_v5(topic_name, message).await}
         }
     }
 
@@ -319,10 +315,9 @@ where
         &'b mut self,
         topic_names: &'b Vec<&'b str, TOPICS>,
     ) -> Result<(), ReasonCode> {
-        if self.config.mqtt_version == MqttVersion::MQTTv5 {
-            self.subscribe_to_topics_v5(topic_names).await
-        } else {
-            Err(ReasonCode::UnsupportedProtocolVersion)
+        match self.config.mqtt_version {
+            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
+            MqttVersion::MQTTv5 => {self.subscribe_to_topics_v5(topic_names).await}
         }
     }
 
@@ -375,10 +370,9 @@ where
         &'b mut self,
         topic_name: &'b str,
     ) -> Result<(), ReasonCode> {
-        if self.config.mqtt_version == MqttVersion::MQTTv5 {
-            self.subscribe_to_topic_v5(topic_name).await
-        } else {
-            Err(ReasonCode::UnsupportedProtocolVersion)
+        match self.config.mqtt_version {
+            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
+            MqttVersion::MQTTv5 => {self.subscribe_to_topic_v5(topic_name).await}
         }
     }
 
@@ -427,10 +421,9 @@ where
     }
 
     pub async fn receive_message<'b>(&'b mut self) -> Result<&'b [u8], ReasonCode> {
-        if self.config.mqtt_version == MqttVersion::MQTTv5 {
-            self.receive_message_v5().await
-        } else {
-            Err(ReasonCode::UnsupportedProtocolVersion)
+        match self.config.mqtt_version {
+            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
+            MqttVersion::MQTTv5 => {self.receive_message_v5().await}
         }
     }
 
@@ -462,10 +455,9 @@ where
     }
 
     pub async fn send_ping<'b>(&'b mut self) -> Result<(), ReasonCode> {
-        if self.config.mqtt_version == MqttVersion::MQTTv5 {
-            self.send_ping_v5().await
-        } else {
-            Err(ReasonCode::UnsupportedProtocolVersion)
+        match self.config.mqtt_version {
+            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
+            MqttVersion::MQTTv5 => {self.send_ping_v5().await}
         }
     }
 }
