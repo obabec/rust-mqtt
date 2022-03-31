@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-use crate::client::client_config::ClientConfig;
+use crate::client::client_config::{ClientConfig, MqttVersion};
 use crate::network::NetworkConnection;
 use crate::packet::v5::connack_packet::ConnackPacket;
 use crate::packet::v5::connect_packet::ConnectPacket;
@@ -44,9 +44,10 @@ use heapless::Vec;
 use rand_core::RngCore;
 use crate::encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerDecoder, VariableByteIntegerEncoder};
 use crate::network::NetworkError::Connection;
+use crate::packet::v5::property::Property;
 use crate::utils::buffer_writer::BuffWriter;
 
-pub struct MqttClientV5<'a, T, const MAX_PROPERTIES: usize> {
+pub struct MqttClient<'a, T, const MAX_PROPERTIES: usize> {
     connection: Option<T>,
     buffer: &'a mut [u8],
     buffer_len: usize,
@@ -56,7 +57,7 @@ pub struct MqttClientV5<'a, T, const MAX_PROPERTIES: usize> {
     config: ClientConfig<'a, MAX_PROPERTIES>,
 }
 
-impl<'a, T, const MAX_PROPERTIES: usize> MqttClientV5<'a, T, MAX_PROPERTIES>
+impl<'a, T, const MAX_PROPERTIES: usize> MqttClient<'a, T, MAX_PROPERTIES>
 where
     T: NetworkConnection,
 {
@@ -79,7 +80,7 @@ where
         }
     }
 
-    pub async fn connect_to_broker<'b>(&'b mut self) -> Result<(), ReasonCode> {
+    async fn connect_to_broker_v5<'b>(&'b mut self) -> Result<(), ReasonCode> {
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
@@ -141,7 +142,15 @@ where
         }
     }
 
-    pub async fn disconnect<'b>(&'b mut self) -> Result<(), ReasonCode> {
+    pub async fn connect_to_broker<'b>(&'b mut self) -> Result<(), ReasonCode> {
+        if self.config.mqtt_version == MqttVersion::MQTTv5 {
+            self.connect_to_broker_v5().await
+        } else {
+            Err(ReasonCode::UnsupportedProtocolVersion)
+        }
+    }
+
+    async fn disconnect_v5<'b>(&'b mut self)  -> Result<(), ReasonCode> {
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
@@ -168,7 +177,16 @@ where
         Ok(())
     }
 
-    pub async fn send_message<'b>(
+    pub async fn disconnect<'b>(&'b mut self) -> Result<(), ReasonCode> {
+        if self.config.mqtt_version == MqttVersion::MQTTv5 {
+            self.disconnect_v5().await
+        } else {
+            Err(ReasonCode::UnsupportedProtocolVersion)
+        }
+
+    }
+
+    async fn send_message_v5<'b>(
         &'b mut self,
         topic_name: &'b str,
         message: &'b str,
@@ -228,7 +246,19 @@ where
         Ok(())
     }
 
-    pub async fn subscribe_to_topics<'b, const TOPICS: usize>(
+    pub async fn send_message<'b>(
+        &'b mut self,
+        topic_name: &'b str,
+        message: &'b str,
+    ) -> Result<(), ReasonCode> {
+        if self.config.mqtt_version == MqttVersion::MQTTv5 {
+            self.send_message_v5(topic_name, message).await
+        } else {
+            Err(ReasonCode::UnsupportedProtocolVersion)
+        }
+    }
+
+    async fn subscribe_to_topics_v5<'b, const TOPICS: usize>(
         &'b mut self,
         topic_names: &'b Vec<&'b str, TOPICS>,
     ) -> Result<(), ReasonCode> {
@@ -285,7 +315,18 @@ where
         Ok(())
     }
 
-    pub async fn subscribe_to_topic<'b>(
+    pub async fn subscribe_to_topics<'b, const TOPICS: usize>(
+        &'b mut self,
+        topic_names: &'b Vec<&'b str, TOPICS>,
+    ) -> Result<(), ReasonCode> {
+        if self.config.mqtt_version == MqttVersion::MQTTv5 {
+            self.subscribe_to_topics_v5(topic_names).await
+        } else {
+            Err(ReasonCode::UnsupportedProtocolVersion)
+        }
+    }
+
+    async fn subscribe_to_topic_v5<'b>(
         &'b mut self,
         topic_name: &'b str,
     ) -> Result<(), ReasonCode> {
@@ -330,7 +371,18 @@ where
         }
     }
 
-    pub async fn receive_message<'b>(&'b mut self) -> Result<&'b [u8], ReasonCode> {
+    pub async fn subscribe_to_topic<'b>(
+        &'b mut self,
+        topic_name: &'b str,
+    ) -> Result<(), ReasonCode> {
+        if self.config.mqtt_version == MqttVersion::MQTTv5 {
+            self.subscribe_to_topic_v5(topic_name).await
+        } else {
+            Err(ReasonCode::UnsupportedProtocolVersion)
+        }
+    }
+
+    async fn receive_message_v5<'b>(&'b mut self) -> Result<&'b [u8], ReasonCode> {
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
@@ -374,7 +426,15 @@ where
         return Ok(packet.message.unwrap());
     }
 
-    pub async fn send_ping<'b>(&'b mut self) -> Result<(), ReasonCode> {
+    pub async fn receive_message<'b>(&'b mut self) -> Result<&'b [u8], ReasonCode> {
+        if self.config.mqtt_version == MqttVersion::MQTTv5 {
+            self.receive_message_v5().await
+        } else {
+            Err(ReasonCode::UnsupportedProtocolVersion)
+        }
+    }
+
+    pub async fn send_ping_v5<'b>(&'b mut self) -> Result<(), ReasonCode> {
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
@@ -400,7 +460,16 @@ where
             Ok(())
         }
     }
+
+    pub async fn send_ping<'b>(&'b mut self) -> Result<(), ReasonCode> {
+        if self.config.mqtt_version == MqttVersion::MQTTv5 {
+            self.send_ping_v5().await
+        } else {
+            Err(ReasonCode::UnsupportedProtocolVersion)
+        }
+    }
 }
+
 
 async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: usize, recv_buffer: & mut [u8], conn: &'c mut T) -> Result<usize, ReasonCode> {
     let mut target_len = 0;
