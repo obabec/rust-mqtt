@@ -41,7 +41,7 @@ jobs:
       - name: Build embedded
         run: cargo build --target thumbv7em-none-eabihf --features "no_std" --no-default-features
 
-      - name: Start Mosquitto
+      - name: Start HiveMQ
         run: |
           curl -LO https://github.com/hivemq/hivemq-community-edition/releases/download/2021.3/hivemq-ce-2021.3.zip
           unzip hivemq-ce-2021.3.zip
