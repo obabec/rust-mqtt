@@ -21,6 +21,8 @@ jobs:
       - name: Start Mosquitto
         run: |
           sudo apt-get install mosquitto
+          sudo service mosquitto stop
+          mosquitto_passwd -U .ci/mqtt_pass.txt
           mosquitto -c .ci/mosquitto.conf -d
 
       - name: Run integration-tests tests

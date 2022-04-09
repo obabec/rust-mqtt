@@ -20,6 +20,7 @@ tokio-test = { version = "0.4.2"}
 env_logger = "0.9.0"
 futures = { version = "0.3.21" }
 log = { version = "0.4.14"}
+serial_test = "0.6.0"
 
 [features]
 default = ["std"]
