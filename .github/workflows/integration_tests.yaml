@@ -22,7 +22,7 @@ jobs:
         run: |
           sudo apt-get install mosquitto
           mosquitto_passwd -U .ci/mqtt_pass.txt
-          mosquitto -c .ci/mosquitto.conf -v
+          mosquitto -c .ci/mosquitto.conf -d
 
       - name: Run integration-tests tests
         run: RUST_LOG=trace cargo test integration
