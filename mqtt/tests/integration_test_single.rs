@@ -203,7 +203,7 @@ async fn receive(ip: [u8; 4], qos: QualityOfService, topic: &str) -> Result<(), 
     config.add_qos(qos);
     config.add_username(USERNAME);
     config.add_password(PASSWORD);
-    config.max_packet_size = 60;
+    config.max_packet_size = 6000;
     config.properties.push(Property::ReceiveMaximum(20));
     let mut recv_buffer = [0; 100];
     let mut write_buffer = [0; 100];
@@ -337,6 +337,7 @@ async fn integration_simple_publish_recv_wrong_cred() {
 
     let publ = task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/recv/wrong").await });
     let (r, rv, p) = join3(recv, recv_right, publ).await;
+    assert_ok!(r.unwrap());
     assert_ok!(rv.unwrap());
     assert_ok!(p.unwrap());
 }

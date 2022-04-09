@@ -38,7 +38,6 @@ pub enum MqttVersion {
 pub struct ClientConfig<'a, const MAX_PROPERTIES: usize> {
     pub qos: QualityOfService,
     pub keep_alive: u16,
-    pub client_id: EncodedString<'a>,
     pub username_flag: bool,
     pub username: EncodedString<'a>,
     pub password_flag: bool,
@@ -53,7 +52,6 @@ impl<'a, const MAX_PROPERTIES: usize> ClientConfig<'a, MAX_PROPERTIES> {
         Self {
             qos: QualityOfService::QoS0,
             keep_alive: 60,
-            client_id: EncodedString::new(),
             username_flag: false,
             username: EncodedString::new(),
             password_flag: false,
