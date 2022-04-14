@@ -472,7 +472,7 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
     loop {
         let len: usize = conn.receive(recv_buffer).await?;
         if len > 0 {
-            writer.insert_ref(len, &recv_buffer);
+            writer.insert_ref(len, &recv_buffer) ?;
 
             if writer.position >= 1 && target_len == 0 {
                 let tmp_rem_len = writer.get_rem_len();
