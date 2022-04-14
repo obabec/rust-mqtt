@@ -473,7 +473,7 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
         let len: usize = conn.receive(recv_buffer).await?;
         if len > 0 {
             trace!("Received len: {}", len);
-            if Err(e) = writer.insert_ref(len, &recv_buffer) {
+            if let Err(e) = writer.insert_ref(len, &recv_buffer) {
                 error!("Buffer operation failed with: {}", e);
                 return Err(ReasonCode::BuffError);
             }
