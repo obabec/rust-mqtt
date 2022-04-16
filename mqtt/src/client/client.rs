@@ -475,7 +475,6 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
     // Get len of packet
     trace!("Reading lenght of packet");
     loop {
-
         let len: usize = conn.receive(&mut recv_buffer[writer.position..(writer.position+1)]).await?;
         i = i + len;
         if let Err(e) = writer.insert_ref(len, &recv_buffer[writer.position..i]) {
@@ -500,6 +499,7 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
         trace!("Reading packet with target len {}", l);
         target_len = l as usize;
     } else {
+        error!("Could not decode len of packet!");
         return Err(BuffError);
     }
 
