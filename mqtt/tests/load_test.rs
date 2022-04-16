@@ -85,7 +85,7 @@ async fn publish_core<'b>(
         if count == amount {
             break;
         }
-        sleep(Duration::from_millis(5)).await;
+        //sleep(Duration::from_millis(5)).await;
     }
 
 
@@ -162,15 +162,16 @@ async fn receive(ip: [u8; 4], qos: QualityOfService, topic: &str, amount: u16) -
     config.add_password(PASSWORD);
     config.max_packet_size = 6000;
     config.keep_alive = 60000;
-    let mut recv_buffer = [0; 100];
-    let mut write_buffer = [0; 100];
+    config.max_packet_size = 300;
+    let mut recv_buffer = [0; 500];
+    let mut write_buffer = [0; 500];
 
     let mut client = MqttClient::<TokioNetwork, 5>::new(
         tokio_network,
         &mut write_buffer,
-        100,
+        500,
         &mut recv_buffer,
-        100,
+        500,
         config,
     );
 
@@ -364,6 +365,23 @@ async fn load_test_ten_thousand_qos() {
     assert_ok!(p.unwrap());
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[serial]
+async fn load_test_ten_thousand() {
+    setup();
+    info!("Running simple tests test");
+
+    let recv =
+        task::spawn(async move { receive(IP, QualityOfService::QoS0, "ten/thousand", 10000).await });
+
+    let publ =
+        task::spawn(async move { publish(IP, 5, QualityOfService::QoS0, "ten/thousand", 10000).await });
+
+    let (r, p) = join(recv, publ).await;
+    assert_ok!(r.unwrap());
+    assert_ok!(p.unwrap());
+}
+
 // 72s
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[serial]
@@ -376,6 +394,23 @@ async fn load_test_twenty_thousand_qos() {
 
     let publ =
         task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "twenty/thousand/qos", 20000).await });
+
+    let (r, p) = join(recv, publ).await;
+    assert_ok!(r.unwrap());
+    assert_ok!(p.unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[serial]
+async fn load_test_twenty_thousand() {
+    setup();
+    info!("Running simple tests test");
+
+    let recv =
+        task::spawn(async move { receive(IP, QualityOfService::QoS0, "twenty/thousand", 20000).await });
+
+    let publ =
+        task::spawn(async move { publish(IP, 5, QualityOfService::QoS0, "twenty/thousand", 20000).await });
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());

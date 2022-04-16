@@ -45,6 +45,7 @@ use rand_core::RngCore;
 use crate::encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerDecoder, VariableByteIntegerEncoder};
 use crate::network::NetworkError::Connection;
 use crate::packet::v5::property::Property;
+use crate::packet::v5::reason_codes::ReasonCode::{BuffError, NetworkError};
 use crate::utils::buffer_writer::BuffWriter;
 
 pub struct MqttClient<'a, T, const MAX_PROPERTIES: usize> {
@@ -382,6 +383,7 @@ where
         }
         let mut conn = self.connection.as_mut().unwrap();
         let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
+
         let mut packet = PublishPacket::<'b, 5>::new();
         if let Err(err) = {
             packet.decode(&mut BuffReader::new(self.buffer, read))
@@ -465,37 +467,45 @@ where
 
 async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: usize, recv_buffer: & mut [u8], conn: &'c mut T) -> Result<usize, ReasonCode> {
     let mut target_len = 0;
-    let mut rem_len: VariableByteInteger = [0; 4];
+    let mut rem_len: Result<VariableByteInteger, ()>;
     let mut rem_len_len: usize = 0;
-    let mut complete_len: bool = false;
     let mut writer = BuffWriter::new(buffer, buffer_len);
+    let mut  i = 0;
+
+    // Get len of packet
     loop {
-        let len: usize = conn.receive(recv_buffer).await?;
-        if len > 0 {
-            trace!("Received len: {}", len);
-            if let Err(e) = writer.insert_ref(len, &recv_buffer) {
-                error!("Buffer operation failed with: {}", e);
-                return Err(ReasonCode::BuffError);
+        let len: usize = conn.receive(&mut recv_buffer[writer.position..(writer.position+1)]).await?;
+        i = i + len;
+        if let Err(e) = writer.insert_ref(len, &recv_buffer[writer.position..i]) {
+            return Err(ReasonCode::BuffError);
+        }
+        if (i > 1) {
+            rem_len = writer.get_rem_len();
+            if rem_len.is_ok() {
+                break;
             }
+            if i >= 5 {
+                return Err(NetworkError);
+            }
+        }
+    }
 
-            if writer.position >= 1 && target_len == 0 {
-                let tmp_rem_len = writer.get_rem_len();
-                if tmp_rem_len.is_err() {
-                    continue;
-                }
-                rem_len = tmp_rem_len.unwrap();
-                rem_len_len = VariableByteIntegerEncoder::len(rem_len);
-                if let Ok(res) = VariableByteIntegerDecoder::decode(rem_len) {
-                    target_len = res as usize;
-                } else {
-                    return Err(ReasonCode::BuffError);
-                }
-            }
+    rem_len_len = i;
+    i = 0;
+    if let Ok(l) = VariableByteIntegerDecoder::decode(rem_len.unwrap()) {
+        target_len = l as usize;
+    } else {
+        return Err(BuffError);
+    }
 
-            if target_len != 0 && (target_len + rem_len_len + 1) >= writer.position {
-                trace!("Just read packet with len {}", (target_len + rem_len_len + 1));
-                return Ok(target_len + rem_len_len + 1);
-            }
+    loop {
+        let len: usize = conn.receive(&mut recv_buffer[writer.position..writer.position + (target_len - i)]).await?;
+        i = i + len;
+        if let Err(e) = writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + i)]) {
+            return Err(BuffError);
+        }
+        if writer.position == target_len + rem_len_len {
+            return Ok(target_len + rem_len_len);
         }
     }
 }
