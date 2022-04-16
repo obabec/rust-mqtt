@@ -473,10 +473,13 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
     let mut  i = 0;
 
     // Get len of packet
+    trace!("Reading lenght of packet");
     loop {
+
         let len: usize = conn.receive(&mut recv_buffer[writer.position..(writer.position+1)]).await?;
         i = i + len;
         if let Err(e) = writer.insert_ref(len, &recv_buffer[writer.position..i]) {
+            error!("Error occurred during write to buffer!");
             return Err(ReasonCode::BuffError);
         }
         if (i > 1) {
@@ -485,6 +488,7 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
                 break;
             }
             if i >= 5 {
+                error!("Could not read len of packet!");
                 return Err(NetworkError);
             }
         }
@@ -503,6 +507,7 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
         let len: usize = conn.receive(&mut recv_buffer[writer.position..writer.position + (target_len - i)]).await?;
         i = i + len;
         if let Err(e) = writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + i)]) {
+            error!("Error occurred during write to buffer!");
             return Err(BuffError);
         }
         if writer.position == target_len + rem_len_len {
