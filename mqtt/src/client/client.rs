@@ -493,6 +493,7 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
     rem_len_len = i;
     i = 0;
     if let Ok(l) = VariableByteIntegerDecoder::decode(rem_len.unwrap()) {
+        trace!("Reading packet with target len {}", l);
         target_len = l as usize;
     } else {
         return Err(BuffError);
@@ -505,6 +506,7 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
             return Err(BuffError);
         }
         if writer.position == target_len + rem_len_len {
+            trace!("Received packet with len: {}", (target_len + rem_len_len));
             return Ok(target_len + rem_len_len);
         }
     }
