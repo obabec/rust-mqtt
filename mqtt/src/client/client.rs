@@ -477,6 +477,7 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
     loop {
         trace!("    Reading in loop!");
         let len: usize = conn.receive(&mut recv_buffer[writer.position..(writer.position+1)]).await?;
+        trace!("    Received data!");
         i = i + len;
         if let Err(e) = writer.insert_ref(len, &recv_buffer[writer.position..i]) {
             error!("Error occurred during write to buffer!");
