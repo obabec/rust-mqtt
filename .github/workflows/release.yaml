@@ -1,0 +1,28 @@
+on:
+  release:
+    types:
+      - created
+
+name: Release
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Run Unit tests
+        run: RUST_LOG=trace cargo test unit
+
+      - name: Build embedded
+        run: cargo build --target thumbv7em-none-eabihf --features "no_std" --no-default-features
+
+      - uses: katyo/publish-crates@v1
+        with:
+          registry-token: ${{ secrets.CARGO_PUBLISH }}

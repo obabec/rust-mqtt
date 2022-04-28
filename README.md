@@ -27,6 +27,7 @@ Integration tests are written using tokio network tcp stack and can be find unde
 ```
 cargo test unit
 cargo test integration
+cargo test load
 ```
 
 ## Acknowledgment
