@@ -22,14 +22,13 @@
  * SOFTWARE.
  */
 
+use heapless::Vec;
+
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::packet_type::PacketType;
 use crate::packet::v5::property::Property;
-use crate::packet::v5::publish_packet::QualityOfService::{QoS0, QoS1};
 use crate::packet::v5::unsubscription_packet::UnsubscriptionPacket;
 use crate::utils::types::{EncodedString, StringPair};
-
-use heapless::Vec;
 
 #[test]
 fn test_encode() {
@@ -49,15 +48,15 @@ fn test_encode() {
     let mut props = Vec::<Property, 1>::new();
     props.push(Property::UserProperty(pair));
     packet.property_len = packet.add_properties(&props);
-    packet.add_new_filter("test/topic", QoS0);
-    packet.add_new_filter("hehe/#", QoS1);
+    packet.add_new_filter("test/topic");
+    packet.add_new_filter("hehe/#");
     let res = packet.encode(&mut buffer, 40);
     assert!(res.is_ok());
     assert_eq!(res.unwrap(), 40);
     assert_eq!(
         buffer,
         [
-            0xA0, 0x26, 0x15, 0x38, 0x0F, 0x26, 0x00, 0x04, 0x68, 0x61, 0x68, 0x61, 0x00, 0x06,
+            0xA2, 0x26, 0x15, 0x38, 0x0F, 0x26, 0x00, 0x04, 0x68, 0x61, 0x68, 0x61, 0x00, 0x06,
             0x68, 0x65, 0x68, 0x65, 0x38, 0x39, 0x00, 0x0A, 0x74, 0x65, 0x73, 0x74, 0x2F, 0x74,
             0x6F, 0x70, 0x69, 0x63, 0x00, 0x06, 0x68, 0x65, 0x68, 0x65, 0x2F, 0x23
         ]

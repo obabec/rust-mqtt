@@ -22,12 +22,11 @@
  * SOFTWARE.
  */
 
-
 use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::v5::mqtt_packet::Packet;
-use crate::packet::v5::publish_packet::QualityOfService;
+use crate::packet::v5::packet_type::PacketType;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BufferError, TopicFilter};
@@ -47,13 +46,12 @@ pub struct UnsubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTI
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
     UnsubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
-    pub fn add_new_filter(&mut self, topic_name: &'a str, qos: QualityOfService) {
+    pub fn add_new_filter(&mut self, topic_name: &'a str) {
         let len = topic_name.len();
         let mut new_filter = TopicFilter::new();
         new_filter.filter.string = topic_name;
         new_filter.filter.len = len as u16;
-        new_filter.sub_options =
-            new_filter.sub_options | (<QualityOfService as Into<u8>>::into(qos) >> 1);
+        new_filter.sub_options = new_filter.sub_options | 0x01;
         self.topic_filters.push(new_filter);
         self.topic_filter_len = self.topic_filter_len + 1;
     }
@@ -64,7 +62,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
 {
     fn new() -> Self {
         Self {
-            fixed_header: 0,
+            fixed_header: PacketType::Unsubscribe.into(),
             remain_len: 0,
             packet_identifier: 0,
             property_len: 0,

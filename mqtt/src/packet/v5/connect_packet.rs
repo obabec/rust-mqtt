@@ -27,7 +27,6 @@ use heapless::Vec;
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
-
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BinaryData, BufferError, EncodedString};
 

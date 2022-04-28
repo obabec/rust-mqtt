@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-
 use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
@@ -82,6 +81,10 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for DisconnectPacket<'a, MAX_PR
         if self.decode_fixed_header(buff_reader)? != (PacketType::Disconnect).into() {
             error!("Packet you are trying to decode is not DISCONNECT packet!");
             return Err(BufferError::WrongPacketToDecode);
+        }
+        if self.remain_len == 0 {
+            self.disconnect_reason = 0x00;
+            return Ok(());
         }
         self.disconnect_reason = buff_reader.read_u8()?;
         return self.decode_properties(buff_reader);

@@ -22,29 +22,30 @@
  * SOFTWARE.
  */
 extern crate alloc;
+
 use alloc::string::String;
 use core::time::Duration;
-use std::future::Future;
-use log::{info, LevelFilter};
-use tokio::time::sleep;
-use tokio::task;
-use tokio_test::{assert_err, assert_ok};
+use std::sync::Once;
+
+use futures::future::{join, join3};
 use heapless::Vec;
-use rust_mqtt::client::client_config::ClientConfig;
+use log::{info};
+use tokio::task;
+use tokio::time::sleep;
+use tokio_test::{assert_err, assert_ok};
+
 use rust_mqtt::client::client::MqttClient;
-use rust_mqtt::network::{NetworkConnection, NetworkConnectionFactory};
+use rust_mqtt::client::client_config::ClientConfig;
+use rust_mqtt::client::client_config::MqttVersion::MQTTv5;
+use rust_mqtt::network::{NetworkConnectionFactory};
 use rust_mqtt::packet::v5::property::Property;
 use rust_mqtt::packet::v5::publish_packet::QualityOfService;
 use rust_mqtt::packet::v5::reason_codes::ReasonCode;
 use rust_mqtt::packet::v5::reason_codes::ReasonCode::NotAuthorized;
 use rust_mqtt::tokio_net::tokio_network::{TokioNetwork, TokioNetworkFactory};
-use rust_mqtt::utils::types::BufferError;
-use std::sync::Once;
-use futures::future::{join, join3};
-use rust_mqtt::client::client_config::MqttVersion::MQTTv5;
+use rust_mqtt::utils::rng_generator::CountingRng;
 
 static IP: [u8; 4] = [127, 0, 0, 1];
-static WRONG_IP: [u8; 4] = [192, 168, 1, 1];
 static PORT: u16 = 1883;
 static USERNAME: &str = "test";
 static PASSWORD: &str = "testPass";
@@ -59,35 +60,49 @@ fn setup() {
 }
 
 async fn publish_core<'b>(
-    client: &mut MqttClient<'b, TokioNetwork, 5>,
+    client: &mut MqttClient<'b, TokioNetwork, 5, CountingRng>,
     wait: u64,
     topic: &str,
+    message: &str,
+    err: bool,
 ) -> Result<(), ReasonCode> {
     info!(
         "[Publisher] Connection to broker with username {} and password {}",
-        USERNAME,
-        PASSWORD
+        USERNAME, PASSWORD
     );
     let mut result = { client.connect_to_broker().await };
     assert_ok!(result);
     info!("[Publisher] Waiting {} seconds before sending", wait);
     sleep(Duration::from_secs(wait)).await;
 
-    info!("[Publisher] Sending new message {} to topic {}", MSG, topic);
-    result = { client.send_message(topic, MSG).await };
+    info!(
+        "[Publisher] Sending new message {} to topic {}",
+        message, topic
+    );
+    result = client.send_message(topic, message).await;
     info!("[PUBLISHER] sent");
-    assert_ok!(result);
+    if err == true {
+        assert_err!(result);
+    } else {
+        assert_ok!(result);
+    }
 
     info!("[Publisher] Disconnecting!");
-    result = { client.disconnect().await };
+    result = client.disconnect().await;
+
     assert_ok!(result);
     Ok(())
 }
 
-async fn publish(ip: [u8; 4], wait: u64, qos: QualityOfService, topic: &str) -> Result<(), ReasonCode> {
+async fn publish(
+    ip: [u8; 4],
+    wait: u64,
+    qos: QualityOfService,
+    topic: &str,
+) -> Result<(), ReasonCode> {
     let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
-    let mut tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
-    let mut config = ClientConfig::new(MQTTv5);
+    let tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
+    let mut config = ClientConfig::new(MQTTv5, CountingRng(20000));
     config.add_qos(qos);
     config.add_username(USERNAME);
     config.add_password(PASSWORD);
@@ -95,7 +110,7 @@ async fn publish(ip: [u8; 4], wait: u64, qos: QualityOfService, topic: &str) -> 
     let mut recv_buffer = [0; 80];
     let mut write_buffer = [0; 80];
 
-    let mut client = MqttClient::<TokioNetwork, 5>::new(
+    let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
         tokio_network,
         &mut write_buffer,
         80,
@@ -103,88 +118,123 @@ async fn publish(ip: [u8; 4], wait: u64, qos: QualityOfService, topic: &str) -> 
         80,
         config,
     );
-    publish_core(&mut client, wait, topic).await
+    publish_core(&mut client, wait, topic, MSG, false).await
+}
+
+async fn publish_spec(
+    ip: [u8; 4],
+    wait: u64,
+    qos: QualityOfService,
+    topic: &str,
+    message: &str,
+    err: bool,
+) -> Result<(), ReasonCode> {
+    let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
+    let tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
+    let mut config = ClientConfig::new(MQTTv5, CountingRng(20000));
+    config.add_qos(qos);
+    config.add_username(USERNAME);
+    config.add_password(PASSWORD);
+    config.max_packet_size = 100;
+    let mut recv_buffer = [0; 80];
+    let mut write_buffer = [0; 80];
+
+    let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
+        tokio_network,
+        &mut write_buffer,
+        80,
+        &mut recv_buffer,
+        80,
+        config,
+    );
+    publish_core(&mut client, wait, topic, message, err).await
 }
 
 async fn receive_core<'b>(
-    client: &mut MqttClient<'b, TokioNetwork, 5>,
+    client: &mut MqttClient<'b, TokioNetwork, 5, CountingRng>,
     topic: &str,
 ) -> Result<(), ReasonCode> {
     info!(
         "[Receiver] Connection to broker with username {} and password {}",
-        USERNAME,
-        PASSWORD
+        USERNAME, PASSWORD
     );
-    let mut result = { client.connect_to_broker().await };
+    let mut result = client.connect_to_broker().await;
     assert_ok!(result);
 
     info!("[Receiver] Subscribing to topic {}", topic);
-    result = { client.subscribe_to_topic(topic).await };
+    result = client.subscribe_to_topic(topic).await;
     assert_ok!(result);
     info!("[Receiver] Waiting for new message!");
-    let msg = { client.receive_message().await };
+    let msg = client.receive_message().await;
     assert_ok!(msg);
     let act_message = String::from_utf8_lossy(msg?);
     info!("[Receiver] Got new message: {}", act_message);
     assert_eq!(act_message, MSG);
 
     info!("[Receiver] Disconnecting");
-    result = { client.disconnect().await };
+    result = client.disconnect().await;
+
     assert_ok!(result);
     Ok(())
 }
 
-
-
 async fn receive_core_multiple<'b, const TOPICS: usize>(
-    client: &mut MqttClient<'b, TokioNetwork, 5>,
+    client: &mut MqttClient<'b, TokioNetwork, 5, CountingRng>,
     topic_names: &'b Vec<&'b str, TOPICS>,
 ) -> Result<(), ReasonCode> {
     info!(
         "[Receiver] Connection to broker with username {} and password {}",
-        USERNAME,
-        PASSWORD
+        USERNAME, PASSWORD
     );
-    let mut result = { client.connect_to_broker().await };
+    let mut result = client.connect_to_broker().await;
     assert_ok!(result);
 
-    info!("[Receiver] Subscribing to topics {}, {}", topic_names.get(0).unwrap(), topic_names.get(1).unwrap());
-    result = { client.subscribe_to_topics(topic_names).await };
+    info!(
+        "[Receiver] Subscribing to topics {}, {}",
+        topic_names.get(0).unwrap(),
+        topic_names.get(1).unwrap()
+    );
+    result = client.subscribe_to_topics(topic_names).await;
+
     assert_ok!(result);
     info!("[Receiver] Waiting for new message!");
     {
-        let msg = { client.receive_message().await };
+        let msg = client.receive_message().await;
         assert_ok!(msg);
         let act_message = String::from_utf8_lossy(msg?);
         info!("[Receiver] Got new message: {}", act_message);
         assert_eq!(act_message, MSG);
     }
     {
-        let msg_sec = { client.receive_message().await };
+        let msg_sec = client.receive_message().await;
         assert_ok!(msg_sec);
         let act_message_second = String::from_utf8_lossy(msg_sec?);
         info!("[Receiver] Got new message: {}", act_message_second);
         assert_eq!(act_message_second, MSG);
     }
     info!("[Receiver] Disconnecting");
-    result = { client.disconnect().await };
+    result = client.disconnect().await;
+
     assert_ok!(result);
     Ok(())
 }
 
-async fn receive_multiple<const TOPICS: usize>(qos: QualityOfService, topic_names: & Vec<& str, TOPICS>,) -> Result<(), ReasonCode> {
+async fn receive_multiple<const TOPICS: usize>(
+    qos: QualityOfService,
+    topic_names: &Vec<&str, TOPICS>,
+) -> Result<(), ReasonCode> {
     let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
-    let mut tokio_network: TokioNetwork = tokio_factory.connect(IP, PORT).await?;
-    let mut config = ClientConfig::new(MQTTv5);
+    let tokio_network: TokioNetwork = tokio_factory.connect(IP, PORT).await?;
+    let mut config = ClientConfig::new(MQTTv5, CountingRng(20000));
     config.add_qos(qos);
     config.add_username(USERNAME);
     config.add_password(PASSWORD);
     config.max_packet_size = 60;
-    config.properties.push(Property::ReceiveMaximum(20));
+    assert_ok!(config.properties.push(Property::ReceiveMaximum(20)));
     let mut recv_buffer = [0; 100];
     let mut write_buffer = [0; 100];
 
-    let mut client = MqttClient::<TokioNetwork, 5>::new(
+    let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
         tokio_network,
         &mut write_buffer,
         100,
@@ -198,17 +248,17 @@ async fn receive_multiple<const TOPICS: usize>(qos: QualityOfService, topic_name
 
 async fn receive(ip: [u8; 4], qos: QualityOfService, topic: &str) -> Result<(), ReasonCode> {
     let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
-    let mut tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
-    let mut config = ClientConfig::new(MQTTv5);
+    let tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
+    let mut config = ClientConfig::new(MQTTv5, CountingRng(20000));
     config.add_qos(qos);
     config.add_username(USERNAME);
     config.add_password(PASSWORD);
     config.max_packet_size = 6000;
-    config.properties.push(Property::ReceiveMaximum(20));
+    assert_ok!(config.properties.push(Property::ReceiveMaximum(20)));
     let mut recv_buffer = [0; 100];
     let mut write_buffer = [0; 100];
 
-    let mut client = MqttClient::<TokioNetwork, 5>::new(
+    let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
         tokio_network,
         &mut write_buffer,
         100,
@@ -222,17 +272,17 @@ async fn receive(ip: [u8; 4], qos: QualityOfService, topic: &str) -> Result<(), 
 
 async fn receive_with_wrong_cred(qos: QualityOfService) -> Result<(), ReasonCode> {
     let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
-    let mut tokio_network: TokioNetwork = tokio_factory.connect(IP, PORT).await?;
-    let mut config = ClientConfig::new(MQTTv5);
+    let tokio_network: TokioNetwork = tokio_factory.connect(IP, PORT).await?;
+    let mut config = ClientConfig::new(MQTTv5, CountingRng(20000));
     config.add_qos(qos);
     config.add_username("xyz");
     config.add_password(PASSWORD);
     config.max_packet_size = 60;
-    config.properties.push(Property::ReceiveMaximum(20));
+    assert_ok!(config.properties.push(Property::ReceiveMaximum(20)));
     let mut recv_buffer = [0; 100];
     let mut write_buffer = [0; 100];
 
-    let mut client = MqttClient::<TokioNetwork, 5>::new(
+    let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
         tokio_network,
         &mut write_buffer,
         100,
@@ -243,17 +293,98 @@ async fn receive_with_wrong_cred(qos: QualityOfService) -> Result<(), ReasonCode
 
     info!(
         "[Receiver] Connection to broker with username {} and password {}",
-        "xyz",
-        PASSWORD
+        "xyz", PASSWORD
     );
-    let result = { client.connect_to_broker().await };
+    let result = client.connect_to_broker().await;
     assert!(result.is_err());
     assert_eq!(result.unwrap_err(), NotAuthorized);
     Ok(())
 }
 
+async fn receive_multiple_second_unsub<const TOPICS: usize>(
+    qos: QualityOfService,
+    topic_names: &Vec<&str, TOPICS>,
+    msg_t1: &str,
+    msg_t2: &str,
+) -> Result<(), ReasonCode> {
+    let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
+    let tokio_network: TokioNetwork = tokio_factory.connect(IP, PORT).await?;
+    let mut config = ClientConfig::new(MQTTv5, CountingRng(20000));
+    config.add_qos(qos);
+    config.add_username(USERNAME);
+    config.add_password(PASSWORD);
+    config.max_packet_size = 60;
+    assert_ok!(config.properties.push(Property::ReceiveMaximum(20)));
+    let mut recv_buffer = [0; 100];
+    let mut write_buffer = [0; 100];
+
+    let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
+        tokio_network,
+        &mut write_buffer,
+        100,
+        &mut recv_buffer,
+        100,
+        config,
+    );
+
+    info!(
+        "[Receiver] Connection to broker with username {} and password {}",
+        USERNAME, PASSWORD
+    );
+    let mut result = { client.connect_to_broker().await };
+    assert_ok!(result);
+
+    info!(
+        "[Receiver] Subscribing to topics {}, {}",
+        topic_names.get(0).unwrap(),
+        topic_names.get(1).unwrap()
+    );
+    result = client.subscribe_to_topics(topic_names).await;
+
+    assert_ok!(result);
+    info!("[Receiver] Waiting for new message!");
+    {
+        let msg = { client.receive_message().await };
+        assert_ok!(msg);
+        let act_message = String::from_utf8_lossy(msg?);
+        info!("[Receiver] Got new message: {}", act_message);
+        assert_eq!(act_message, msg_t1);
+    }
+    {
+        let msg_sec = { client.receive_message().await };
+        assert_ok!(msg_sec);
+        let act_message_second = String::from_utf8_lossy(msg_sec?);
+        info!("[Receiver] Got new message: {}", act_message_second);
+        assert_eq!(act_message_second, msg_t2);
+    }
+
+    {
+        let res = client
+            .unsubscribe_from_topic(topic_names.get(1).unwrap())
+            .await;
+        assert_ok!(res);
+    }
+    {
+        let msg = { client.receive_message().await };
+        assert_ok!(msg);
+        let act_message = String::from_utf8_lossy(msg?);
+        info!("[Receiver] Got new message: {}", act_message);
+        assert_eq!(act_message, msg_t1);
+    }
+
+    let res =
+        tokio::time::timeout(std::time::Duration::from_secs(10), client.receive_message()).await;
+    assert_err!(res);
+
+    info!("[Receiver] Disconnecting");
+    result = client.disconnect().await;
+
+    assert_ok!(result);
+    Ok(())
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn integration_simple_publish_recv() {
+async fn integration_publish_recv() {
     setup();
     info!("Running simple tests test");
 
@@ -261,7 +392,9 @@ async fn integration_simple_publish_recv() {
         task::spawn(async move { receive(IP, QualityOfService::QoS0, "test/recv/simple").await });
 
     let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS0, "test/recv/simple").await });
+        task::spawn(
+            async move { publish(IP, 5, QualityOfService::QoS0, "test/recv/simple").await },
+        );
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -269,17 +402,17 @@ async fn integration_simple_publish_recv() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn integration_simple_publish_recv_multiple() {
+async fn integration_publish_recv_multiple() {
     setup();
     info!("Running simple tests test");
     let mut topic_names = Vec::<&str, 2>::new();
-    topic_names.push("test/topic1");
-    topic_names.push("test/topic2");
+    assert_ok!(topic_names.push("test/topic1"));
+    assert_ok!(topic_names.push("test/topic2"));
     let recv =
         task::spawn(async move { receive_multiple(QualityOfService::QoS0, &topic_names).await });
 
     let publ =
-        task::spawn(async move { publish(IP, 5,QualityOfService::QoS0, "test/topic1").await });
+        task::spawn(async move { publish(IP, 5, QualityOfService::QoS0, "test/topic1").await });
 
     let publ2 =
         task::spawn(async move { publish(IP, 10, QualityOfService::QoS0, "test/topic2").await });
@@ -291,14 +424,14 @@ async fn integration_simple_publish_recv_multiple() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn integration_simple_publish_recv_multiple_qos() {
+async fn integration_publish_recv_multiple_qos() {
     setup();
     info!("Running simple tests test");
     let mut topic_names = Vec::<&str, 2>::new();
-    topic_names.push("test/topic3");
-    topic_names.push("test/topic4");
+    assert_ok!(topic_names.push("test/topic3"));
+    assert_ok!(topic_names.push("test/topic4"));
     let recv =
-       task::spawn(async move { receive_multiple(QualityOfService::QoS1, &topic_names).await });
+        task::spawn(async move { receive_multiple(QualityOfService::QoS1, &topic_names).await });
 
     let publ =
         task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/topic3").await });
@@ -306,38 +439,72 @@ async fn integration_simple_publish_recv_multiple_qos() {
     let publ2 =
         task::spawn(async move { publish(IP, 10, QualityOfService::QoS1, "test/topic4").await });
 
-    let ( r, p, p2) = join3(recv, publ, publ2).await;
+    let (r, p, p2) = join3(recv, publ, publ2).await;
     assert_ok!(r.unwrap());
     assert_ok!(p.unwrap());
     assert_ok!(p2.unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn integration_simple_publish_recv_qos() {
+async fn integration_publish_recv_qos() {
     setup();
-    info!("Running simple tests test with Quality of Service 1");
+    info!("Running tests test with Quality of Service 1");
 
-    let recv = task::spawn(async move { receive(IP, QualityOfService::QoS1, "test/recv/qos").await });
+    let recv =
+        task::spawn(async move { receive(IP, QualityOfService::QoS1, "test/recv/qos").await });
 
-    let publ = task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/recv/qos").await });
+    let publ =
+        task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/recv/qos").await });
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
     assert_ok!(p.unwrap());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-async fn integration_simple_publish_recv_wrong_cred() {
+async fn integration_publish_recv_wrong_cred() {
     setup();
-    info!("Running simple tests test wrong credentials");
+    info!("Running tests test wrong credentials");
 
     let recv = task::spawn(async move { receive_with_wrong_cred(QualityOfService::QoS1).await });
 
     let recv_right =
         task::spawn(async move { receive(IP, QualityOfService::QoS0, "test/recv/wrong").await });
 
-    let publ = task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/recv/wrong").await });
+    let publ =
+        task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/recv/wrong").await });
     let (r, rv, p) = join3(recv, recv_right, publ).await;
     assert_ok!(r.unwrap());
     assert_ok!(rv.unwrap());
     assert_ok!(p.unwrap());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+async fn integration_sub_unsub() {
+    setup();
+    info!("Running tests with sub and unsub");
+    let mut topic_names = Vec::<&str, 2>::new();
+    assert_ok!(topic_names.push("unsub/topic1"));
+    assert_ok!(topic_names.push("unsub/topic2"));
+    let msg_t1 = "First topic message";
+    let msg_t2 = "Second topic message";
+
+    let recv = task::spawn(async move {
+        receive_multiple_second_unsub(QualityOfService::QoS1, &topic_names, msg_t1, msg_t2).await
+    });
+
+    let publ = task::spawn(async move {
+        assert_ok!(publish_spec(IP, 5, QualityOfService::QoS1, "unsub/topic1", msg_t1, false).await);
+
+        publish_spec(IP, 2, QualityOfService::QoS1, "unsub/topic1", msg_t1, false).await
+    });
+
+    let publ2 = task::spawn(async move {
+        assert_ok!(publish_spec(IP, 6, QualityOfService::QoS1, "unsub/topic2", msg_t2, false).await);
+
+        publish_spec(IP, 3, QualityOfService::QoS1, "unsub/topic2", msg_t2, true).await
+    });
+    let (r, p1, p2) = join3(recv, publ, publ2).await;
+    assert_ok!(r.unwrap());
+    assert_ok!(p1.unwrap());
+    assert_ok!(p2.unwrap());
 }

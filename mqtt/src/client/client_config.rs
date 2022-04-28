@@ -22,20 +22,21 @@
  * SOFTWARE.
  */
 
+use heapless::Vec;
+use rand_core::RngCore;
+
 use crate::packet::v5::property::Property;
 use crate::packet::v5::publish_packet::QualityOfService;
 use crate::utils::types::{BinaryData, EncodedString};
 
-use heapless::Vec;
-
 #[derive(Clone, PartialEq)]
 pub enum MqttVersion {
     MQTTv3,
-    MQTTv5
+    MQTTv5,
 }
 
 #[derive(Clone)]
-pub struct ClientConfig<'a, const MAX_PROPERTIES: usize> {
+pub struct ClientConfig<'a, const MAX_PROPERTIES: usize, T: RngCore> {
     pub qos: QualityOfService,
     pub keep_alive: u16,
     pub username_flag: bool,
@@ -45,10 +46,11 @@ pub struct ClientConfig<'a, const MAX_PROPERTIES: usize> {
     pub properties: Vec<Property<'a>, MAX_PROPERTIES>,
     pub max_packet_size: u32,
     pub mqtt_version: MqttVersion,
+    pub rng: T,
 }
 
-impl<'a, const MAX_PROPERTIES: usize> ClientConfig<'a, MAX_PROPERTIES> {
-    pub fn new(version: MqttVersion) -> Self {
+impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIES, T> {
+    pub fn new(version: MqttVersion, rng: T) -> Self {
         Self {
             qos: QualityOfService::QoS0,
             keep_alive: 60,
@@ -58,7 +60,8 @@ impl<'a, const MAX_PROPERTIES: usize> ClientConfig<'a, MAX_PROPERTIES> {
             password: BinaryData::new(),
             properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
             max_packet_size: 265_000,
-            mqtt_version: version
+            mqtt_version: version,
+            rng,
         }
     }
 

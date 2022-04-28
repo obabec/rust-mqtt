@@ -22,17 +22,17 @@
  * SOFTWARE.
  */
 
-
 use heapless::Vec;
 
-use super::packet_type::PacketType;
-use super::property::Property;
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::publish_packet::QualityOfService;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BufferError, TopicFilter};
+
+use super::packet_type::PacketType;
+use super::property::Property;
 
 pub struct SubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> {
     pub fixed_header: u8,

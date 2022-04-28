@@ -22,30 +22,28 @@
  * SOFTWARE.
  */
 extern crate alloc;
+
 use alloc::string::String;
 use core::time::Duration;
-use std::future::Future;
-use log::{info, LevelFilter};
-use tokio::time::sleep;
+use std::sync::Once;
+
+use futures::future::{join};
+use log::{info};
 use serial_test::serial;
 use tokio::task;
-use tokio_test::{assert_err, assert_ok};
-use heapless::Vec;
-use rust_mqtt::client::client_config::ClientConfig;
+use tokio::time::sleep;
+use tokio_test::{assert_ok};
+
 use rust_mqtt::client::client::MqttClient;
-use rust_mqtt::network::{NetworkConnection, NetworkConnectionFactory};
-use rust_mqtt::packet::v5::property::Property;
+use rust_mqtt::client::client_config::ClientConfig;
+use rust_mqtt::client::client_config::MqttVersion::MQTTv5;
+use rust_mqtt::network::{NetworkConnectionFactory};
 use rust_mqtt::packet::v5::publish_packet::QualityOfService;
 use rust_mqtt::packet::v5::reason_codes::ReasonCode;
-use rust_mqtt::packet::v5::reason_codes::ReasonCode::NotAuthorized;
 use rust_mqtt::tokio_net::tokio_network::{TokioNetwork, TokioNetworkFactory};
-use rust_mqtt::utils::types::BufferError;
-use std::sync::Once;
-use futures::future::{join, join3};
-use rust_mqtt::client::client_config::MqttVersion::MQTTv5;
+use rust_mqtt::utils::rng_generator::CountingRng;
 
 static IP: [u8; 4] = [127, 0, 0, 1];
-static WRONG_IP: [u8; 4] = [192, 168, 1, 1];
 static PORT: u16 = 1883;
 static USERNAME: &str = "test";
 static PASSWORD: &str = "testPass";
@@ -60,17 +58,16 @@ fn setup() {
 }
 
 async fn publish_core<'b>(
-    client: &mut MqttClient<'b, TokioNetwork, 5>,
+    client: &mut MqttClient<'b, TokioNetwork, 5, CountingRng>,
     wait: u64,
     topic: &str,
     amount: u16,
 ) -> Result<(), ReasonCode> {
     info!(
         "[Publisher] Connection to broker with username {} and password {}",
-        USERNAME,
-        PASSWORD
+        USERNAME, PASSWORD
     );
-    let mut result = { client.connect_to_broker().await };
+    let mut result = client.connect_to_broker().await;
     assert_ok!(result);
     info!("[Publisher] Waiting {} seconds before sending", wait);
     sleep(Duration::from_secs(wait)).await;
@@ -78,7 +75,7 @@ async fn publish_core<'b>(
     info!("[Publisher] Sending new message {} to topic {}", MSG, topic);
     let mut count = 0;
     loop {
-        result = { client.send_message(topic, MSG).await };
+        result = client.send_message(topic, MSG).await;
         info!("[PUBLISHER] sent {}", count);
         assert_ok!(result);
         count = count + 1;
@@ -88,18 +85,22 @@ async fn publish_core<'b>(
         //sleep(Duration::from_millis(5)).await;
     }
 
-
-
     info!("[Publisher] Disconnecting!");
-    result = { client.disconnect().await };
+    result = client.disconnect().await;
     assert_ok!(result);
     Ok(())
 }
 
-async fn publish(ip: [u8; 4], wait: u64, qos: QualityOfService, topic: &str, amount: u16) -> Result<(), ReasonCode> {
+async fn publish(
+    ip: [u8; 4],
+    wait: u64,
+    qos: QualityOfService,
+    topic: &str,
+    amount: u16,
+) -> Result<(), ReasonCode> {
     let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
-    let mut tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
-    let mut config = ClientConfig::new(MQTTv5);
+    let tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
+    let mut config = ClientConfig::new(MQTTv5, CountingRng(50000));
     config.add_qos(qos);
     config.add_username(USERNAME);
     config.add_password(PASSWORD);
@@ -107,7 +108,7 @@ async fn publish(ip: [u8; 4], wait: u64, qos: QualityOfService, topic: &str, amo
     let mut recv_buffer = [0; 80];
     let mut write_buffer = [0; 80];
 
-    let mut client = MqttClient::<TokioNetwork, 5>::new(
+    let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
         tokio_network,
         &mut write_buffer,
         80,
@@ -119,25 +120,24 @@ async fn publish(ip: [u8; 4], wait: u64, qos: QualityOfService, topic: &str, amo
 }
 
 async fn receive_core<'b>(
-    client: &mut MqttClient<'b, TokioNetwork, 5>,
+    client: &mut MqttClient<'b, TokioNetwork, 5, CountingRng>,
     topic: &str,
     amount: u16,
 ) -> Result<(), ReasonCode> {
     info!(
         "[Receiver] Connection to broker with username {} and password {}",
-        USERNAME,
-        PASSWORD
+        USERNAME, PASSWORD
     );
-    let mut result = { client.connect_to_broker().await };
+    let mut result = client.connect_to_broker().await;
     assert_ok!(result);
 
     info!("[Receiver] Subscribing to topic {}", topic);
-    result = { client.subscribe_to_topic(topic).await };
+    result = client.subscribe_to_topic(topic).await;
     assert_ok!(result);
     info!("[Receiver] Waiting for new message!");
     let mut count = 0;
     loop {
-        let msg = { client.receive_message().await };
+        let msg = client.receive_message().await;
         assert_ok!(msg);
         let act_message = String::from_utf8_lossy(msg?);
         info!("[Receiver] Got new {}. message: {}", count, act_message);
@@ -148,15 +148,20 @@ async fn receive_core<'b>(
         }
     }
     info!("[Receiver] Disconnecting");
-    result = { client.disconnect().await };
+    result = client.disconnect().await;
     assert_ok!(result);
     Ok(())
 }
 
-async fn receive(ip: [u8; 4], qos: QualityOfService, topic: &str, amount: u16) -> Result<(), ReasonCode> {
+async fn receive(
+    ip: [u8; 4],
+    qos: QualityOfService,
+    topic: &str,
+    amount: u16,
+) -> Result<(), ReasonCode> {
     let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
-    let mut tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
-    let mut config = ClientConfig::new(MQTTv5);
+    let tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
+    let mut config = ClientConfig::new(MQTTv5, CountingRng(50000));
     config.add_qos(qos);
     config.add_username(USERNAME);
     config.add_password(PASSWORD);
@@ -166,7 +171,7 @@ async fn receive(ip: [u8; 4], qos: QualityOfService, topic: &str, amount: u16) -
     let mut recv_buffer = [0; 500];
     let mut write_buffer = [0; 500];
 
-    let mut client = MqttClient::<TokioNetwork, 5>::new(
+    let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
         tokio_network,
         &mut write_buffer,
         500,
@@ -188,7 +193,9 @@ async fn load_test_ten() {
         task::spawn(async move { receive(IP, QualityOfService::QoS0, "test/recv/ten", 10).await });
 
     let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS0, "test/recv/ten", 10).await });
+        task::spawn(
+            async move { publish(IP, 5, QualityOfService::QoS0, "test/recv/ten", 10).await },
+        );
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -201,10 +208,13 @@ async fn load_test_ten_qos() {
     info!("Running simple tests test");
 
     let recv =
-        task::spawn(async move { receive(IP, QualityOfService::QoS1, "test/recv/ten/qos", 10).await });
+        task::spawn(
+            async move { receive(IP, QualityOfService::QoS1, "test/recv/ten/qos", 10).await },
+        );
 
-    let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/recv/ten/qos", 10).await });
+    let publ = task::spawn(async move {
+        publish(IP, 5, QualityOfService::QoS1, "test/recv/ten/qos", 10).await
+    });
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -218,10 +228,14 @@ async fn load_test_fifty() {
     info!("Running simple tests test");
 
     let recv =
-        task::spawn(async move { receive(IP, QualityOfService::QoS0, "test/recv/fifty", 50).await });
+        task::spawn(
+            async move { receive(IP, QualityOfService::QoS0, "test/recv/fifty", 50).await },
+        );
 
     let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS0, "test/recv/fifty", 50).await });
+        task::spawn(
+            async move { publish(IP, 5, QualityOfService::QoS0, "test/recv/fifty", 50).await },
+        );
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -235,10 +249,13 @@ async fn load_test_fifty_qos() {
     info!("Running simple tests test");
 
     let recv =
-        task::spawn(async move { receive(IP, QualityOfService::QoS1, "test/recv/fifty/qos", 50).await });
+        task::spawn(
+            async move { receive(IP, QualityOfService::QoS1, "test/recv/fifty/qos", 50).await },
+        );
 
-    let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "test/recv/fifty/qos", 50).await });
+    let publ = task::spawn(async move {
+        publish(IP, 5, QualityOfService::QoS1, "test/recv/fifty/qos", 50).await
+    });
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -252,10 +269,13 @@ async fn load_test_hundred() {
     info!("Running simple tests test");
 
     let recv =
-        task::spawn(async move { receive(IP, QualityOfService::QoS0, "test/recv/hundred", 100).await });
+        task::spawn(
+            async move { receive(IP, QualityOfService::QoS0, "test/recv/hundred", 100).await },
+        );
 
-    let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS0, "test/recv/hundred", 100).await });
+    let publ = task::spawn(async move {
+        publish(IP, 5, QualityOfService::QoS0, "test/recv/hundred", 100).await
+    });
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -272,7 +292,9 @@ async fn load_test_hundred_qos() {
         task::spawn(async move { receive(IP, QualityOfService::QoS1, "hundred/qos", 100).await });
 
     let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "hundred/qos", 100).await });
+        task::spawn(
+            async move { publish(IP, 5, QualityOfService::QoS1, "hundred/qos", 100).await },
+        );
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -289,7 +311,9 @@ async fn load_test_five_hundred() {
         task::spawn(async move { receive(IP, QualityOfService::QoS0, "five/hundred", 500).await });
 
     let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS0, "five/hundred", 500).await });
+        task::spawn(
+            async move { publish(IP, 5, QualityOfService::QoS0, "five/hundred", 500).await },
+        );
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -303,10 +327,13 @@ async fn load_test_five_hundred_qos() {
     info!("Running simple tests test");
 
     let recv =
-        task::spawn(async move { receive(IP, QualityOfService::QoS1, "five/hundred/qos", 500).await });
+        task::spawn(
+            async move { receive(IP, QualityOfService::QoS1, "five/hundred/qos", 500).await },
+        );
 
-    let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "five/hundred/qos", 500).await });
+    let publ = task::spawn(async move {
+        publish(IP, 5, QualityOfService::QoS1, "five/hundred/qos", 500).await
+    });
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -340,7 +367,9 @@ async fn load_test_thousand_qos() {
         task::spawn(async move { receive(IP, QualityOfService::QoS1, "thousand/qos", 1000).await });
 
     let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "thousand/qos", 1000).await });
+        task::spawn(
+            async move { publish(IP, 5, QualityOfService::QoS1, "thousand/qos", 1000).await },
+        );
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -355,10 +384,13 @@ async fn load_test_ten_thousand_qos() {
     info!("Running simple tests test");
 
     let recv =
-        task::spawn(async move { receive(IP, QualityOfService::QoS1, "ten/thousand/qos", 10000).await });
+        task::spawn(
+            async move { receive(IP, QualityOfService::QoS1, "ten/thousand/qos", 10000).await },
+        );
 
-    let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "ten/thousand/qos", 10000).await });
+    let publ = task::spawn(async move {
+        publish(IP, 5, QualityOfService::QoS1, "ten/thousand/qos", 10000).await
+    });
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -372,10 +404,14 @@ async fn load_test_ten_thousand() {
     info!("Running simple tests test");
 
     let recv =
-        task::spawn(async move { receive(IP, QualityOfService::QoS0, "ten/thousand", 10000).await });
+        task::spawn(
+            async move { receive(IP, QualityOfService::QoS0, "ten/thousand", 10000).await },
+        );
 
     let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS0, "ten/thousand", 10000).await });
+        task::spawn(
+            async move { publish(IP, 5, QualityOfService::QoS0, "ten/thousand", 10000).await },
+        );
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -389,11 +425,13 @@ async fn load_test_twenty_thousand_qos() {
     setup();
     info!("Running simple tests test");
 
-    let recv =
-        task::spawn(async move { receive(IP, QualityOfService::QoS1, "twenty/thousand/qos", 20000).await });
+    let recv = task::spawn(async move {
+        receive(IP, QualityOfService::QoS1, "twenty/thousand/qos", 20000).await
+    });
 
-    let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS1, "twenty/thousand/qos", 20000).await });
+    let publ = task::spawn(async move {
+        publish(IP, 5, QualityOfService::QoS1, "twenty/thousand/qos", 20000).await
+    });
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());
@@ -407,10 +445,13 @@ async fn load_test_twenty_thousand() {
     info!("Running simple tests test");
 
     let recv =
-        task::spawn(async move { receive(IP, QualityOfService::QoS0, "twenty/thousand", 20000).await });
+        task::spawn(
+            async move { receive(IP, QualityOfService::QoS0, "twenty/thousand", 20000).await },
+        );
 
-    let publ =
-        task::spawn(async move { publish(IP, 5, QualityOfService::QoS0, "twenty/thousand", 20000).await });
+    let publ = task::spawn(async move {
+        publish(IP, 5, QualityOfService::QoS0, "twenty/thousand", 20000).await
+    });
 
     let (r, p) = join(recv, publ).await;
     assert_ok!(r.unwrap());

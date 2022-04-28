@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
