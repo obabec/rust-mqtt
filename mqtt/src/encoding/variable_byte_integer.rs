@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-
 use crate::utils::types::BufferError;
 
 /// VariableByteIntegerEncoder and VariableByteIntegerDecoder are implemented based on

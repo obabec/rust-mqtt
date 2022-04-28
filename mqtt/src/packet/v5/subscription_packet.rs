@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-
 use heapless::Vec;
 
 use super::packet_type::PacketType;

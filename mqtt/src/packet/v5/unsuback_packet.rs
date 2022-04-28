@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-
 use heapless::Vec;
 
 use crate::packet::v5::mqtt_packet::Packet;

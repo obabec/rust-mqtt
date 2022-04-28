@@ -40,27 +40,32 @@ use crate::utils::buffer_reader::BuffReader;
 use crate::utils::rng_generator::CountingRng;
 use crate::utils::types::BufferError;
 
-use heapless::Vec;
-use rand_core::RngCore;
-use crate::encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerDecoder, VariableByteIntegerEncoder};
+use crate::encoding::variable_byte_integer::{
+    VariableByteInteger, VariableByteIntegerDecoder, VariableByteIntegerEncoder,
+};
 use crate::network::NetworkError::Connection;
+use crate::packet::v5::packet_type::PacketType::Unsubscribe;
 use crate::packet::v5::property::Property;
 use crate::packet::v5::reason_codes::ReasonCode::{BuffError, NetworkError};
+use crate::packet::v5::unsuback_packet::UnsubackPacket;
+use crate::packet::v5::unsubscription_packet::UnsubscriptionPacket;
 use crate::utils::buffer_writer::BuffWriter;
+use heapless::Vec;
+use rand_core::RngCore;
 
-pub struct MqttClient<'a, T, const MAX_PROPERTIES: usize> {
+pub struct MqttClient<'a, T, const MAX_PROPERTIES: usize, R: RngCore> {
     connection: Option<T>,
     buffer: &'a mut [u8],
     buffer_len: usize,
     recv_buffer: &'a mut [u8],
     recv_buffer_len: usize,
-    rng: CountingRng,
-    config: ClientConfig<'a, MAX_PROPERTIES>,
+    config: ClientConfig<'a, MAX_PROPERTIES, R>,
 }
 
-impl<'a, T, const MAX_PROPERTIES: usize> MqttClient<'a, T, MAX_PROPERTIES>
+impl<'a, T, const MAX_PROPERTIES: usize, R> MqttClient<'a, T, MAX_PROPERTIES, R>
 where
     T: NetworkConnection,
+    R: RngCore,
 {
     pub fn new(
         network_driver: T,
@@ -68,7 +73,7 @@ where
         buffer_len: usize,
         recv_buffer: &'a mut [u8],
         recv_buffer_len: usize,
-        config: ClientConfig<'a, MAX_PROPERTIES>,
+        config: ClientConfig<'a, MAX_PROPERTIES, R>,
     ) -> Self {
         Self {
             connection: Some(network_driver),
@@ -76,7 +81,6 @@ where
             buffer_len,
             recv_buffer,
             recv_buffer_len,
-            rng: CountingRng(50),
             config,
         }
     }
@@ -111,16 +115,14 @@ where
         let reason: Result<u8, BufferError> = {
             trace!("Waiting for connack");
 
-            let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
+            let read =
+                { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
 
             let mut packet = ConnackPacket::<'b, MAX_PROPERTIES>::new();
             if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
                 if err == BufferError::PacketTypeMismatch {
                     let mut disc = DisconnectPacket::<'b, MAX_PROPERTIES>::new();
-                    if disc
-                        .decode(&mut BuffReader::new(self.buffer, read))
-                        .is_ok()
-                    {
+                    if disc.decode(&mut BuffReader::new(self.buffer, read)).is_ok() {
                         error!("Client was disconnected with reason: ");
                         return Err(ReasonCode::from(disc.disconnect_reason));
                     }
@@ -145,12 +147,12 @@ where
 
     pub async fn connect_to_broker<'b>(&'b mut self) -> Result<(), ReasonCode> {
         match self.config.mqtt_version {
-            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
-            MqttVersion::MQTTv5 => {self.connect_to_broker_v5().await}
+            MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
+            MqttVersion::MQTTv5 => self.connect_to_broker_v5().await,
         }
     }
 
-    async fn disconnect_v5<'b>(&'b mut self)  -> Result<(), ReasonCode> {
+    async fn disconnect_v5<'b>(&'b mut self) -> Result<(), ReasonCode> {
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
@@ -179,8 +181,8 @@ where
 
     pub async fn disconnect<'b>(&'b mut self) -> Result<(), ReasonCode> {
         match self.config.mqtt_version {
-            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
-            MqttVersion::MQTTv5 => {self.disconnect_v5().await}
+            MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
+            MqttVersion::MQTTv5 => self.disconnect_v5().await,
         }
     }
 
@@ -193,7 +195,8 @@ where
             return Err(ReasonCode::NetworkError);
         }
         let mut conn = self.connection.as_mut().unwrap();
-        let identifier: u16 = self.rng.next_u32() as u16;
+        let identifier: u16 = self.config.rng.next_u32() as u16;
+        //self.rng.next_u32() as u16;
         let len = {
             let mut packet = PublishPacket::<'b, MAX_PROPERTIES>::new();
             packet.add_topic_name(topic_name);
@@ -216,11 +219,11 @@ where
         {
             let reason: Result<[u16; 2], BufferError> = {
                 trace!("Waiting for ack");
-                let read = receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await?;
+                let read =
+                    receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await?;
                 trace!("[PUBACK] Received packet with len");
                 let mut packet = PubackPacket::<'b, MAX_PROPERTIES>::new();
-                if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read))
-                {
+                if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
                     Err(err)
                 } else {
                     Ok([packet.packet_identifier, packet.reason_code as u16])
@@ -250,8 +253,8 @@ where
         message: &'b str,
     ) -> Result<(), ReasonCode> {
         match self.config.mqtt_version {
-            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
-            MqttVersion::MQTTv5 => {self.send_message_v5(topic_name, message).await}
+            MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
+            MqttVersion::MQTTv5 => self.send_message_v5(topic_name, message).await,
         }
     }
 
@@ -284,7 +287,8 @@ where
         conn.send(&self.buffer[0..len.unwrap()]).await?;
 
         let reason: Result<Vec<u8, TOPICS>, BufferError> = {
-            let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
+            let read =
+                { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
 
             let mut packet = SubackPacket::<'b, TOPICS, MAX_PROPERTIES>::new();
             if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
@@ -304,7 +308,9 @@ where
             if i == TOPICS {
                 break;
             }
-            if *reasons.get(i).unwrap() != (<QualityOfService as Into<u8>>::into(self.config.qos) >> 1) {
+            if *reasons.get(i).unwrap()
+                != (<QualityOfService as Into<u8>>::into(self.config.qos) >> 1)
+            {
                 return Err(ReasonCode::from(*reasons.get(i).unwrap()));
             }
             i = i + 1;
@@ -317,9 +323,51 @@ where
         topic_names: &'b Vec<&'b str, TOPICS>,
     ) -> Result<(), ReasonCode> {
         match self.config.mqtt_version {
-            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
-            MqttVersion::MQTTv5 => {self.subscribe_to_topics_v5(topic_names).await}
+            MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
+            MqttVersion::MQTTv5 => self.subscribe_to_topics_v5(topic_names).await,
         }
+    }
+
+    pub async fn unsubscribe_from_topic<'b>(
+        &'b mut self,
+        topic_name: &'b str,
+    ) -> Result<(), ReasonCode> {
+        if self.connection.is_none() {
+            return Err(ReasonCode::NetworkError);
+        }
+        let mut conn = self.connection.as_mut().unwrap();
+
+        let len = {
+            let mut unsub = UnsubscriptionPacket::<'b, 1, MAX_PROPERTIES>::new();
+            unsub.packet_identifier = self.config.rng.next_u32() as u16;
+            unsub.add_new_filter(topic_name);
+            unsub.encode(self.buffer, self.buffer_len)
+        };
+
+        if let Err(err) = len {
+            error!("[DECODE ERR]: {}", err);
+            return Err(ReasonCode::BuffError);
+        }
+        conn.send(&self.buffer[0..len.unwrap()]).await?;
+
+        let reason: Result<u8, BufferError> = {
+            let read =
+                { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
+            let mut packet = UnsubackPacket::<'b, 1, MAX_PROPERTIES>::new();
+
+            if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
+                Err(err)
+            } else {
+                Ok(*packet.reason_codes.get(0).unwrap())
+            }
+        };
+
+        if let Err(err) = reason {
+            error!("[DECODE ERR]: {}", err);
+            return Err(ReasonCode::BuffError);
+        }
+
+        Ok(())
     }
 
     async fn subscribe_to_topic_v5<'b>(
@@ -344,9 +392,10 @@ where
         conn.send(&self.buffer[0..len.unwrap()]).await?;
 
         let reason: Result<u8, BufferError> = {
-            let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
+            let read =
+                { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
 
-            let mut packet = SubackPacket::<'b, 5, MAX_PROPERTIES>::new();
+            let mut packet = SubackPacket::<'b, 1, MAX_PROPERTIES>::new();
             if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
                 Err(err)
             } else {
@@ -372,8 +421,8 @@ where
         topic_name: &'b str,
     ) -> Result<(), ReasonCode> {
         match self.config.mqtt_version {
-            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
-            MqttVersion::MQTTv5 => {self.subscribe_to_topic_v5(topic_name).await}
+            MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
+            MqttVersion::MQTTv5 => self.subscribe_to_topic_v5(topic_name).await,
         }
     }
 
@@ -385,16 +434,10 @@ where
         let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
 
         let mut packet = PublishPacket::<'b, 5>::new();
-        if let Err(err) = {
-            packet.decode(&mut BuffReader::new(self.buffer, read))
-        }
-
-        {
+        if let Err(err) = { packet.decode(&mut BuffReader::new(self.buffer, read)) } {
             if err == BufferError::PacketTypeMismatch {
                 let mut disc = DisconnectPacket::<'b, 5>::new();
-                if disc.decode(&mut BuffReader::new(self.buffer, read))
-                    .is_ok()
-                {
+                if disc.decode(&mut BuffReader::new(self.buffer, read)).is_ok() {
                     error!("Client was disconnected with reason: ");
                     return Err(ReasonCode::from(disc.disconnect_reason));
                 }
@@ -424,8 +467,8 @@ where
 
     pub async fn receive_message<'b>(&'b mut self) -> Result<&'b [u8], ReasonCode> {
         match self.config.mqtt_version {
-            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
-            MqttVersion::MQTTv5 => {self.receive_message_v5().await}
+            MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
+            MqttVersion::MQTTv5 => self.receive_message_v5().await,
         }
     }
 
@@ -458,25 +501,31 @@ where
 
     pub async fn send_ping<'b>(&'b mut self) -> Result<(), ReasonCode> {
         match self.config.mqtt_version {
-            MqttVersion::MQTTv3 => {Err(ReasonCode::UnsupportedProtocolVersion)}
-            MqttVersion::MQTTv5 => {self.send_ping_v5().await}
+            MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
+            MqttVersion::MQTTv5 => self.send_ping_v5().await,
         }
     }
 }
 
-
-async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: usize, recv_buffer: & mut [u8], conn: &'c mut T) -> Result<usize, ReasonCode> {
+async fn receive_packet<'c, T: NetworkConnection>(
+    buffer: &mut [u8],
+    buffer_len: usize,
+    recv_buffer: &mut [u8],
+    conn: &'c mut T,
+) -> Result<usize, ReasonCode> {
     let mut target_len = 0;
     let mut rem_len: Result<VariableByteInteger, ()>;
     let mut rem_len_len: usize = 0;
     let mut writer = BuffWriter::new(buffer, buffer_len);
-    let mut  i = 0;
+    let mut i = 0;
 
     // Get len of packet
     trace!("Reading lenght of packet");
     loop {
         trace!("    Reading in loop!");
-        let len: usize = conn.receive(&mut recv_buffer[writer.position..(writer.position+1)]).await?;
+        let len: usize = conn
+            .receive(&mut recv_buffer[writer.position..(writer.position + 1)])
+            .await?;
         trace!("    Received data!");
         i = i + len;
         if let Err(e) = writer.insert_ref(len, &recv_buffer[writer.position..i]) {
@@ -506,9 +555,12 @@ async fn receive_packet<'c, T:NetworkConnection>(buffer: & mut [u8],buffer_len: 
     }
 
     loop {
-        let len: usize = conn.receive(&mut recv_buffer[writer.position..writer.position + (target_len - i)]).await?;
+        let len: usize = conn
+            .receive(&mut recv_buffer[writer.position..writer.position + (target_len - i)])
+            .await?;
         i = i + len;
-        if let Err(e) = writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + i)]) {
+        if let Err(e) = writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + i)])
+        {
             error!("Error occurred during write to buffer!");
             return Err(BuffError);
         }

@@ -25,7 +25,6 @@
 use core::mem;
 use core::str;
 
-
 use crate::encoding::variable_byte_integer::VariableByteIntegerDecoder;
 use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair};
 

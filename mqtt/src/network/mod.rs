@@ -40,7 +40,7 @@ pub trait NetworkConnectionFactory: Sized {
 
     type ConnectionFuture<'m>: Future<Output = Result<Self::Connection, ReasonCode>>
     where
-    Self: 'm;
+        Self: 'm;
 
     fn connect<'m>(&'m mut self, ip: [u8; 4], port: u16) -> Self::ConnectionFuture<'m>;
 }
@@ -48,15 +48,15 @@ pub trait NetworkConnectionFactory: Sized {
 pub trait NetworkConnection {
     type SendFuture<'m>: Future<Output = Result<(), ReasonCode>>
     where
-    Self: 'm;
+        Self: 'm;
 
     type ReceiveFuture<'m>: Future<Output = Result<usize, ReasonCode>>
     where
-    Self: 'm;
+        Self: 'm;
 
     type CloseFuture<'m>: Future<Output = Result<(), ReasonCode>>
     where
-    Self: 'm;
+        Self: 'm;
 
     fn send<'m>(&'m mut self, buffer: &'m [u8]) -> Self::SendFuture<'m>;
 

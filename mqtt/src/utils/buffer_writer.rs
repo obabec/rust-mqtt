@@ -22,7 +22,6 @@
  * SOFTWARE.
  */
 
-
 use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerEncoder};
@@ -48,15 +47,19 @@ impl<'a> BuffWriter<'a> {
         self.position = self.position + increment;
     }
 
-    pub fn get_n_byte(& mut self, n: usize) -> u8 {
+    pub fn get_n_byte(&mut self, n: usize) -> u8 {
         if self.position >= n {
-            return self.buffer[n]
+            return self.buffer[n];
         }
-        return 0
+        return 0;
     }
 
-    pub fn get_rem_len(& mut self) -> Result<VariableByteInteger, ()> {
-        let mut max = if self.position >= 5 {4} else {self.position - 1};
+    pub fn get_rem_len(&mut self) -> Result<VariableByteInteger, ()> {
+        let mut max = if self.position >= 5 {
+            4
+        } else {
+            self.position - 1
+        };
         let mut i = 1;
         let mut len: VariableByteInteger = [0; 4];
         loop {

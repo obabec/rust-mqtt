@@ -34,16 +34,13 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::sleep;
 
-
 pub struct TokioNetwork {
     stream: TcpStream,
 }
 
 impl TokioNetwork {
     pub fn new(stream: TcpStream) -> Self {
-        Self {
-            stream,
-        }
+        Self { stream }
     }
 
     pub fn convert_ip(ip: [u8; 4], port: u16) -> String {

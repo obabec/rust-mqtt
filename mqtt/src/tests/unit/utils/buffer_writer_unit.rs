@@ -26,9 +26,9 @@ use crate::packet::v5::property::Property;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair, TopicFilter};
 
+use crate::encoding::variable_byte_integer::VariableByteInteger;
 use heapless::Vec;
 use tokio_test::{assert_err, assert_ok};
-use crate::encoding::variable_byte_integer::VariableByteInteger;
 
 #[test]
 fn buffer_write_ref() {
@@ -410,7 +410,6 @@ fn buffer_get_rem_len_two() {
     assert_ok!(rm_len);
     assert_eq!(rm_len.unwrap(), REF);
 }
-
 
 #[test]
 fn buffer_get_rem_len_three() {
