@@ -305,6 +305,7 @@ impl<'a> Property<'a> {
             Ok(0x24) => Ok(Property::MaximumQoS(buff_reader.read_u8()?)),
             Ok(0x25) => Ok(Property::RetainAvailable(buff_reader.read_u8()?)),
             Ok(0x26) => Ok(Property::UserProperty(buff_reader.read_string_pair()?)),
+            Ok(0x27) => Ok(Property::MaximumPacketSize(buff_reader.read_u32()?)),
             Ok(0x28) => Ok(Property::WildcardSubscriptionAvailable(
                 buff_reader.read_u8()?,
             )),

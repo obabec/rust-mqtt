@@ -1,6 +1,6 @@
 [package]
 name = "rust-mqtt"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Ondrej Babec <ond.babec@gmail.com>"]
 edition = "2021"
 resolver = "2"
