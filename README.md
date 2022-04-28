@@ -7,7 +7,7 @@ for MQTTv3 which is planned during year 2022.
 
 ## Async executors
 For desktop usage I recommend using Tokio async executor and for embedded there is prepared wrapper for Drogue device
-framework in crate [examples](examples/drogue) crate.
+framework in the Drogue-IoT project [examples](https://github.com/drogue-iot/drogue-device/tree/main/device/src/network/clients) mqtt module.
 
 ## Restrains
 Client supports following:
