@@ -23,16 +23,16 @@
  */
 
 extern crate alloc;
+
 use alloc::format;
 use alloc::string::String;
 use core::future::Future;
-use core::time::Duration;
+
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 
 use crate::network::{NetworkConnection, NetworkConnectionFactory};
 use crate::packet::v5::reason_codes::ReasonCode;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
-use tokio::time::sleep;
 
 pub struct TokioNetwork {
     stream: TcpStream,
@@ -50,24 +50,13 @@ impl TokioNetwork {
 
 impl NetworkConnection for TokioNetwork {
     type SendFuture<'m>
-    where
-        Self: 'm,
-    = impl Future<Output = Result<(), ReasonCode>> + 'm;
+    = impl Future<Output = Result<(), ReasonCode>> + 'm where Self: 'm;
 
     type ReceiveFuture<'m>
-    where
-        Self: 'm,
-    = impl Future<Output = Result<usize, ReasonCode>> + 'm;
+    = impl Future<Output = Result<usize, ReasonCode>> + 'm where Self: 'm;
 
     type CloseFuture<'m>
-    where
-        Self: 'm,
-    = impl Future<Output = Result<(), ReasonCode>> + 'm;
-
-    /*type TimerFuture<'m>
-        where
-            Self: 'm,
-    = impl Future<Output = ()>;*/
+    = impl Future<Output = Result<(), ReasonCode>> + 'm where Self: 'm;
 
     fn send<'m>(&'m mut self, buffer: &'m [u8]) -> Self::SendFuture<'m> {
         async move {
@@ -109,9 +98,7 @@ impl NetworkConnectionFactory for TokioNetworkFactory {
     type Connection = TokioNetwork;
 
     type ConnectionFuture<'m>
-    where
-        Self: 'm,
-    = impl Future<Output = Result<TokioNetwork, ReasonCode>> + 'm;
+    = impl Future<Output = Result<TokioNetwork, ReasonCode>> + 'm where Self: 'm;
 
     fn connect<'m>(&'m mut self, ip: [u8; 4], port: u16) -> Self::ConnectionFuture<'m> {
         async move {

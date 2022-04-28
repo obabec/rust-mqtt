@@ -22,13 +22,13 @@
  * SOFTWARE.
  */
 
+use heapless::Vec;
+use tokio_test::{assert_err, assert_ok};
+
+use crate::encoding::variable_byte_integer::VariableByteInteger;
 use crate::packet::v5::property::Property;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair, TopicFilter};
-
-use crate::encoding::variable_byte_integer::VariableByteInteger;
-use heapless::Vec;
-use tokio_test::{assert_err, assert_ok};
 
 #[test]
 fn buffer_write_ref() {
@@ -488,11 +488,11 @@ fn buffer_get_rem_len_cont() {
     let mut res_buffer: [u8; 6] = [0; 6];
 
     let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 6);
-    let mut test_write = writer.insert_ref(2, &[0x82, 0x81]);
+    let test_write = writer.insert_ref(2, &[0x82, 0x81]);
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
     assert_err!(rm_len);
-    test_write = writer.insert_ref(2, &[0x82, 0x01]);
+    writer.insert_ref(2, &[0x82, 0x01]);
     let rm_len_sec = writer.get_rem_len();
     assert_ok!(rm_len_sec);
     assert_eq!(rm_len_sec.unwrap(), [0x81, 0x82, 0x01, 0x00]);

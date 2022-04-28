@@ -55,7 +55,7 @@ impl<'a> BuffWriter<'a> {
     }
 
     pub fn get_rem_len(&mut self) -> Result<VariableByteInteger, ()> {
-        let mut max = if self.position >= 5 {
+        let max = if self.position >= 5 {
             4
         } else {
             self.position - 1

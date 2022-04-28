@@ -26,7 +26,7 @@ use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::v5::mqtt_packet::Packet;
-use crate::packet::v5::publish_packet::QualityOfService::{QoS0, QoS1, QoS2, INVALID};
+use crate::packet::v5::publish_packet::QualityOfService::{INVALID, QoS0, QoS1, QoS2};
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BufferError, EncodedString};

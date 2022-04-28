@@ -1,7 +1,6 @@
 [workspace]
 members = [
-    #"examples/drogue",
-    "mqtt",
+    "mqtt"
 ]
 resolver = "2"
 

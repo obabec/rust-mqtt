@@ -22,13 +22,13 @@
  * SOFTWARE.
  */
 
+use heapless::Vec;
+
 use crate::packet::v5::disconnect_packet::DisconnectPacket;
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::packet_type::PacketType;
 use crate::packet::v5::property::Property;
 use crate::utils::buffer_reader::BuffReader;
-
-use heapless::Vec;
 
 #[test]
 fn test_encode() {

@@ -22,31 +22,28 @@
  * SOFTWARE.
  */
 extern crate alloc;
+
 use alloc::string::String;
 use core::time::Duration;
-use futures::future::{join, join3};
-use heapless::Vec;
-use log::{info, LevelFilter};
+use std::sync::Once;
+
+use futures::future::{join};
+use log::{info};
+use serial_test::serial;
+use tokio::task;
+use tokio::time::sleep;
+use tokio_test::{assert_ok};
+
 use rust_mqtt::client::client::MqttClient;
 use rust_mqtt::client::client_config::ClientConfig;
 use rust_mqtt::client::client_config::MqttVersion::MQTTv5;
-use rust_mqtt::network::{NetworkConnection, NetworkConnectionFactory};
-use rust_mqtt::packet::v5::property::Property;
+use rust_mqtt::network::{NetworkConnectionFactory};
 use rust_mqtt::packet::v5::publish_packet::QualityOfService;
 use rust_mqtt::packet::v5::reason_codes::ReasonCode;
-use rust_mqtt::packet::v5::reason_codes::ReasonCode::NotAuthorized;
 use rust_mqtt::tokio_net::tokio_network::{TokioNetwork, TokioNetworkFactory};
 use rust_mqtt::utils::rng_generator::CountingRng;
-use rust_mqtt::utils::types::BufferError;
-use serial_test::serial;
-use std::future::Future;
-use std::sync::Once;
-use tokio::task;
-use tokio::time::sleep;
-use tokio_test::{assert_err, assert_ok};
 
 static IP: [u8; 4] = [127, 0, 0, 1];
-static WRONG_IP: [u8; 4] = [192, 168, 1, 1];
 static PORT: u16 = 1883;
 static USERNAME: &str = "test";
 static PASSWORD: &str = "testPass";
@@ -70,7 +67,7 @@ async fn publish_core<'b>(
         "[Publisher] Connection to broker with username {} and password {}",
         USERNAME, PASSWORD
     );
-    let mut result = { client.connect_to_broker().await };
+    let mut result = client.connect_to_broker().await;
     assert_ok!(result);
     info!("[Publisher] Waiting {} seconds before sending", wait);
     sleep(Duration::from_secs(wait)).await;
@@ -78,7 +75,7 @@ async fn publish_core<'b>(
     info!("[Publisher] Sending new message {} to topic {}", MSG, topic);
     let mut count = 0;
     loop {
-        result = { client.send_message(topic, MSG).await };
+        result = client.send_message(topic, MSG).await;
         info!("[PUBLISHER] sent {}", count);
         assert_ok!(result);
         count = count + 1;
@@ -89,7 +86,7 @@ async fn publish_core<'b>(
     }
 
     info!("[Publisher] Disconnecting!");
-    result = { client.disconnect().await };
+    result = client.disconnect().await;
     assert_ok!(result);
     Ok(())
 }
@@ -102,7 +99,7 @@ async fn publish(
     amount: u16,
 ) -> Result<(), ReasonCode> {
     let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
-    let mut tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
+    let tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
     let mut config = ClientConfig::new(MQTTv5, CountingRng(50000));
     config.add_qos(qos);
     config.add_username(USERNAME);
@@ -131,16 +128,16 @@ async fn receive_core<'b>(
         "[Receiver] Connection to broker with username {} and password {}",
         USERNAME, PASSWORD
     );
-    let mut result = { client.connect_to_broker().await };
+    let mut result = client.connect_to_broker().await;
     assert_ok!(result);
 
     info!("[Receiver] Subscribing to topic {}", topic);
-    result = { client.subscribe_to_topic(topic).await };
+    result = client.subscribe_to_topic(topic).await;
     assert_ok!(result);
     info!("[Receiver] Waiting for new message!");
     let mut count = 0;
     loop {
-        let msg = { client.receive_message().await };
+        let msg = client.receive_message().await;
         assert_ok!(msg);
         let act_message = String::from_utf8_lossy(msg?);
         info!("[Receiver] Got new {}. message: {}", count, act_message);
@@ -151,7 +148,7 @@ async fn receive_core<'b>(
         }
     }
     info!("[Receiver] Disconnecting");
-    result = { client.disconnect().await };
+    result = client.disconnect().await;
     assert_ok!(result);
     Ok(())
 }
@@ -163,7 +160,7 @@ async fn receive(
     amount: u16,
 ) -> Result<(), ReasonCode> {
     let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
-    let mut tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
+    let tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
     let mut config = ClientConfig::new(MQTTv5, CountingRng(50000));
     config.add_qos(qos);
     config.add_username(USERNAME);

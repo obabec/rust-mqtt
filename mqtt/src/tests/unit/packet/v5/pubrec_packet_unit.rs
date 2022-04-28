@@ -22,14 +22,14 @@
  * SOFTWARE.
  */
 
+use heapless::Vec;
+
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::packet_type::PacketType;
 use crate::packet::v5::property::Property;
 use crate::packet::v5::pubrec_packet::PubrecPacket;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::types::{EncodedString, StringPair};
-
-use heapless::Vec;
 
 #[test]
 fn test_encode() {

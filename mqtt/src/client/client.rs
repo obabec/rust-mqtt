@@ -22,7 +22,13 @@
  * SOFTWARE.
  */
 
+use heapless::Vec;
+use rand_core::RngCore;
+
 use crate::client::client_config::{ClientConfig, MqttVersion};
+use crate::encoding::variable_byte_integer::{
+    VariableByteInteger, VariableByteIntegerDecoder,
+};
 use crate::network::NetworkConnection;
 use crate::packet::v5::connack_packet::ConnackPacket;
 use crate::packet::v5::connect_packet::ConnectPacket;
@@ -31,27 +37,17 @@ use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::pingreq_packet::PingreqPacket;
 use crate::packet::v5::pingresp_packet::PingrespPacket;
 use crate::packet::v5::puback_packet::PubackPacket;
-use crate::packet::v5::publish_packet::QualityOfService::QoS1;
 use crate::packet::v5::publish_packet::{PublishPacket, QualityOfService};
+use crate::packet::v5::publish_packet::QualityOfService::QoS1;
 use crate::packet::v5::reason_codes::ReasonCode;
+use crate::packet::v5::reason_codes::ReasonCode::{BuffError, NetworkError};
 use crate::packet::v5::suback_packet::SubackPacket;
 use crate::packet::v5::subscription_packet::SubscriptionPacket;
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::rng_generator::CountingRng;
-use crate::utils::types::BufferError;
-
-use crate::encoding::variable_byte_integer::{
-    VariableByteInteger, VariableByteIntegerDecoder, VariableByteIntegerEncoder,
-};
-use crate::network::NetworkError::Connection;
-use crate::packet::v5::packet_type::PacketType::Unsubscribe;
-use crate::packet::v5::property::Property;
-use crate::packet::v5::reason_codes::ReasonCode::{BuffError, NetworkError};
 use crate::packet::v5::unsuback_packet::UnsubackPacket;
 use crate::packet::v5::unsubscription_packet::UnsubscriptionPacket;
+use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
-use heapless::Vec;
-use rand_core::RngCore;
+use crate::utils::types::BufferError;
 
 pub struct MqttClient<'a, T, const MAX_PROPERTIES: usize, R: RngCore> {
     connection: Option<T>,
@@ -107,7 +103,7 @@ where
             error!("[DECODE ERR]: {}", err);
             return Err(ReasonCode::BuffError);
         }
-        let mut conn = self.connection.as_mut().unwrap();
+        let conn = self.connection.as_mut().unwrap();
         trace!("Sending connect");
         conn.send(&self.buffer[0..len.unwrap()]).await?;
 
@@ -166,7 +162,7 @@ where
             return Err(ReasonCode::BuffError);
         }
 
-        if let Err(e) = conn.send(&self.buffer[0..len.unwrap()]).await {
+        if let Err(_e) = conn.send(&self.buffer[0..len.unwrap()]).await {
             warn!("Could not send DISCONNECT packet");
         }
 
@@ -194,7 +190,7 @@ where
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
-        let mut conn = self.connection.as_mut().unwrap();
+        let conn = self.connection.as_mut().unwrap();
         let identifier: u16 = self.config.rng.next_u32() as u16;
         //self.rng.next_u32() as u16;
         let len = {
@@ -265,7 +261,7 @@ where
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
-        let mut conn = self.connection.as_mut().unwrap();
+        let conn = self.connection.as_mut().unwrap();
         let len = {
             let mut subs = SubscriptionPacket::<'b, TOPICS, MAX_PROPERTIES>::new();
             let mut i = 0;
@@ -332,10 +328,20 @@ where
         &'b mut self,
         topic_name: &'b str,
     ) -> Result<(), ReasonCode> {
+        match self.config.mqtt_version {
+            MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
+            MqttVersion::MQTTv5 => self.unsubscribe_from_topic_v5(topic_name).await,
+        }
+    }
+
+    pub async fn unsubscribe_from_topic_v5<'b>(
+        &'b mut self,
+        topic_name: &'b str,
+    ) -> Result<(), ReasonCode> {
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
-        let mut conn = self.connection.as_mut().unwrap();
+        let conn = self.connection.as_mut().unwrap();
 
         let len = {
             let mut unsub = UnsubscriptionPacket::<'b, 1, MAX_PROPERTIES>::new();
@@ -377,7 +383,7 @@ where
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
-        let mut conn = self.connection.as_mut().unwrap();
+        let conn = self.connection.as_mut().unwrap();
         let len = {
             let mut subs = SubscriptionPacket::<'b, 1, MAX_PROPERTIES>::new();
             subs.add_new_filter(topic_name, self.config.qos);
@@ -430,7 +436,7 @@ where
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
-        let mut conn = self.connection.as_mut().unwrap();
+        let conn = self.connection.as_mut().unwrap();
         let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
 
         let mut packet = PublishPacket::<'b, 5>::new();
@@ -476,7 +482,7 @@ where
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
-        let mut conn = self.connection.as_mut().unwrap();
+        let conn = self.connection.as_mut().unwrap();
         let len = {
             let mut packet = PingreqPacket::new();
             packet.encode(self.buffer, self.buffer_len)
@@ -513,9 +519,8 @@ async fn receive_packet<'c, T: NetworkConnection>(
     recv_buffer: &mut [u8],
     conn: &'c mut T,
 ) -> Result<usize, ReasonCode> {
-    let mut target_len = 0;
+    let target_len: usize;
     let mut rem_len: Result<VariableByteInteger, ()>;
-    let mut rem_len_len: usize = 0;
     let mut writer = BuffWriter::new(buffer, buffer_len);
     let mut i = 0;
 
@@ -528,11 +533,11 @@ async fn receive_packet<'c, T: NetworkConnection>(
             .await?;
         trace!("    Received data!");
         i = i + len;
-        if let Err(e) = writer.insert_ref(len, &recv_buffer[writer.position..i]) {
+        if let Err(_e) = writer.insert_ref(len, &recv_buffer[writer.position..i]) {
             error!("Error occurred during write to buffer!");
             return Err(ReasonCode::BuffError);
         }
-        if (i > 1) {
+        if i > 1 {
             rem_len = writer.get_rem_len();
             if rem_len.is_ok() {
                 break;
@@ -544,7 +549,7 @@ async fn receive_packet<'c, T: NetworkConnection>(
         }
     }
 
-    rem_len_len = i;
+    let rem_len_len = i;
     i = 0;
     if let Ok(l) = VariableByteIntegerDecoder::decode(rem_len.unwrap()) {
         trace!("Reading packet with target len {}", l);
@@ -559,7 +564,7 @@ async fn receive_packet<'c, T: NetworkConnection>(
             .receive(&mut recv_buffer[writer.position..writer.position + (target_len - i)])
             .await?;
         i = i + len;
-        if let Err(e) = writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + i)])
+        if let Err(_e) = writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + i)])
         {
             error!("Error occurred during write to buffer!");
             return Err(BuffError);
