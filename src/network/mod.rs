@@ -54,9 +54,7 @@ pub trait NetworkConnection {
     where
         Self: 'm;
 
-    type CloseFuture<'m>: Future<Output = Result<(), ReasonCode>>
-    where
-        Self: 'm;
+    type CloseFuture<'m>: Future<Output = Result<(), ReasonCode>>;
 
     fn send<'m>(&'m mut self, buffer: &'m [u8]) -> Self::SendFuture<'m>;
 
