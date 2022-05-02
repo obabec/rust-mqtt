@@ -478,7 +478,7 @@ where
         }
     }
 
-    pub async fn send_ping_v5<'b>(&'b mut self) -> Result<(), ReasonCode> {
+    async fn send_ping_v5<'b>(&'b mut self) -> Result<(), ReasonCode> {
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
@@ -513,6 +513,7 @@ where
     }
 }
 
+#[cfg(not(feature = "tls"))]
 async fn receive_packet<'c, T: NetworkConnection>(
     buffer: &mut [u8],
     buffer_len: usize,
@@ -548,7 +549,7 @@ async fn receive_packet<'c, T: NetworkConnection>(
             }
         }
     }
-
+    trace!("Lenght done!");
     let rem_len_len = i;
     i = 0;
     if let Ok(l) = VariableByteIntegerDecoder::decode(rem_len.unwrap()) {
@@ -574,4 +575,24 @@ async fn receive_packet<'c, T: NetworkConnection>(
             return Ok(target_len + rem_len_len);
         }
     }
+}
+
+#[cfg(feature = "tls")]
+async fn receive_packet<'c, T: NetworkConnection>(
+    buffer: &mut [u8],
+    buffer_len: usize,
+    recv_buffer: &mut [u8],
+    conn: &'c mut T,
+) -> Result<usize, ReasonCode> {
+    trace!("Reading packet");
+    let mut writer = BuffWriter::new(buffer, buffer_len);
+    let len = conn
+        .receive(recv_buffer)
+        .await?;
+    if let Err(_e) = writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + len)])
+    {
+        error!("Error occurred during write to buffer!");
+        return Err(BuffError);
+    }
+   Ok(len)
 }

@@ -1,6 +1,6 @@
 [package]
 name = "rust-mqtt"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Ondrej Babec <ond.babec@gmail.com>"]
 edition = "2021"
 resolver = "2"
@@ -29,3 +29,4 @@ serial_test = "0.6.0"
 default = ["std"]
 std = ["tokio", "log"]
 no_std = ["defmt"]
+tls = []
