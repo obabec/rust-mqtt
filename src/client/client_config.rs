@@ -34,7 +34,16 @@ pub enum MqttVersion {
     MQTTv3,
     MQTTv5,
 }
-
+/// Client config is main configuration for the `MQTTClient` structure.
+/// All of the properties are optional if they are not set they are not gonna
+/// be used. Configuration contains also MQTTv5 properties. Generic constant
+/// `MAX_PROPERTIES` sets the length for the properties Vec. User can insert
+/// all the properties and client will automatically use variables that are
+/// usable for the specific packet types. `mqtt_version` sets the version
+/// of the MQTT protocol that is gonna be used. Config also expects the rng
+/// implementation. This implementation is used for generating packet identifiers.
+/// There is counting rng implementation in the `utils` module that can be used.
+/// Examples of the configurations can be found in the integration tests.
 #[derive(Clone)]
 pub struct ClientConfig<'a, const MAX_PROPERTIES: usize, T: RngCore> {
     pub qos: QualityOfService,
@@ -69,6 +78,8 @@ impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIE
         self.qos = qos;
     }
 
+    /// Method adds the username array and also sets the username flag so client
+    /// will use it for the authentication
     pub fn add_username(&mut self, username: &'a str) {
         let mut username_s: EncodedString = EncodedString::new();
         username_s.string = username;
@@ -76,7 +87,8 @@ impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIE
         self.username_flag = true;
         self.username = username_s;
     }
-
+    /// Method adds the password array and also sets the password flag so client
+    /// will use it for the authentication
     pub fn add_password(&mut self, password: &'a str) {
         let mut password_s: BinaryData = BinaryData::new();
         password_s.bin = password.as_bytes();
@@ -85,12 +97,14 @@ impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIE
         self.password_flag = true;
     }
 
+    /// Method adds the property to the properties Vec if there is still space. Otherwise do nothing.
     pub fn add_property(&mut self, prop: Property<'a>) {
         if self.properties.len() < MAX_PROPERTIES {
             self.properties.push(prop);
         }
     }
 
+    /// Method encode the `max_packet_size` attribute as property to the properties Vec.
     pub fn add_max_packet_size_as_prop(&mut self) -> u32 {
         if self.properties.len() < MAX_PROPERTIES {
             let prop = Property::MaximumPacketSize(self.max_packet_size);

@@ -141,6 +141,10 @@ where
         }
     }
 
+    /// Method allows client connect to server. Client is connecting to the specified broker
+    /// in the `ClientConfig`. Method selects proper implementation of the MQTT version based on the config.
+    /// If the connection to the broker fails, method returns Err variable that contains
+    /// Reason codes returned from the broker.
     pub async fn connect_to_broker<'b>(&'b mut self) -> Result<(), ReasonCode> {
         match self.config.mqtt_version {
             MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
@@ -175,6 +179,10 @@ where
         Ok(())
     }
 
+    /// Method allows client disconnect from the server. Client disconnects from the specified broker
+    /// in the `ClientConfig`. Method selects proper implementation of the MQTT version based on the config.
+    /// If the disconnect from the broker fails, method returns Err variable that contains
+    /// Reason codes returned from the broker.
     pub async fn disconnect<'b>(&'b mut self) -> Result<(), ReasonCode> {
         match self.config.mqtt_version {
             MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
@@ -242,7 +250,10 @@ where
         }
         Ok(())
     }
-
+    /// Method allows sending message to broker specified from the ClientConfig. Client sends the
+    /// message from the parameter `message` to the topic `topic_name` on the broker
+    /// specified in the ClientConfig. If the send fails method returns Err with reason code
+    /// received by broker.
     pub async fn send_message<'b>(
         &'b mut self,
         topic_name: &'b str,
@@ -314,6 +325,10 @@ where
         Ok(())
     }
 
+    /// Method allows client subscribe to multiple topics specified in the parameter
+    /// `topic_names` on the broker specified in the `ClientConfig`. Generics `TOPICS`
+    /// sets the value of the `topics_names` vector. MQTT protocol implementation
+    /// is selected automatically.
     pub async fn subscribe_to_topics<'b, const TOPICS: usize>(
         &'b mut self,
         topic_names: &'b Vec<&'b str, TOPICS>,
@@ -324,6 +339,9 @@ where
         }
     }
 
+    /// Method allows client unsubscribe from the topic specified in the parameter
+    /// `topic_name` on the broker from the `ClientConfig`. MQTT protocol implementation
+    /// is selected automatically.
     pub async fn unsubscribe_from_topic<'b>(
         &'b mut self,
         topic_name: &'b str,
@@ -334,7 +352,7 @@ where
         }
     }
 
-    pub async fn unsubscribe_from_topic_v5<'b>(
+    async fn unsubscribe_from_topic_v5<'b>(
         &'b mut self,
         topic_name: &'b str,
     ) -> Result<(), ReasonCode> {
@@ -422,6 +440,9 @@ where
         }
     }
 
+    /// Method allows client subscribe to multiple topics specified in the parameter
+    /// `topic_name` on the broker specified in the `ClientConfig`. MQTT protocol implementation
+    /// is selected automatically.
     pub async fn subscribe_to_topic<'b>(
         &'b mut self,
         topic_name: &'b str,
@@ -471,6 +492,9 @@ where
         return Ok(packet.message.unwrap());
     }
 
+    /// Method allows client receive a message. The work of this method strictly depends on the
+    /// network implementation passed in the `ClientConfig`. It expects the PUBLISH packet
+    /// from the broker.
     pub async fn receive_message<'b>(&'b mut self) -> Result<&'b [u8], ReasonCode> {
         match self.config.mqtt_version {
             MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
@@ -505,6 +529,9 @@ where
         }
     }
 
+    /// Method allows client send PING message to the broker specified in the `ClientConfig`.
+    /// If there is expectation for long running connection. Method should be executed
+    /// regularly by the timer that counts down the session expiry interval.
     pub async fn send_ping<'b>(&'b mut self) -> Result<(), ReasonCode> {
         match self.config.mqtt_version {
             MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),

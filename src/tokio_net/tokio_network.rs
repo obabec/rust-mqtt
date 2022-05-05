@@ -34,6 +34,8 @@ use tokio::net::TcpStream;
 use crate::network::{NetworkConnection, NetworkConnectionFactory};
 use crate::packet::v5::reason_codes::ReasonCode;
 
+/// TokioNetwork is an implementation of the `NetworkConnection` trait. This implementation
+/// allows communication through the `Tokio` TcpStream.
 pub struct TokioNetwork {
     stream: TcpStream,
 }
@@ -86,6 +88,8 @@ impl NetworkConnection for TokioNetwork {
     }
 }
 
+/// TokioNetworkFactory is an implementation of the `NetworkConnectionFactory` trait. This implementation
+/// allows to establish the `Tokio` TcpStream connection.
 pub struct TokioNetworkFactory {}
 
 impl TokioNetworkFactory {

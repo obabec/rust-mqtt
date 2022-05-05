@@ -28,6 +28,8 @@ use crate::encoding::variable_byte_integer::{VariableByteInteger, VariableByteIn
 use crate::packet::v5::property::Property;
 use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair, TopicFilter};
 
+/// Buff writer is writing corresponding types to buffer (Byte array) and stores current position
+/// (later as cursor)
 pub struct BuffWriter<'a> {
     buffer: &'a mut [u8],
     pub position: usize,
@@ -47,6 +49,7 @@ impl<'a> BuffWriter<'a> {
         self.position = self.position + increment;
     }
 
+    /// Returns n-th Byte from the buffer to which is currently written.
     pub fn get_n_byte(&mut self, n: usize) -> u8 {
         if self.position >= n {
             return self.buffer[n];
@@ -54,6 +57,7 @@ impl<'a> BuffWriter<'a> {
         return 0;
     }
 
+    /// Return the remaining lenght of the packet from the buffer to which is packet written.
     pub fn get_rem_len(&mut self) -> Result<VariableByteInteger, ()> {
         let max = if self.position >= 5 {
             4
@@ -77,6 +81,7 @@ impl<'a> BuffWriter<'a> {
         }
     }
 
+    /// Writes an array to the buffer.
     pub fn insert_ref(&mut self, len: usize, array: &[u8]) -> Result<(), BufferError> {
         let mut x: usize = 0;
         if self.position + len > self.len {
@@ -95,6 +100,7 @@ impl<'a> BuffWriter<'a> {
         return Ok(());
     }
 
+    /// Writes a single Byte to the buffer.
     pub fn write_u8(&mut self, byte: u8) -> Result<(), BufferError> {
         return if self.position >= self.len {
             Err(BufferError::InsufficientBufferSize)
@@ -105,16 +111,19 @@ impl<'a> BuffWriter<'a> {
         };
     }
 
+    /// Writes the two Byte value to the buffer.
     pub fn write_u16(&mut self, two_bytes: u16) -> Result<(), BufferError> {
         let bytes: [u8; 2] = two_bytes.to_be_bytes();
         return self.insert_ref(2, &bytes);
     }
 
+    /// Writes the four Byte value to the buffer.
     pub fn write_u32(&mut self, four_bytes: u32) -> Result<(), BufferError> {
         let bytes: [u8; 4] = four_bytes.to_be_bytes();
         return self.insert_ref(4, &bytes);
     }
 
+    /// Writes the UTF-8 string type to the buffer.
     pub fn write_string_ref(&mut self, str: &EncodedString<'a>) -> Result<(), BufferError> {
         self.write_u16(str.len)?;
         if str.len != 0 {
@@ -124,16 +133,19 @@ impl<'a> BuffWriter<'a> {
         return Ok(());
     }
 
+    /// Writes BinaryData to the buffer.
     pub fn write_binary_ref(&mut self, bin: &BinaryData<'a>) -> Result<(), BufferError> {
         self.write_u16(bin.len)?;
         return self.insert_ref(bin.len as usize, bin.bin);
     }
 
+    /// Writes the string pair to the buffer.
     pub fn write_string_pair_ref(&mut self, str_pair: &StringPair<'a>) -> Result<(), BufferError> {
         self.write_string_ref(&str_pair.name)?;
         return self.write_string_ref(&str_pair.value);
     }
 
+    /// Encodes the u32 value into the VariableByteInteger and this value writes to the buffer.
     pub fn write_variable_byte_int(&mut self, int: u32) -> Result<(), BufferError> {
         let x: VariableByteInteger = VariableByteIntegerEncoder::encode(int)?;
         let len = VariableByteIntegerEncoder::len(x);
@@ -146,6 +158,7 @@ impl<'a> BuffWriter<'a> {
         return property.encode(self);
     }
 
+    /// Writes all properties from the `properties` Vec into the buffer.
     pub fn write_properties<const LEN: usize>(
         &mut self,
         properties: &Vec<Property<'a>, LEN>,
@@ -165,6 +178,8 @@ impl<'a> BuffWriter<'a> {
         Ok(())
     }
 
+    /// Writes the MQTT `TopicFilter` into the buffer. If the `sub` option is set to `false`, it will
+    /// not write the `sub_options` only topic name.
     fn write_topic_filter_ref(
         &mut self,
         sub: bool,
@@ -177,6 +192,8 @@ impl<'a> BuffWriter<'a> {
         return Ok(());
     }
 
+    /// Writes the topic filter Vec to the buffer. If the `sub` option is set to `false`, it will not
+    /// write the `sub_options` only topic names.
     pub fn write_topic_filters_ref<const MAX: usize>(
         &mut self,
         sub: bool,

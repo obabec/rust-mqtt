@@ -34,7 +34,8 @@ pub enum NetworkError {
     IDNotMatchedOnAck,
     NoMatchingSubs,
 }
-
+/// NetworkConnectionFactory implementation should create a TCP connection and return
+/// the `Connection` trait implementation. Otherwise return `ReasonCode`.
 pub trait NetworkConnectionFactory: Sized {
     type Connection: NetworkConnection;
 
@@ -42,9 +43,11 @@ pub trait NetworkConnectionFactory: Sized {
     where
         Self: 'm;
 
+    /// Connect function estabilish TCP connection and return the `Connection`.
     fn connect<'m>(&'m mut self, ip: [u8; 4], port: u16) -> Self::ConnectionFuture<'m>;
 }
 
+/// Network connection represents estabilished TCP connection created with `NetworkConnectionFactory`.
 pub trait NetworkConnection {
     type SendFuture<'m>: Future<Output = Result<(), ReasonCode>>
     where
@@ -56,9 +59,12 @@ pub trait NetworkConnection {
 
     type CloseFuture<'m>: Future<Output = Result<(), ReasonCode>>;
 
+    /// Send function should enable sending the data from `buffer` via TCP connection.
     fn send<'m>(&'m mut self, buffer: &'m [u8]) -> Self::SendFuture<'m>;
 
+    /// Receive should enable receiving data to the `buffer` from TCP connection.
     fn receive<'m>(&'m mut self, buffer: &'m mut [u8]) -> Self::ReceiveFuture<'m>;
 
+    /// Close function should close the TCP connection.
     fn close<'m>(self) -> Self::CloseFuture<'m>;
 }
