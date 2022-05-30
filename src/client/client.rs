@@ -22,13 +22,13 @@
  * SOFTWARE.
  */
 
+use embedded_io::asynch::{Read, Write};
+use embedded_nal_async::Close;
 use heapless::Vec;
 use rand_core::RngCore;
 
 use crate::client::client_config::{ClientConfig, MqttVersion};
-use crate::encoding::variable_byte_integer::{
-    VariableByteInteger, VariableByteIntegerDecoder,
-};
+use crate::encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerDecoder};
 use crate::network::NetworkConnection;
 use crate::packet::v5::connack_packet::ConnackPacket;
 use crate::packet::v5::connect_packet::ConnectPacket;
@@ -37,8 +37,8 @@ use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::pingreq_packet::PingreqPacket;
 use crate::packet::v5::pingresp_packet::PingrespPacket;
 use crate::packet::v5::puback_packet::PubackPacket;
-use crate::packet::v5::publish_packet::{PublishPacket, QualityOfService};
 use crate::packet::v5::publish_packet::QualityOfService::QoS1;
+use crate::packet::v5::publish_packet::{PublishPacket, QualityOfService};
 use crate::packet::v5::reason_codes::ReasonCode;
 use crate::packet::v5::reason_codes::ReasonCode::{BuffError, NetworkError};
 use crate::packet::v5::suback_packet::SubackPacket;
@@ -49,8 +49,11 @@ use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::BufferError;
 
-pub struct MqttClient<'a, T, const MAX_PROPERTIES: usize, R: RngCore> {
-    connection: Option<T>,
+pub struct MqttClient<'a, T, const MAX_PROPERTIES: usize, R: RngCore>
+where
+    T: Read + Write + Close,
+{
+    connection: Option<NetworkConnection<T>>,
     buffer: &'a mut [u8],
     buffer_len: usize,
     recv_buffer: &'a mut [u8],
@@ -60,7 +63,7 @@ pub struct MqttClient<'a, T, const MAX_PROPERTIES: usize, R: RngCore> {
 
 impl<'a, T, const MAX_PROPERTIES: usize, R> MqttClient<'a, T, MAX_PROPERTIES, R>
 where
-    T: NetworkConnection,
+    T: Read + Write + Close,
     R: RngCore,
 {
     pub fn new(
@@ -72,7 +75,7 @@ where
         config: ClientConfig<'a, MAX_PROPERTIES, R>,
     ) -> Self {
         Self {
-            connection: Some(network_driver),
+            connection: Some(NetworkConnection::new(network_driver)),
             buffer,
             buffer_len,
             recv_buffer,
@@ -541,11 +544,11 @@ where
 }
 
 #[cfg(not(feature = "tls"))]
-async fn receive_packet<'c, T: NetworkConnection>(
+async fn receive_packet<'c, T: Read + Write + Close>(
     buffer: &mut [u8],
     buffer_len: usize,
     recv_buffer: &mut [u8],
-    conn: &'c mut T,
+    conn: &'c mut NetworkConnection<T>,
 ) -> Result<usize, ReasonCode> {
     let target_len: usize;
     let mut rem_len: Result<VariableByteInteger, ()>;
@@ -592,7 +595,8 @@ async fn receive_packet<'c, T: NetworkConnection>(
             .receive(&mut recv_buffer[writer.position..writer.position + (target_len - i)])
             .await?;
         i = i + len;
-        if let Err(_e) = writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + i)])
+        if let Err(_e) =
+            writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + i)])
         {
             error!("Error occurred during write to buffer!");
             return Err(BuffError);
@@ -605,21 +609,19 @@ async fn receive_packet<'c, T: NetworkConnection>(
 }
 
 #[cfg(feature = "tls")]
-async fn receive_packet<'c, T: NetworkConnection>(
+async fn receive_packet<'c, T: Read + Write + Close>(
     buffer: &mut [u8],
     buffer_len: usize,
     recv_buffer: &mut [u8],
-    conn: &'c mut T,
+    conn: &'c mut NetworkConnection<T>,
 ) -> Result<usize, ReasonCode> {
     trace!("Reading packet");
     let mut writer = BuffWriter::new(buffer, buffer_len);
-    let len = conn
-        .receive(recv_buffer)
-        .await?;
+    let len = conn.receive(recv_buffer).await?;
     if let Err(_e) = writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + len)])
     {
         error!("Error occurred during write to buffer!");
         return Err(BuffError);
     }
-   Ok(len)
+    Ok(len)
 }

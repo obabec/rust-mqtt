@@ -22,49 +22,47 @@
  * SOFTWARE.
  */
 
-use core::future::Future;
-
 use crate::packet::v5::reason_codes::ReasonCode;
+use embedded_io::asynch::{Read, Write};
+use embedded_nal_async::Close;
 
-#[derive(Debug)]
-pub enum NetworkError {
-    Connection,
-    Unknown,
-    QoSAck,
-    IDNotMatchedOnAck,
-    NoMatchingSubs,
-}
-/// NetworkConnectionFactory implementation should create a TCP connection and return
-/// the `Connection` trait implementation. Otherwise return `ReasonCode`.
-pub trait NetworkConnectionFactory: Sized {
-    type Connection: NetworkConnection;
-
-    type ConnectionFuture<'m>: Future<Output = Result<Self::Connection, ReasonCode>>
-    where
-        Self: 'm;
-
-    /// Connect function estabilish TCP connection and return the `Connection`.
-    fn connect<'m>(&'m mut self, ip: [u8; 4], port: u16) -> Self::ConnectionFuture<'m>;
+pub struct NetworkConnection<T>
+where
+    T: Read + Write + Close,
+{
+    io: T,
 }
 
-/// Network connection represents estabilished TCP connection created with `NetworkConnectionFactory`.
-pub trait NetworkConnection {
-    type SendFuture<'m>: Future<Output = Result<(), ReasonCode>>
-    where
-        Self: 'm;
+/// Network connection represents an established TCP connection.
+impl<T> NetworkConnection<T>
+where
+    T: Read + Write + Close,
+{
+    /// Create a new network handle using the provided IO implementation.
+    pub fn new(io: T) -> Self {
+        Self { io }
+    }
 
-    type ReceiveFuture<'m>: Future<Output = Result<usize, ReasonCode>>
-    where
-        Self: 'm;
+    /// Send the data from `buffer` via TCP connection.
+    pub async fn send(&mut self, buffer: &[u8]) -> Result<(), ReasonCode> {
+        let _ = self
+            .io
+            .write(buffer)
+            .await
+            .map_err(|_| ReasonCode::NetworkError)?;
+        Ok(())
+    }
 
-    type CloseFuture<'m>: Future<Output = Result<(), ReasonCode>>;
+    /// Receive data to the `buffer` from TCP connection.
+    pub async fn receive(&mut self, buffer: &mut [u8]) -> Result<usize, ReasonCode> {
+        self.io
+            .read(buffer)
+            .await
+            .map_err(|_| ReasonCode::NetworkError)
+    }
 
-    /// Send function should enable sending the data from `buffer` via TCP connection.
-    fn send<'m>(&'m mut self, buffer: &'m [u8]) -> Self::SendFuture<'m>;
-
-    /// Receive should enable receiving data to the `buffer` from TCP connection.
-    fn receive<'m>(&'m mut self, buffer: &'m mut [u8]) -> Self::ReceiveFuture<'m>;
-
-    /// Close function should close the TCP connection.
-    fn close<'m>(self) -> Self::CloseFuture<'m>;
+    /// Close the TCP connection.
+    pub async fn close(mut self) -> Result<(), ReasonCode> {
+        self.io.close().await.map_err(|_| ReasonCode::NetworkError)
+    }
 }
