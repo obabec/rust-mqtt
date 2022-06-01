@@ -16,8 +16,6 @@ rand_core = "0.6.0"
 defmt = { version = "0.3", optional = true }
 log = { version = "0.4.14", optional = true }
 embedded-io = { version = "0.3.0", features = ["async"]}
-embedded-nal-async = { version = "0.1.0" }
-tokio = { version = "1", features = ["full"], optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -29,11 +27,7 @@ log = { version = "0.4.14"}
 serial_test = "0.6.0"
 
 [features]
-default = ["std", "tokio"]
+default = ["std"]
 std = ["embedded-io/std", "log"]
-tokio = ["embedded-io/tokio", "dep:tokio"]
 no_std = ["defmt"]
 tls = []
-
-[patch.crates-io]
-embedded-nal-async = { path = "../embedded-nal/embedded-nal-async" }
