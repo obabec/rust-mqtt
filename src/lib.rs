@@ -28,10 +28,10 @@
 #![feature(type_alias_impl_trait)]
 #![feature(generic_associated_types)]
 pub(crate) mod fmt;
+
 pub mod client;
 pub mod encoding;
 pub mod network;
 pub mod packet;
 pub mod tests;
-pub mod tokio_net;
 pub mod utils;

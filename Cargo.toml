@@ -15,10 +15,11 @@ heapless = "0.7.10"
 rand_core = "0.6.0"
 defmt = { version = "0.3", optional = true }
 log = { version = "0.4.14", optional = true }
-tokio = { version = "1", features = ["full"], optional = true, default-features = false }
+embedded-io = { version = "0.3.0", features = ["async"]}
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
+embedded-io = { version = "0.3.0", features = ["tokio"]}
 tokio-test = { version = "0.4.2"}
 env_logger = "0.9.0"
 futures = { version = "0.3.21" }
@@ -27,6 +28,6 @@ serial_test = "0.6.0"
 
 [features]
 default = ["std"]
-std = ["tokio", "log"]
+std = ["embedded-io/std", "log"]
 no_std = ["defmt"]
 tls = []

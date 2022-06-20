@@ -27,23 +27,26 @@ use alloc::string::String;
 use core::time::Duration;
 use std::sync::Once;
 
-use futures::future::{join};
-use log::{info};
+use futures::future::join;
+use log::info;
 use serial_test::serial;
+use std::net::{Ipv4Addr, SocketAddr};
 use tokio::task;
 use tokio::time::sleep;
-use tokio_test::{assert_ok};
+use tokio_test::assert_ok;
 
 use rust_mqtt::client::client::MqttClient;
 use rust_mqtt::client::client_config::ClientConfig;
 use rust_mqtt::client::client_config::MqttVersion::MQTTv5;
-use rust_mqtt::network::{NetworkConnectionFactory};
 use rust_mqtt::packet::v5::publish_packet::QualityOfService;
 use rust_mqtt::packet::v5::reason_codes::ReasonCode;
-use rust_mqtt::tokio_net::tokio_network::{TokioNetwork, TokioNetworkFactory};
 use rust_mqtt::utils::rng_generator::CountingRng;
+use tokio::net::TcpStream;
 
-static IP: [u8; 4] = [127, 0, 0, 1];
+use embedded_io::adapters::FromTokio;
+pub type TokioNetwork = FromTokio<TcpStream>;
+
+static IP: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
 static PORT: u16 = 1883;
 static USERNAME: &str = "test";
 static PASSWORD: &str = "testPass";
@@ -92,14 +95,17 @@ async fn publish_core<'b>(
 }
 
 async fn publish(
-    ip: [u8; 4],
+    ip: Ipv4Addr,
     wait: u64,
     qos: QualityOfService,
     topic: &str,
     amount: u16,
 ) -> Result<(), ReasonCode> {
-    let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
-    let tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
+    let addr = SocketAddr::new(ip.into(), PORT);
+    let connection = TcpStream::connect(addr)
+        .await
+        .map_err(|_| ReasonCode::NetworkError)?;
+    let connection = TokioNetwork::new(connection);
     let mut config = ClientConfig::new(MQTTv5, CountingRng(50000));
     config.add_qos(qos);
     config.add_username(USERNAME);
@@ -109,7 +115,7 @@ async fn publish(
     let mut write_buffer = [0; 80];
 
     let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
-        tokio_network,
+        connection,
         &mut write_buffer,
         80,
         &mut recv_buffer,
@@ -154,13 +160,16 @@ async fn receive_core<'b>(
 }
 
 async fn receive(
-    ip: [u8; 4],
+    ip: Ipv4Addr,
     qos: QualityOfService,
     topic: &str,
     amount: u16,
 ) -> Result<(), ReasonCode> {
-    let mut tokio_factory: TokioNetworkFactory = TokioNetworkFactory::new();
-    let tokio_network: TokioNetwork = tokio_factory.connect(ip, PORT).await?;
+    let addr = SocketAddr::new(ip.into(), PORT);
+    let connection = TcpStream::connect(addr)
+        .await
+        .map_err(|_| ReasonCode::NetworkError)?;
+    let connection = TokioNetwork::new(connection);
     let mut config = ClientConfig::new(MQTTv5, CountingRng(50000));
     config.add_qos(qos);
     config.add_username(USERNAME);
@@ -172,7 +181,7 @@ async fn receive(
     let mut write_buffer = [0; 500];
 
     let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
-        tokio_network,
+        connection,
         &mut write_buffer,
         500,
         &mut recv_buffer,
