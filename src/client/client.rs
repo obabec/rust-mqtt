@@ -558,6 +558,10 @@ async fn receive_packet<'c, T: Read + Write>(
             .receive(&mut recv_buffer[writer.position..(writer.position + 1)])
             .await?;
         trace!("    Received data!");
+        if len == 0 {
+            trace!("Zero byte len packet received, dropping connection.");
+            return Err(NetworkError);
+        }
         i = i + len;
         if let Err(_e) = writer.insert_ref(len, &recv_buffer[writer.position..i]) {
             error!("Error occurred during write to buffer!");
