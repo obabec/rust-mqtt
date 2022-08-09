@@ -451,7 +451,7 @@ where
         }
     }
 
-    async fn receive_message_v5<'b>(&'b mut self) -> Result<&'b [u8], ReasonCode> {
+    async fn receive_message_v5<'b>(&'b mut self) -> Result<(&'b str, &'b [u8]), ReasonCode> {
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
         }
@@ -487,13 +487,13 @@ where
             }
         }
 
-        return Ok(packet.message.unwrap());
+        return Ok((packet.topic_name.string, packet.message.unwrap()));
     }
 
     /// Method allows client receive a message. The work of this method strictly depends on the
     /// network implementation passed in the `ClientConfig`. It expects the PUBLISH packet
     /// from the broker.
-    pub async fn receive_message<'b>(&'b mut self) -> Result<&'b [u8], ReasonCode> {
+    pub async fn receive_message<'b>(&'b mut self) -> Result<(&'b str, &'b [u8]), ReasonCode> {
         match self.config.mqtt_version {
             MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
             MqttVersion::MQTTv5 => self.receive_message_v5().await,

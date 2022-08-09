@@ -174,7 +174,7 @@ async fn receive_core<'b>(
     info!("[Receiver] Waiting for new message!");
     let msg = client.receive_message().await;
     assert_ok!(msg);
-    let act_message = String::from_utf8_lossy(msg?);
+    let act_message = String::from_utf8_lossy(msg?.1);
     info!("[Receiver] Got new message: {}", act_message);
     assert_eq!(act_message, MSG);
 
@@ -208,14 +208,14 @@ async fn receive_core_multiple<'b, const TOPICS: usize>(
     {
         let msg = client.receive_message().await;
         assert_ok!(msg);
-        let act_message = String::from_utf8_lossy(msg?);
+        let act_message = String::from_utf8_lossy(msg?.1);
         info!("[Receiver] Got new message: {}", act_message);
         assert_eq!(act_message, MSG);
     }
     {
         let msg_sec = client.receive_message().await;
         assert_ok!(msg_sec);
-        let act_message_second = String::from_utf8_lossy(msg_sec?);
+        let act_message_second = String::from_utf8_lossy(msg_sec?.1);
         info!("[Receiver] Got new message: {}", act_message_second);
         assert_eq!(act_message_second, MSG);
     }
@@ -365,14 +365,14 @@ async fn receive_multiple_second_unsub<const TOPICS: usize>(
     {
         let msg = { client.receive_message().await };
         assert_ok!(msg);
-        let act_message = String::from_utf8_lossy(msg?);
+        let act_message = String::from_utf8_lossy(msg?.1);
         info!("[Receiver] Got new message: {}", act_message);
         assert_eq!(act_message, msg_t1);
     }
     {
         let msg_sec = { client.receive_message().await };
         assert_ok!(msg_sec);
-        let act_message_second = String::from_utf8_lossy(msg_sec?);
+        let act_message_second = String::from_utf8_lossy(msg_sec?.1);
         info!("[Receiver] Got new message: {}", act_message_second);
         assert_eq!(act_message_second, msg_t2);
     }
@@ -386,7 +386,7 @@ async fn receive_multiple_second_unsub<const TOPICS: usize>(
     {
         let msg = { client.receive_message().await };
         assert_ok!(msg);
-        let act_message = String::from_utf8_lossy(msg?);
+        let act_message = String::from_utf8_lossy(msg?.1);
         info!("[Receiver] Got new message: {}", act_message);
         assert_eq!(act_message, msg_t1);
     }

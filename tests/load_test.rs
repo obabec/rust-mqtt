@@ -145,7 +145,7 @@ async fn receive_core<'b>(
     loop {
         let msg = client.receive_message().await;
         assert_ok!(msg);
-        let act_message = String::from_utf8_lossy(msg?);
+        let act_message = String::from_utf8_lossy(msg?.1);
         info!("[Receiver] Got new {}. message: {}", count, act_message);
         assert_eq!(act_message, MSG);
         count = count + 1;
