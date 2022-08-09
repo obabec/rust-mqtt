@@ -78,7 +78,7 @@ async fn publish_core<'b>(
     info!("[Publisher] Sending new message {} to topic {}", MSG, topic);
     let mut count = 0;
     loop {
-        result = client.send_message(topic, MSG).await;
+        result = client.send_message(topic, MSG.as_bytes()).await;
         info!("[PUBLISHER] sent {}", count);
         assert_ok!(result);
         count = count + 1;

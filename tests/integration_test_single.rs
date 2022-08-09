@@ -80,7 +80,7 @@ async fn publish_core<'b>(
         "[Publisher] Sending new message {} to topic {}",
         message, topic
     );
-    result = client.send_message(topic, message).await;
+    result = client.send_message(topic, message.as_bytes()).await;
     info!("[PUBLISHER] sent");
     if err == true {
         assert_err!(result);

@@ -191,7 +191,7 @@ where
     async fn send_message_v5<'b>(
         &'b mut self,
         topic_name: &'b str,
-        message: &'b str,
+        message: &'b [u8],
     ) -> Result<(), ReasonCode> {
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
@@ -204,7 +204,7 @@ where
             packet.add_topic_name(topic_name);
             packet.add_qos(self.config.qos);
             packet.add_identifier(identifier);
-            packet.add_message(message.as_bytes());
+            packet.add_message(message);
             packet.encode(self.buffer, self.buffer_len)
         };
 
@@ -255,7 +255,7 @@ where
     pub async fn send_message<'b>(
         &'b mut self,
         topic_name: &'b str,
-        message: &'b str,
+        message: &'b [u8],
     ) -> Result<(), ReasonCode> {
         match self.config.mqtt_version {
             MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
