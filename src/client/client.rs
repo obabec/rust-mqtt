@@ -590,6 +590,10 @@ async fn receive_packet<'c, T: Read + Write>(
     }
 
     loop {
+        if writer.position == target_len + rem_len_len {
+            trace!("Received packet with len: {}", (target_len + rem_len_len));
+            return Ok(target_len + rem_len_len);
+        }
         let len: usize = conn
             .receive(&mut recv_buffer[writer.position..writer.position + (target_len - i)])
             .await?;
@@ -599,10 +603,6 @@ async fn receive_packet<'c, T: Read + Write>(
         {
             error!("Error occurred during write to buffer!");
             return Err(BuffError);
-        }
-        if writer.position == target_len + rem_len_len {
-            trace!("Received packet with len: {}", (target_len + rem_len_len));
-            return Ok(target_len + rem_len_len);
         }
     }
 }
