@@ -200,6 +200,8 @@ where
         &'b mut self,
         topic_name: &'b str,
         message: &'b [u8],
+        qos: QualityOfService,
+        retain: bool,
     ) -> Result<(), ReasonCode> {
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
@@ -210,9 +212,10 @@ where
         let len = {
             let mut packet = PublishPacket::<'b, MAX_PROPERTIES>::new();
             packet.add_topic_name(topic_name);
-            packet.add_qos(self.config.qos);
+            packet.add_qos(qos);
             packet.add_identifier(identifier);
             packet.add_message(message);
+            packet.add_retain(retain);
             packet.encode(self.buffer, self.buffer_len)
         };
 
@@ -224,9 +227,7 @@ where
         conn.send(&self.buffer[0..len.unwrap()]).await?;
 
         // QoS1
-        if <QualityOfService as Into<u8>>::into(self.config.qos)
-            == <QualityOfService as Into<u8>>::into(QoS1)
-        {
+        if qos == QoS1 {
             let reason: Result<[u16; 2], BufferError> = {
                 trace!("Waiting for ack");
                 let read =
@@ -264,10 +265,12 @@ where
         &'b mut self,
         topic_name: &'b str,
         message: &'b [u8],
+        qos: QualityOfService,
+        retain: bool,
     ) -> Result<(), ReasonCode> {
         match self.config.mqtt_version {
             MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
-            MqttVersion::MQTTv5 => self.send_message_v5(topic_name, message).await,
+            MqttVersion::MQTTv5 => self.send_message_v5(topic_name, message, qos, retain).await,
         }
     }
 
@@ -286,7 +289,7 @@ where
                 if i == TOPICS {
                     break;
                 }
-                subs.add_new_filter(topic_names.get(i).unwrap(), self.config.qos);
+                subs.add_new_filter(topic_names.get(i).unwrap(), self.config.max_subscribe_qos);
                 i = i + 1;
             }
             subs.encode(self.buffer, self.buffer_len)
@@ -322,7 +325,7 @@ where
                 break;
             }
             if *reasons.get(i).unwrap()
-                != (<QualityOfService as Into<u8>>::into(self.config.qos) >> 1)
+                != (<QualityOfService as Into<u8>>::into(self.config.max_subscribe_qos) >> 1)
             {
                 return Err(ReasonCode::from(*reasons.get(i).unwrap()));
             }
@@ -410,7 +413,7 @@ where
         let conn = self.connection.as_mut().unwrap();
         let len = {
             let mut subs = SubscriptionPacket::<'b, 1, MAX_PROPERTIES>::new();
-            subs.add_new_filter(topic_name, self.config.qos);
+            subs.add_new_filter(topic_name, self.config.max_subscribe_qos);
             subs.encode(self.buffer, self.buffer_len)
         };
 
@@ -439,7 +442,7 @@ where
         }
 
         let res = reason.unwrap();
-        if res != (<QualityOfService as Into<u8>>::into(self.config.qos) >> 1) {
+        if res != (<QualityOfService as Into<u8>>::into(self.config.max_subscribe_qos) >> 1) {
             Err(ReasonCode::from(res))
         } else {
             Ok(())

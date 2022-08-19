@@ -46,7 +46,7 @@ pub enum MqttVersion {
 /// Examples of the configurations can be found in the integration tests.
 #[derive(Clone)]
 pub struct ClientConfig<'a, const MAX_PROPERTIES: usize, T: RngCore> {
-    pub qos: QualityOfService,
+    pub max_subscribe_qos: QualityOfService,
     pub keep_alive: u16,
     pub username_flag: bool,
     pub username: EncodedString<'a>,
@@ -66,7 +66,7 @@ pub struct ClientConfig<'a, const MAX_PROPERTIES: usize, T: RngCore> {
 impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIES, T> {
     pub fn new(version: MqttVersion, rng: T) -> Self {
         Self {
-            qos: QualityOfService::QoS0,
+            max_subscribe_qos: QualityOfService::QoS0,
             keep_alive: 60,
             username_flag: false,
             username: EncodedString::new(),
@@ -84,8 +84,8 @@ impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIE
         }
     }
 
-    pub fn add_qos(&mut self, qos: QualityOfService) {
-        self.qos = qos;
+    pub fn add_max_subscribe_qos(&mut self, qos: QualityOfService) {
+        self.max_subscribe_qos = qos;
     }
 
     pub fn add_will(&mut self, topic: &'a str, payload: &'a [u8], retain: bool) {

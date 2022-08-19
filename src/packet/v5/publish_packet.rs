@@ -88,6 +88,10 @@ impl<'a, const MAX_PROPERTIES: usize> PublishPacket<'a, MAX_PROPERTIES> {
         self.fixed_header = self.fixed_header | <QualityOfService as Into<u8>>::into(qos);
     }
 
+    pub fn add_retain(&mut self, retain: bool) {
+        self.fixed_header |= retain as u8
+    }
+
     pub fn add_identifier(&mut self, identifier: u16) {
         self.packet_identifier = identifier;
     }

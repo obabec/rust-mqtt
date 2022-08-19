@@ -78,7 +78,9 @@ async fn publish_core<'b>(
     info!("[Publisher] Sending new message {} to topic {}", MSG, topic);
     let mut count = 0;
     loop {
-        result = client.send_message(topic, MSG.as_bytes()).await;
+        result = client
+            .send_message(topic, MSG.as_bytes(), QualityOfService::QoS0, false)
+            .await;
         info!("[PUBLISHER] sent {}", count);
         assert_ok!(result);
         count = count + 1;
@@ -107,7 +109,7 @@ async fn publish(
         .map_err(|_| ReasonCode::NetworkError)?;
     let connection = TokioNetwork::new(connection);
     let mut config = ClientConfig::new(MQTTv5, CountingRng(50000));
-    config.add_qos(qos);
+    config.add_max_subscribe_qos(qos);
     config.add_username(USERNAME);
     config.add_password(PASSWORD);
     config.max_packet_size = 100;
@@ -171,7 +173,7 @@ async fn receive(
         .map_err(|_| ReasonCode::NetworkError)?;
     let connection = TokioNetwork::new(connection);
     let mut config = ClientConfig::new(MQTTv5, CountingRng(50000));
-    config.add_qos(qos);
+    config.add_max_subscribe_qos(qos);
     config.add_username(USERNAME);
     config.add_password(PASSWORD);
     config.max_packet_size = 6000;
