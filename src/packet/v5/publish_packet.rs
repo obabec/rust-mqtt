@@ -116,7 +116,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PublishPacket<'a, MAX_PROPE
         rm_ln = rm_ln + property_len_len as u32 + msg_len + self.topic_name.len as u32 + 2;
 
         buff_writer.write_u8(self.fixed_header)?;
-        let qos = self.fixed_header & 0x03;
+        let qos = self.fixed_header & 0x06;
         if qos != 0 {
             rm_ln = rm_ln + 2;
         }
@@ -140,7 +140,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PublishPacket<'a, MAX_PROPE
             return Err(BufferError::PacketTypeMismatch);
         }
         self.topic_name = buff_reader.read_string()?;
-        let qos = self.fixed_header & 0x03;
+        let qos = self.fixed_header & 0x06;
         if qos != 0 {
             // Decode only for QoS 1 / 2
             self.packet_identifier = buff_reader.read_u16()?;
