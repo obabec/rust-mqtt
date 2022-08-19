@@ -56,6 +56,11 @@ pub struct ClientConfig<'a, const MAX_PROPERTIES: usize, T: RngCore> {
     pub max_packet_size: u32,
     pub mqtt_version: MqttVersion,
     pub rng: T,
+    pub will_flag: bool,
+    pub will_topic: EncodedString<'a>,
+    pub will_payload: BinaryData<'a>,
+    pub will_retain: bool,
+    pub client_id: EncodedString<'a>,
 }
 
 impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIES, T> {
@@ -71,11 +76,31 @@ impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIE
             max_packet_size: 265_000,
             mqtt_version: version,
             rng,
+            will_flag: false,
+            will_topic: EncodedString::new(),
+            will_payload: BinaryData::new(),
+            will_retain: false,
+            client_id: EncodedString::new(),
         }
     }
 
     pub fn add_qos(&mut self, qos: QualityOfService) {
         self.qos = qos;
+    }
+
+    pub fn add_will(&mut self, topic: &'a str, payload: &'a [u8], retain: bool) {
+        let mut topic_s = EncodedString::new();
+        topic_s.string = topic;
+        topic_s.len = topic.len() as u16;
+
+        let mut payload_d = BinaryData::new();
+        payload_d.bin = payload;
+        payload_d.len = payload.len() as u16;
+
+        self.will_flag = true;
+        self.will_retain = retain;
+        self.will_topic = topic_s;
+        self.will_payload = payload_d;
     }
 
     /// Method adds the username array and also sets the username flag so client
@@ -112,5 +137,13 @@ impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIE
             return 5;
         }
         return 0;
+    }
+
+    pub fn add_client_id(&mut self, client_id: &'a str) {
+        let mut client_id_s = EncodedString::new();
+        client_id_s.string = client_id;
+        client_id_s.len = client_id.len() as u16;
+
+        self.client_id = client_id_s
     }
 }

@@ -98,6 +98,14 @@ where
             if self.config.password_flag {
                 connect.add_password(&self.config.password)
             }
+            if self.config.will_flag {
+                connect.add_will(
+                    &self.config.will_topic,
+                    &self.config.will_payload,
+                    self.config.will_retain,
+                )
+            }
+            connect.add_client_id(&self.config.client_id);
             connect.encode(self.buffer, self.buffer_len)
         };
 
