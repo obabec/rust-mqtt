@@ -165,4 +165,13 @@ impl<'a> BuffReader<'a> {
         }
         return &self.buffer[self.position..total_len];
     }
+
+    /// Peeking (without incremental internal pointer) one byte from buffer as `Big endian`
+    pub fn peek_u8(&self) -> Result<u8, BufferError> {
+        if self.position >= self.len {
+            return Err(BufferError::InsufficientBufferSize);
+        }
+        let ret: u8 = self.buffer[self.position];
+        return Ok(ret);
+    }
 }
