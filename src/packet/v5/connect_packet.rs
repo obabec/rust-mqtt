@@ -98,6 +98,15 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize>
         self.connect_flags = self.connect_flags | 0x40;
     }
 
+    pub fn add_will(&mut self, topic: &EncodedString<'a>, payload: &BinaryData<'a>, retain: bool) {
+        self.will_topic = topic.clone();
+        self.will_payload = payload.clone();
+        self.connect_flags |= 0x04;
+        if retain {
+            self.connect_flags |= 0x20;
+        }
+    }
+
     pub fn add_client_id(&mut self, id: &EncodedString<'a>) {
         self.client_id = (*id).clone();
     }
@@ -145,7 +154,9 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
                 + wil_prop_len_len as u32
                 + self.will_property_len as u32
                 + self.will_topic.len as u32
-                + self.will_payload.len as u32;
+                + 2
+                + self.will_payload.len as u32
+                + 2;
         }
         if (self.connect_flags & 0x80) != 0 {
             rm_ln = rm_ln + self.username.len as u32 + 2;
