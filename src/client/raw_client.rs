@@ -220,7 +220,7 @@ where
                     break;
                 }
                 subs.add_new_filter(topic_names.get(i).unwrap(), self.config.max_subscribe_qos);
-                i = i + 1;
+                i += 1;
             }
             subs.encode(self.buffer, self.buffer_len)
         };
@@ -361,11 +361,9 @@ where
             PacketType::Puback => {
                 let reason: Result<[u16; 2], BufferError> = {
                     let mut packet = PubackPacket::<'b, MAX_PROPERTIES>::new();
-                    if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
-                        Err(err)
-                    } else {
-                        Ok([packet.packet_identifier, packet.reason_code as u16])
-                    }
+                    packet
+                        .decode(&mut BuffReader::new(self.buffer, read))
+                        .map(|_| [packet.packet_identifier, packet.reason_code as u16])
                 };
 
                 if let Err(err) = reason {
@@ -384,11 +382,9 @@ where
             PacketType::Suback => {
                 let reason: Result<(u16, Vec<u8, MAX_TOPICS>), BufferError> = {
                     let mut packet = SubackPacket::<'b, MAX_TOPICS, MAX_PROPERTIES>::new();
-                    if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
-                        Err(err)
-                    } else {
-                        Ok((packet.packet_identifier, packet.reason_codes))
-                    }
+                    packet
+                        .decode(&mut BuffReader::new(self.buffer, read))
+                        .map(|_| (packet.packet_identifier, packet.reason_codes))
                 };
 
                 if let Err(err) = reason {
@@ -407,19 +403,16 @@ where
                     {
                         return Err(ReasonCode::from(*reasons.get(i).unwrap()));
                     }
-                    i = i + 1;
+                    i += 1;
                 }
                 Ok(Event::Suback(packet_identifier))
             }
             PacketType::Unsuback => {
                 let res: Result<u16, BufferError> = {
                     let mut packet = UnsubackPacket::<'b, 1, MAX_PROPERTIES>::new();
-
-                    if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
-                        Err(err)
-                    } else {
-                        Ok(packet.packet_identifier)
-                    }
+                    packet
+                        .decode(&mut BuffReader::new(self.buffer, read))
+                        .map(|_| packet.packet_identifier)
                 };
 
                 if let Err(err) = res {
@@ -433,7 +426,7 @@ where
                 let mut packet = PingrespPacket::new();
                 if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
                     error!("[DECODE ERR]: {}", err);
-                    return Err(ReasonCode::BuffError);
+                    Err(ReasonCode::BuffError)
                 } else {
                     Ok(Event::Pingresp)
                 }
@@ -496,8 +489,10 @@ async fn receive_packet<'c, T: Read + Write>(
     recv_buffer: &mut [u8],
     conn: &'c mut NetworkConnection<T>,
 ) -> Result<usize, ReasonCode> {
+    use crate::utils::buffer_writer::RemLenError;
+
     let target_len: usize;
-    let mut rem_len: Result<VariableByteInteger, ()>;
+    let mut rem_len: Result<VariableByteInteger, RemLenError>;
     let mut writer = BuffWriter::new(buffer, buffer_len);
     let mut i = 0;
 
@@ -513,7 +508,7 @@ async fn receive_packet<'c, T: Read + Write>(
             trace!("Zero byte len packet received, dropping connection.");
             return Err(ReasonCode::NetworkError);
         }
-        i = i + len;
+        i += len;
         if let Err(_e) = writer.insert_ref(len, &recv_buffer[writer.position..i]) {
             error!("Error occurred during write to buffer!");
             return Err(ReasonCode::BuffError);
@@ -548,7 +543,7 @@ async fn receive_packet<'c, T: Read + Write>(
         let len: usize = conn
             .receive(&mut recv_buffer[writer.position..writer.position + (target_len - i)])
             .await?;
-        i = i + len;
+        i += len;
         if let Err(_e) =
             writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + i)])
         {

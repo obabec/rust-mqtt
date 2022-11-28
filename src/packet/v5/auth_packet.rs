@@ -78,8 +78,8 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTI
         let mut rm_ln = self.property_len;
         let property_len_enc: [u8; 4] = VariableByteIntegerEncoder::encode(self.property_len)?;
         let property_len_len = VariableByteIntegerEncoder::len(property_len_enc);
-        rm_ln = rm_ln + property_len_len as u32;
-        rm_ln = rm_ln + 1;
+        rm_ln += property_len_len as u32;
+        rm_ln += 1;
 
         buff_writer.write_u8(self.fixed_header)?;
         buff_writer.write_variable_byte_int(rm_ln)?;
@@ -92,7 +92,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTI
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
         self.decode_fixed_header(buff_reader)?;
         self.auth_reason = buff_reader.read_u8()?;
-        return self.decode_properties(buff_reader);
+        self.decode_properties(buff_reader)
     }
 
     fn set_property_len(&mut self, value: u32) {
@@ -100,7 +100,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTI
     }
 
     fn get_property_len(&mut self) -> u32 {
-        return self.property_len;
+        self.property_len
     }
 
     fn push_to_properties(&mut self, property: Property<'a>) {

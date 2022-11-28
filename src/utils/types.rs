@@ -56,7 +56,7 @@ impl Display for BufferError {
     }
 }
 /// Encoded string provides structure representing UTF-8 encoded string in MQTTv5 packets
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct EncodedString<'a> {
     pub string: &'a str,
     pub len: u16,
@@ -68,13 +68,13 @@ impl EncodedString<'_> {
     }
 
     /// Return length of string
-    pub fn len(&self) -> u16 {
-        return self.len + 2;
+    pub fn encoded_len(&self) -> u16 {
+        self.len + 2
     }
 }
 
 /// Binary data represents `Binary data` in MQTTv5 protocol
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct BinaryData<'a> {
     pub bin: &'a [u8],
     pub len: u16,
@@ -85,13 +85,13 @@ impl BinaryData<'_> {
         Self { bin: &[0], len: 0 }
     }
     /// Returns length of Byte array
-    pub fn len(&self) -> u16 {
-        return self.len + 2;
+    pub fn encoded_len(&self) -> u16 {
+        self.len + 2
     }
 }
 
 /// String pair struct represents `String pair` in MQTTv5 (2 UTF-8 encoded strings name-value)
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct StringPair<'a> {
     pub name: EncodedString<'a>,
     pub value: EncodedString<'a>,
@@ -105,14 +105,13 @@ impl StringPair<'_> {
         }
     }
     /// Returns length which is equal to sum of the lenghts of UTF-8 encoded strings in pair
-    pub fn len(&self) -> u16 {
-        let ln = self.name.len() + self.value.len();
-        return ln;
+    pub fn encoded_len(&self) -> u16 {
+        self.name.encoded_len() + self.value.encoded_len()
     }
 }
 
 /// Topic filter serves as bound for topic selection and subscription options for `SUBSCRIPTION` packet
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TopicFilter<'a> {
     pub filter: EncodedString<'a>,
     pub sub_options: u8,
@@ -126,7 +125,7 @@ impl TopicFilter<'_> {
         }
     }
 
-    pub fn len(&self) -> u16 {
-        return self.filter.len + 3;
+    pub fn encoded_len(&self) -> u16 {
+        self.filter.len + 3
     }
 }

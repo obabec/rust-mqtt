@@ -35,7 +35,7 @@ pub struct PingrespPacket {
     pub remain_len: u32,
 }
 
-impl<'a> PingrespPacket {}
+impl PingrespPacket {}
 
 impl<'a> Packet<'a> for PingrespPacket {
     fn new() -> Self {
@@ -54,7 +54,7 @@ impl<'a> Packet<'a> for PingrespPacket {
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
         let x = self.decode_fixed_header(buff_reader)?;
-        if x != (PacketType::Pingresp).into() {
+        if x != PacketType::Pingresp {
             error!("Packet you are trying to decode is not PINGRESP packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
@@ -71,7 +71,7 @@ impl<'a> Packet<'a> for PingrespPacket {
 
     fn get_property_len(&mut self) -> u32 {
         error!("PINGRESP packet does not contain any properties!");
-        return 0;
+        0
     }
 
     fn push_to_properties(&mut self, _property: Property<'a>) {

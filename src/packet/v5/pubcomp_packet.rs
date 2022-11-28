@@ -74,7 +74,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubcompPacket<'a, MAX_PROPE
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        if self.decode_fixed_header(buff_reader)? != (PacketType::Pubcomp).into() {
+        if self.decode_fixed_header(buff_reader)? != PacketType::Pubcomp {
             error!("Packet you are trying to decode is not PUBCOMP packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
@@ -89,7 +89,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubcompPacket<'a, MAX_PROPE
     }
 
     fn get_property_len(&mut self) -> u32 {
-        return self.property_len;
+        self.property_len
     }
 
     fn push_to_properties(&mut self, property: Property<'a>) {

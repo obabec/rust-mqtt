@@ -74,13 +74,13 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubrelPacket<'a, MAX_PROPER
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        if self.decode_fixed_header(buff_reader)? != (PacketType::Pubrel).into() {
+        if self.decode_fixed_header(buff_reader)? != PacketType::Pubrel {
             error!("Packet you are trying to decode is not PUBREL packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
         self.packet_identifier = buff_reader.read_u16()?;
         self.reason_code = buff_reader.read_u8()?;
-        return self.decode_properties(buff_reader);
+        self.decode_properties(buff_reader)
     }
 
     fn set_property_len(&mut self, value: u32) {
@@ -88,7 +88,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubrelPacket<'a, MAX_PROPER
     }
 
     fn get_property_len(&mut self) -> u32 {
-        return self.property_len;
+        self.property_len
     }
 
     fn push_to_properties(&mut self, property: Property<'a>) {

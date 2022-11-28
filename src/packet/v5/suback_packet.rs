@@ -61,7 +61,7 @@ impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize>
                 break;
             }
         }
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -81,17 +81,17 @@ impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize> Packet<'a>
 
     fn encode(&mut self, _buffer: &mut [u8], _buffer_len: usize) -> Result<usize, BufferError> {
         error!("SUBACK packet does not support encoding!");
-        return Err(BufferError::WrongPacketToEncode);
+        Err(BufferError::WrongPacketToEncode)
     }
 
     fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        if self.decode_fixed_header(buff_reader)? != (PacketType::Suback).into() {
+        if self.decode_fixed_header(buff_reader)? != PacketType::Suback {
             error!("Packet you are trying to decode is not SUBACK packet!");
             return Err(BufferError::PacketTypeMismatch);
         }
         self.packet_identifier = buff_reader.read_u16()?;
         self.decode_properties(buff_reader)?;
-        return self.read_reason_codes(buff_reader);
+        self.read_reason_codes(buff_reader)
     }
 
     fn set_property_len(&mut self, value: u32) {
@@ -99,7 +99,7 @@ impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     }
 
     fn get_property_len(&mut self) -> u32 {
-        return self.property_len;
+        self.property_len
     }
 
     fn push_to_properties(&mut self, property: Property<'a>) {

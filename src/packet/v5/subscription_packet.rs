@@ -52,10 +52,9 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
         let mut new_filter = TopicFilter::new();
         new_filter.filter.string = topic_name;
         new_filter.filter.len = len as u16;
-        new_filter.sub_options =
-            new_filter.sub_options | (<QualityOfService as Into<u8>>::into(qos) >> 1);
+        new_filter.sub_options |= <QualityOfService as Into<u8>>::into(qos) >> 1;
         self.topic_filters.push(new_filter);
-        self.topic_filter_len = self.topic_filter_len + 1;
+        self.topic_filter_len += 1;
     }
 }
 
@@ -63,7 +62,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     for SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
     fn new() -> Self {
-        let x = Self {
+        Self {
             fixed_header: PacketType::Subscribe.into(),
             remain_len: 0,
             packet_identifier: 1,
@@ -71,8 +70,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
             properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
             topic_filter_len: 0,
             topic_filters: Vec::<TopicFilter<'a>, MAX_FILTERS>::new(),
-        };
-        return x;
+        }
     }
 
     fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
@@ -86,7 +84,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         let mut filters_len = 0;
         loop {
             filters_len = filters_len + self.topic_filters.get(lt).unwrap().filter.len + 3;
-            lt = lt + 1;
+            lt += 1;
             if lt == self.topic_filter_len as usize {
                 break;
             }
@@ -115,7 +113,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     }
 
     fn get_property_len(&mut self) -> u32 {
-        return self.property_len;
+        self.property_len
     }
 
     fn push_to_properties(&mut self, property: Property<'a>) {

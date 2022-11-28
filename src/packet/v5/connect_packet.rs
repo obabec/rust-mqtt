@@ -80,22 +80,22 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize>
         let y = Property::ReceiveMaximum(20);
         x.properties.push(y);
         x.client_id.len = 0;
-        return x;
+        x
     }
 
     pub fn add_packet_type(&mut self, new_packet_type: PacketType) {
-        self.fixed_header = self.fixed_header & 0x0F;
-        self.fixed_header = self.fixed_header | <PacketType as Into<u8>>::into(new_packet_type);
+        self.fixed_header &= 0x0F;
+        self.fixed_header |= u8::from(new_packet_type);
     }
 
     pub fn add_username(&mut self, username: &EncodedString<'a>) {
         self.username = (*username).clone();
-        self.connect_flags = self.connect_flags | 0x80;
+        self.connect_flags |= 0x80;
     }
 
     pub fn add_password(&mut self, password: &BinaryData<'a>) {
         self.password = (*password).clone();
-        self.connect_flags = self.connect_flags | 0x40;
+        self.connect_flags |= 0x40;
     }
 
     pub fn add_will(&mut self, topic: &EncodedString<'a>, payload: &BinaryData<'a>, retain: bool) {
@@ -152,7 +152,7 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
             let wil_prop_len_len = VariableByteIntegerEncoder::len(wil_prop_len_enc);
             rm_ln = rm_ln
                 + wil_prop_len_len as u32
-                + self.will_property_len as u32
+                + self.will_property_len
                 + self.will_topic.len as u32
                 + 2
                 + self.will_payload.len as u32
@@ -206,7 +206,7 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
     }
 
     fn get_property_len(&mut self) -> u32 {
-        return self.property_len;
+        self.property_len
     }
 
     fn push_to_properties(&mut self, property: Property<'a>) {

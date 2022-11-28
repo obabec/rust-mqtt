@@ -48,7 +48,7 @@ impl<'a> Packet<'a> for PingreqPacket {
     fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
         buff_writer.write_u8(self.fixed_header)?;
-        buff_writer.write_variable_byte_int(0 as u32)?;
+        buff_writer.write_variable_byte_int(0)?;
         Ok(buff_writer.position)
     }
 
@@ -63,7 +63,7 @@ impl<'a> Packet<'a> for PingreqPacket {
 
     fn get_property_len(&mut self) -> u32 {
         error!("PINGREQ packet does not contain any properties!");
-        return 0;
+        0
     }
 
     fn push_to_properties(&mut self, _property: Property<'a>) {

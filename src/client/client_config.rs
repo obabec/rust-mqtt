@@ -136,7 +136,7 @@ impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIE
             self.properties.push(prop);
             return 5;
         }
-        return 0;
+        0
     }
 
     pub fn add_client_id(&mut self, client_id: &'a str) {

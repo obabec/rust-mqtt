@@ -61,7 +61,9 @@ pub enum Property<'a> {
 
 impl<'a> Property<'a> {
     pub fn connect_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::SessionExpiryInterval(_u) => true,
             Property::ReceiveMaximum(_u) => true,
             Property::MaximumPacketSize(_u) => true,
@@ -72,11 +74,13 @@ impl<'a> Property<'a> {
             Property::AuthenticationMethod(_u) => true,
             Property::AuthenticationData(_u) => true,
             _ => false,
-        };
+        }
     }
 
     pub fn connack_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::SessionExpiryInterval(_u) => true,
             Property::ReceiveMaximum(_u) => true,
             Property::MaximumQoS(_u) => true,
@@ -94,11 +98,13 @@ impl<'a> Property<'a> {
             Property::AuthenticationMethod(_u) => true,
             Property::AuthenticationData(_u) => true,
             _ => false,
-        };
+        }
     }
 
     pub fn publish_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::PayloadFormat(_u) => true,
             Property::MessageExpiryInterval(_u) => true,
             Property::TopicAlias(_u) => true,
@@ -108,142 +114,155 @@ impl<'a> Property<'a> {
             Property::SubscriptionIdentifier(_u) => true,
             Property::ContentType(_u) => true,
             _ => false,
-        };
+        }
     }
 
     pub fn puback_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::ReasonString(_u) => true,
             Property::UserProperty(_u) => true,
             _ => false,
-        };
+        }
     }
 
     pub fn pubrec_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::ReasonString(_u) => true,
             Property::UserProperty(_u) => true,
             _ => false,
-        };
+        }
     }
 
     pub fn pubrel_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::ReasonString(_u) => true,
             Property::UserProperty(_u) => true,
             _ => false,
-        };
+        }
     }
 
     pub fn pubcomp_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::ReasonString(_u) => true,
             Property::UserProperty(_u) => true,
             _ => false,
-        };
+        }
     }
 
     pub fn subscribe_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::SubscriptionIdentifier(_u) => true,
             Property::UserProperty(_u) => true,
             _ => false,
-        };
+        }
     }
 
     pub fn suback_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::ReasonString(_u) => true,
             Property::UserProperty(_u) => true,
             _ => false,
-        };
+        }
     }
 
     pub fn unsubscribe_property(&self) -> bool {
-        return match self {
-            Property::UserProperty(_u) => true,
-            _ => false,
-        };
+        matches!(self, Property::UserProperty(_u))
     }
 
     pub fn unsuback_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::ReasonString(_u) => true,
             Property::UserProperty(_u) => true,
             _ => false,
-        };
+        }
     }
 
     pub fn pingreq_property(&self) -> bool {
-        return match self {
-            _ => false,
-        };
+        warn!("pingreq property list is incomplete");
+        false
     }
 
     pub fn pingresp_property(&self) -> bool {
-        return match self {
-            _ => false,
-        };
+        warn!("pingresp property list is incomplete");
+        false
     }
 
     pub fn disconnect_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::SessionExpiryInterval(_u) => true,
             Property::ReasonString(_u) => true,
             Property::UserProperty(_u) => true,
             Property::ServerReference(_u) => true,
             _ => false,
-        };
+        }
     }
 
     pub fn auth_property(&self) -> bool {
-        return match self {
+        // not possible to use with associated values with different types
+        #[allow(clippy::match_like_matches_macro)]
+        match self {
             Property::AuthenticationMethod(_u) => true,
             Property::AuthenticationData(_u) => true,
             Property::ReasonString(_u) => true,
             Property::UserProperty(_u) => true,
             _ => false,
-        };
+        }
     }
 
-    pub fn len(&self) -> u16 {
-        return match self {
+    pub fn encoded_len(&self) -> u16 {
+        match self {
             Property::PayloadFormat(_u) => 1,
             Property::MessageExpiryInterval(_u) => 4,
-            Property::ContentType(u) => u.len(),
-            Property::ResponseTopic(u) => u.len(),
-            Property::CorrelationData(u) => u.len(),
+            Property::ContentType(u) => u.encoded_len(),
+            Property::ResponseTopic(u) => u.encoded_len(),
+            Property::CorrelationData(u) => u.encoded_len(),
             Property::SubscriptionIdentifier(u) => {
                 VariableByteIntegerEncoder::len(VariableByteIntegerEncoder::encode(*u).unwrap())
                     as u16
             }
             Property::SessionExpiryInterval(_u) => 4,
-            Property::AssignedClientIdentifier(u) => u.len(),
+            Property::AssignedClientIdentifier(u) => u.encoded_len(),
             Property::ServerKeepAlive(_u) => 2,
-            Property::AuthenticationMethod(u) => u.len(),
-            Property::AuthenticationData(u) => u.len(),
+            Property::AuthenticationMethod(u) => u.encoded_len(),
+            Property::AuthenticationData(u) => u.encoded_len(),
             Property::RequestProblemInformation(_u) => 1,
             Property::WillDelayInterval(_u) => 4,
             Property::RequestResponseInformation(_u) => 1,
-            Property::ResponseInformation(u) => u.len(),
-            Property::ServerReference(u) => u.len(),
-            Property::ReasonString(u) => u.len(),
+            Property::ResponseInformation(u) => u.encoded_len(),
+            Property::ServerReference(u) => u.encoded_len(),
+            Property::ReasonString(u) => u.encoded_len(),
             Property::ReceiveMaximum(_u) => 2,
             Property::TopicAliasMaximum(_u) => 2,
             Property::TopicAlias(_u) => 2,
             Property::MaximumQoS(_u) => 1,
             Property::RetainAvailable(_u) => 1,
-            Property::UserProperty(u) => u.len(),
+            Property::UserProperty(u) => u.encoded_len(),
             Property::MaximumPacketSize(_u) => 4,
             Property::WildcardSubscriptionAvailable(_u) => 1,
             Property::SubscriptionIdentifierAvailable(_u) => 1,
             Property::SharedSubscriptionAvailable(_u) => 1,
             _ => 0,
-        };
+        }
     }
 
     pub fn encode(&self, buff_writer: &mut BuffWriter<'a>) -> Result<(), BufferError> {
-        return match self {
+        match self {
             Property::PayloadFormat(u) => buff_writer.write_u8(*u),
             Property::MessageExpiryInterval(u) => buff_writer.write_u32(*u),
             Property::ContentType(u) => buff_writer.write_string_ref(u),
@@ -272,7 +291,7 @@ impl<'a> Property<'a> {
             Property::SubscriptionIdentifierAvailable(u) => buff_writer.write_u8(*u),
             Property::SharedSubscriptionAvailable(u) => buff_writer.write_u8(*u),
             _ => Err(BufferError::PropertyNotFound),
-        };
+        }
     }
 
     pub fn decode(buff_reader: &mut BuffReader<'a>) -> Result<Property<'a>, BufferError> {
@@ -321,9 +340,9 @@ impl<'a> Property<'a> {
     }
 }
 
-impl<'a> Into<u8> for &Property<'a> {
-    fn into(self) -> u8 {
-        return match &*self {
+impl<'a> From<&Property<'a>> for u8 {
+    fn from(value: &Property<'a>) -> Self {
+        match value {
             Property::PayloadFormat(_u) => 0x01,
             Property::MessageExpiryInterval(_u) => 0x02,
             Property::ContentType(_u) => 0x03,
@@ -352,14 +371,13 @@ impl<'a> Into<u8> for &Property<'a> {
             Property::SubscriptionIdentifierAvailable(_u) => 0x29,
             Property::SharedSubscriptionAvailable(_u) => 0x2A,
             _ => 0x00,
-        };
+        }
     }
 }
 
 impl<'a> From<u8> for Property<'a> {
     fn from(_orig: u8) -> Self {
-        return match _orig {
-            _ => Property::Reserved(),
-        };
+        warn!("Deserialization of Properties from u8 is not implemented");
+        Property::Reserved()
     }
 }
