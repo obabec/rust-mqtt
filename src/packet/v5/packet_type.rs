@@ -47,7 +47,7 @@ pub enum PacketType {
 impl From<u8> for PacketType {
     fn from(orig: u8) -> Self {
         let packet_type: u8 = orig & 0xF0;
-        return match packet_type {
+        match packet_type {
             0x10 => PacketType::Connect,
             0x20 => PacketType::Connack,
             0x00 => PacketType::Reserved,
@@ -65,13 +65,13 @@ impl From<u8> for PacketType {
             0xE0 => PacketType::Disconnect,
             0xF0 => PacketType::Auth,
             _ => PacketType::Reserved,
-        };
+        }
     }
 }
 
-impl Into<u8> for PacketType {
-    fn into(self) -> u8 {
-        return match self {
+impl From<PacketType> for u8 {
+    fn from(value: PacketType) -> Self {
+        match value {
             PacketType::Connect => 0x10,
             PacketType::Connack => 0x20,
             PacketType::Publish => 0x30,
@@ -88,6 +88,6 @@ impl Into<u8> for PacketType {
             PacketType::Disconnect => 0xE0,
             PacketType::Auth => 0xF0,
             PacketType::Reserved => 0x00,
-        };
+        }
     }
 }

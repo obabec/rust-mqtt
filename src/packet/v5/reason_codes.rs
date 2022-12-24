@@ -75,9 +75,9 @@ pub enum ReasonCode {
     NetworkError,
 }
 
-impl Into<u8> for ReasonCode {
-    fn into(self) -> u8 {
-        return match self {
+impl From<ReasonCode> for u8 {
+    fn from(value: ReasonCode) -> Self {
+        match value {
             ReasonCode::Success => 0x00,
             ReasonCode::GrantedQoS1 => 0x01,
             ReasonCode::GrantedQoS2 => 0x02,
@@ -124,13 +124,13 @@ impl Into<u8> for ReasonCode {
             ReasonCode::TimerNotSupported => 0xFD,
             ReasonCode::BuffError => 0xFE,
             ReasonCode::NetworkError => 0xFF,
-        };
+        }
     }
 }
 
 impl From<u8> for ReasonCode {
     fn from(orig: u8) -> Self {
-        return match orig {
+        match orig {
             0x00 => ReasonCode::Success,
             0x01 => ReasonCode::GrantedQoS1,
             0x02 => ReasonCode::GrantedQoS2,
@@ -176,7 +176,7 @@ impl From<u8> for ReasonCode {
             0xFD => ReasonCode::TimerNotSupported,
             0xFE => ReasonCode::BuffError,
             _ => ReasonCode::NetworkError,
-        };
+        }
     }
 }
 

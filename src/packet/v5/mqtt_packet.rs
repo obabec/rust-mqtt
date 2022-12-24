@@ -59,14 +59,14 @@ pub trait Packet<'a> {
             let prop = properties.get(i).unwrap();
             if self.property_allowed(prop) {
                 self.push_to_properties((*prop).clone());
-                res = res + prop.len() as u32 + 1;
+                res = res + prop.encoded_len() as u32 + 1;
             }
-            i = i + 1;
+            i += 1;
             if i == max {
                 break;
             }
         }
-        return res;
+        res
     }
 
     /// Setter for packet fixed header
@@ -84,7 +84,7 @@ pub trait Packet<'a> {
             loop {
                 prop = Property::decode(buff_reader)?;
                 //debug!("Parsed property {:?}", prop);
-                x = x + prop.len() as u32 + 1;
+                x = x + prop.encoded_len() as u32 + 1;
                 self.push_to_properties(prop);
 
                 if x == self.get_property_len() {
@@ -104,6 +104,6 @@ pub trait Packet<'a> {
         trace!("First byte of accepted packet: {:02X}", first_byte);
         self.set_fixed_header(first_byte);
         self.set_remaining_len(buff_reader.read_variable_byte_int()?);
-        return Ok(PacketType::from(first_byte));
+        Ok(PacketType::from(first_byte))
     }
 }

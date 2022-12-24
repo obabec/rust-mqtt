@@ -51,9 +51,9 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
         let mut new_filter = TopicFilter::new();
         new_filter.filter.string = topic_name;
         new_filter.filter.len = len as u16;
-        new_filter.sub_options = new_filter.sub_options | 0x01;
+        new_filter.sub_options |= 0x01;
         self.topic_filters.push(new_filter);
-        self.topic_filter_len = self.topic_filter_len + 1;
+        self.topic_filter_len += 1;
     }
 }
 
@@ -83,7 +83,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         let mut filters_len = 0;
         loop {
             filters_len = filters_len + self.topic_filters.get(lt).unwrap().filter.len + 2;
-            lt = lt + 1;
+            lt += 1;
             if lt == self.topic_filter_len as usize {
                 break;
             }
@@ -113,7 +113,7 @@ impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize> Packet<'a>
     }
 
     fn get_property_len(&mut self) -> u32 {
-        return self.property_len;
+        self.property_len
     }
 
     fn push_to_properties(&mut self, property: Property<'a>) {

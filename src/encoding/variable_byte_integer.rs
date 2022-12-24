@@ -58,30 +58,29 @@ impl VariableByteIntegerEncoder {
 
         loop {
             encoded_byte = (target % MOD) as u8;
-            target = target / 128;
+            target /= 128;
             if target > 0 {
-                encoded_byte = encoded_byte | 128;
+                encoded_byte |= 128;
             }
             res[i] = encoded_byte;
-            i = i + 1;
-            if target <= 0 {
+            i += 1;
+            if target == 0 {
                 break;
             }
         }
-        return Ok(res);
+        Ok(res)
     }
 
     pub fn len(var_int: VariableByteInteger) -> usize {
         let mut i: usize = 0;
         loop {
-            let encoded_byte: u8;
-            encoded_byte = var_int[i];
-            i = i + 1;
+            let encoded_byte = var_int[i];
+            i += 1;
             if (encoded_byte & 128) == 0 {
                 break;
             }
         }
-        return i;
+        i
     }
 }
 
@@ -102,17 +101,17 @@ impl VariableByteIntegerDecoder {
 
         loop {
             encoded_byte = encoded[i];
-            i = i + 1;
-            ret = ret + ((encoded_byte & 127) as u32 * multiplier) as u32;
+            i += 1;
+            ret += (encoded_byte & 127) as u32 * multiplier;
             if multiplier > 128 * 128 * 128 {
                 return Err(BufferError::DecodingError);
             }
-            multiplier = multiplier * 128;
+            multiplier *= 128;
             if (encoded_byte & 128) == 0 {
                 break;
             }
         }
 
-        return Ok(ret);
+        Ok(ret)
     }
 }
