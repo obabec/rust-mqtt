@@ -52,18 +52,11 @@ pub trait Packet<'a> {
         &mut self,
         properties: &Vec<Property<'a>, MAX_PROPERTIES>,
     ) -> u32 {
-        let mut i = 0;
-        let max = properties.len();
         let mut res: u32 = 0;
-        loop {
-            let prop = properties.get(i).unwrap();
+        for prop in properties.iter() {
             if self.property_allowed(prop) {
                 self.push_to_properties((*prop).clone());
                 res = res + prop.encoded_len() as u32 + 1;
-            }
-            i += 1;
-            if i == max {
-                break;
             }
         }
         res
