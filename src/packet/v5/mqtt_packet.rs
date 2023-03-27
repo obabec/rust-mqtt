@@ -77,7 +77,7 @@ pub trait Packet<'a> {
     /// Method is decoding Byte array pointing to properties into heapless Vec
     /// in packet. If decoding goes wrong method is returning Error
     fn decode_properties(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        self.set_property_len(buff_reader.read_variable_byte_int().unwrap());
+        self.set_property_len(buff_reader.read_variable_byte_int()?);
         let mut x: u32 = 0;
         let mut prop: Property;
         if self.get_property_len() != 0 {
