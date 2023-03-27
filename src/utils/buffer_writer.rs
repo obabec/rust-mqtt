@@ -85,22 +85,13 @@ impl<'a> BuffWriter<'a> {
         }
     }
 
-    /// Writes an array to the buffer.
+    /// Writes (part of) an array to the buffer.
     pub fn insert_ref(&mut self, len: usize, array: &[u8]) -> Result<(), BufferError> {
-        let mut x: usize = 0;
         if self.position + len > self.len {
             return Err(BufferError::InsufficientBufferSize);
         }
-        if len != 0 {
-            loop {
-                self.buffer[self.position] = array[x];
-                self.increment_position(1);
-                x += 1;
-                if x == len {
-                    break;
-                }
-            }
-        }
+        self.buffer[self.position..self.position+len].copy_from_slice(&array[0..len]);
+        self.increment_position(len);
         Ok(())
     }
 
