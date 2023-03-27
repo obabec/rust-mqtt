@@ -387,18 +387,13 @@ where
                     return Err(ReasonCode::BuffError);
                 }
                 let (packet_identifier, reasons) = reason.unwrap();
-                let mut i = 0;
-                loop {
-                    if i == reasons.len() {
-                        break;
-                    }
-                    if *reasons.get(i).unwrap()
+                for reason_code in &reasons {
+                    if *reason_code
                         != (<QualityOfService as Into<u8>>::into(self.config.max_subscribe_qos)
                             >> 1)
                     {
-                        return Err(ReasonCode::from(*reasons.get(i).unwrap()));
+                        return Err(ReasonCode::from(*reason_code));
                     }
-                    i += 1;
                 }
                 Ok(Event::Suback(packet_identifier))
             }

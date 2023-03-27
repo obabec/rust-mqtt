@@ -167,17 +167,8 @@ impl<'a> BuffWriter<'a> {
         &mut self,
         properties: &Vec<Property<'a>, LEN>,
     ) -> Result<(), BufferError> {
-        let mut i = 0;
-        let len = properties.len();
-        if len != 0 {
-            loop {
-                let prop: &Property = properties.get(i).unwrap_or(&Property::Reserved());
-                self.write_property(prop)?;
-                i += 1;
-                if i == len {
-                    break;
-                }
-            }
+        for prop in properties.iter() {
+            self.write_property(prop)?;
         }
         Ok(())
     }
@@ -204,14 +195,8 @@ impl<'a> BuffWriter<'a> {
         len: usize,
         filters: &Vec<TopicFilter<'a>, MAX>,
     ) -> Result<(), BufferError> {
-        let mut i = 0;
-        loop {
-            let topic_filter: &TopicFilter<'a> = filters.get(i).unwrap();
-            self.write_topic_filter_ref(sub, topic_filter)?;
-            i += 1;
-            if i == len {
-                break;
-            }
+        for filter in filters {
+            self.write_topic_filter_ref(sub, filter)?;
         }
         Ok(())
     }
