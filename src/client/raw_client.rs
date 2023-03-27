@@ -214,13 +214,8 @@ where
         let len = {
             let mut subs = SubscriptionPacket::<'b, TOPICS, MAX_PROPERTIES>::new();
             subs.packet_identifier = identifier;
-            let mut i = 0;
-            loop {
-                if i == TOPICS {
-                    break;
-                }
-                subs.add_new_filter(topic_names.get(i).unwrap(), self.config.max_subscribe_qos);
-                i += 1;
+            for topic_name in topic_names.iter() {
+                subs.add_new_filter(topic_name, self.config.max_subscribe_qos);
             }
             subs.encode(self.buffer, self.buffer_len)
         };
