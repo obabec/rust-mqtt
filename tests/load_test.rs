@@ -83,7 +83,7 @@ async fn publish_core<'b>(
             .await;
         info!("[PUBLISHER] sent {}", count);
         assert_ok!(result);
-        count = count + 1;
+        count += 1;
         if count == amount {
             break;
         }
@@ -150,7 +150,7 @@ async fn receive_core<'b>(
         let act_message = String::from_utf8_lossy(msg?.1);
         info!("[Receiver] Got new {}. message: {}", count, act_message);
         assert_eq!(act_message, MSG);
-        count = count + 1;
+        count += 1;
         if count == amount {
             break;
         }

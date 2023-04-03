@@ -68,7 +68,7 @@ fn test_decode() {
         0x15,
     ];
     let mut connack_res = ConnackPacket::<2>::new();
-    let res = connack_res.decode(&mut BuffReader::new(&mut buffer, 8));
+    let res = connack_res.decode(&mut BuffReader::new(&buffer, 8));
 
     assert!(res.is_ok());
     assert_eq!(connack_res.property_len, 3);

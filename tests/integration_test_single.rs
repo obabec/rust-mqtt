@@ -66,7 +66,7 @@ async fn publish_core<'b>(
     qos: QualityOfService,
     topic: &str,
     message: &str,
-    err: bool,
+    should_err: bool,
 ) -> Result<(), ReasonCode> {
     info!(
         "[Publisher] Connection to broker with username {} and password {}",
@@ -85,7 +85,7 @@ async fn publish_core<'b>(
         .send_message(topic, message.as_bytes(), qos, false)
         .await;
     info!("[PUBLISHER] sent");
-    if err == true {
+    if should_err {
         assert_err!(result);
     } else {
         assert_ok!(result);

@@ -52,18 +52,11 @@ pub trait Packet<'a> {
         &mut self,
         properties: &Vec<Property<'a>, MAX_PROPERTIES>,
     ) -> u32 {
-        let mut i = 0;
-        let max = properties.len();
         let mut res: u32 = 0;
-        loop {
-            let prop = properties.get(i).unwrap();
+        for prop in properties.iter() {
             if self.property_allowed(prop) {
                 self.push_to_properties((*prop).clone());
                 res = res + prop.encoded_len() as u32 + 1;
-            }
-            i += 1;
-            if i == max {
-                break;
             }
         }
         res
@@ -77,7 +70,7 @@ pub trait Packet<'a> {
     /// Method is decoding Byte array pointing to properties into heapless Vec
     /// in packet. If decoding goes wrong method is returning Error
     fn decode_properties(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
-        self.set_property_len(buff_reader.read_variable_byte_int().unwrap());
+        self.set_property_len(buff_reader.read_variable_byte_int()?);
         let mut x: u32 = 0;
         let mut prop: Property;
         if self.get_property_len() != 0 {
