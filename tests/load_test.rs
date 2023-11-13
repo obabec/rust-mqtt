@@ -43,7 +43,7 @@ use rust_mqtt::packet::v5::reason_codes::ReasonCode;
 use rust_mqtt::utils::rng_generator::CountingRng;
 use tokio::net::TcpStream;
 
-use embedded_io::adapters::FromTokio;
+use embedded_io_adapters::tokio_1::FromTokio;
 pub type TokioNetwork = FromTokio<TcpStream>;
 
 static IP: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);

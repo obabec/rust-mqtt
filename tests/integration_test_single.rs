@@ -35,7 +35,7 @@ use tokio::time::sleep;
 use tokio::{net::TcpStream, task};
 use tokio_test::{assert_err, assert_ok};
 
-use embedded_io::adapters::FromTokio;
+use embedded_io_adapters::tokio_1::FromTokio;
 use rust_mqtt::client::client::MqttClient;
 use rust_mqtt::client::client_config::ClientConfig;
 use rust_mqtt::client::client_config::MqttVersion::MQTTv5;

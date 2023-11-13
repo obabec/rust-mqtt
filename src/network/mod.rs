@@ -23,7 +23,7 @@
  */
 
 use crate::packet::v5::reason_codes::ReasonCode;
-use embedded_io::asynch::{Read, Write};
+use embedded_io_async::{Read, Write};
 
 pub struct NetworkConnection<T>
 where
