@@ -1,6 +1,6 @@
 [package]
 name = "rust-mqtt"
-version = "0.1.5"
+version = "0.2.0"
 authors = ["Ondrej Babec <ond.babec@gmail.com>"]
 edition = "2021"
 resolver = "2"
@@ -11,18 +11,18 @@ repository = "https://github.com/obabec/rust-mqtt"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-heapless = "0.7.10"
-rand_core = "0.6.0"
+heapless = "0.8"
+rand_core = "0.6"
 defmt = { version = "0.3", optional = true }
-log = { version = "0.4.14", optional = true }
-embedded-io = "0.6.1"
-embedded-io-async = { version = "0.6.0" }
+log = { version = "0.4", optional = true }
+embedded-io = "0.6"
+embedded-io-async = "0.6"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
-embedded-io = "0.6.1"
-embedded-io-adapters ={ version = "0.6.0", features = ["tokio-1"]}
-embedded-io-async = { version = "0.6.0" }
+embedded-io = "0.6"
+embedded-io-adapters ={ version = "0.6", features = ["tokio-1"]}
+embedded-io-async = { version = "0.6" }
 tokio-test = { version = "0.4.2"}
 env_logger = "0.9.0"
 futures = { version = "0.3.21" }
