@@ -67,7 +67,7 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize>
             property_len: 3,
             properties: Vec::<Property<'a>, MAX_PROPERTIES>::new(),
             client_id: EncodedString::new(),
-            /// Will is not supported as it is un-necessary load for embedded
+            // Will is not supported as it is un-necessary load for embedded
             will_property_len: 0,
             will_properties: Vec::<Property<'a>, MAX_WILL_PROPERTIES>::new(),
             will_topic: EncodedString::new(),
