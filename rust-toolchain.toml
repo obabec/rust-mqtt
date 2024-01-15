@@ -1,4 +1,11 @@
 [toolchain]
-channel = "nightly-2023-11-01"
-components = [ "rust-src", "rustfmt" ]
-targets = [ "thumbv7em-none-eabi", "thumbv7m-none-eabi", "thumbv6m-none-eabi", "thumbv7em-none-eabihf", "thumbv8m.main-none-eabihf", "wasm32-unknown-unknown" ]
+channel = "1.75"
+components = ["rust-src", "rustfmt"]
+targets = [
+  "thumbv7em-none-eabi",
+  "thumbv7m-none-eabi",
+  "thumbv6m-none-eabi",
+  "thumbv7em-none-eabihf",
+  "thumbv8m.main-none-eabihf",
+  "wasm32-unknown-unknown",
+]

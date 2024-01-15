@@ -25,7 +25,6 @@
 #![macro_use]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code)]
-#![feature(type_alias_impl_trait)]
 pub(crate) mod fmt;
 
 pub mod client;
