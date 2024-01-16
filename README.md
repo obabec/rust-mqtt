@@ -30,6 +30,10 @@ cargo test integration
 cargo test load
 ```
 
+## Minimum supported Rust version (MSRV)
+Rust-mqtt is guaranteed to compile on stable Rust 1.75 and up.
+It might compile with older versions but that may change in any new patch release.
+
 ## Acknowledgment
 This project could not be in state in which currently is without Ulf Lilleengen and rest of the community
 from [Drogue IoT](https://github.com/drogue-iot).
