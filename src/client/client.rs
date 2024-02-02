@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-use embedded_io_async::{Read, Write};
+use embedded_io_async::{Read, ReadReady, Write};
 use heapless::Vec;
 use rand_core::RngCore;
 
@@ -34,14 +34,14 @@ use super::raw_client::{Event, RawMqttClient};
 
 pub struct MqttClient<'a, T, const MAX_PROPERTIES: usize, R: RngCore>
 where
-    T: Read + Write,
+    T: Read + ReadReady + Write,
 {
     raw: RawMqttClient<'a, T, MAX_PROPERTIES, R>,
 }
 
 impl<'a, T, const MAX_PROPERTIES: usize, R> MqttClient<'a, T, MAX_PROPERTIES, R>
 where
-    T: Read + Write,
+    T: Read + ReadReady + Write,
     R: RngCore,
 {
     pub fn new(
@@ -220,5 +220,10 @@ where
             // If an application message comes at this moment, it is lost.
             _ => Err(ReasonCode::ImplementationSpecificError),
         }
+    }
+
+    /// Get whether a TCP connection reader is ready.
+    pub fn read_ready(&mut self) -> Result<bool, ReasonCode> {
+        self.raw.read_ready()
     }
 }

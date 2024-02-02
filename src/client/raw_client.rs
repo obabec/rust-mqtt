@@ -1,4 +1,4 @@
-use embedded_io_async::{Read, Write};
+use embedded_io_async::{Read, ReadReady, Write};
 use heapless::Vec;
 use rand_core::RngCore;
 
@@ -38,7 +38,7 @@ pub enum Event<'a> {
 
 pub struct RawMqttClient<'a, T, const MAX_PROPERTIES: usize, R: RngCore>
 where
-    T: Read + Write,
+    T: Read + ReadReady + Write,
 {
     connection: Option<NetworkConnection<T>>,
     buffer: &'a mut [u8],
@@ -50,7 +50,7 @@ where
 
 impl<'a, T, const MAX_PROPERTIES: usize, R> RawMqttClient<'a, T, MAX_PROPERTIES, R>
 where
-    T: Read + Write,
+    T: Read + ReadReady + Write,
     R: RngCore,
 {
     pub fn new(
@@ -470,10 +470,18 @@ where
             }
         }
     }
+
+    pub fn read_ready(&mut self) -> Result<bool, ReasonCode> {
+        if self.connection.is_none() {
+            return Err(ReasonCode::NetworkError);
+        }
+        let conn = self.connection.as_mut().unwrap();
+        conn.read_ready()
+    }
 }
 
 #[cfg(not(feature = "tls"))]
-async fn receive_packet<'c, T: Read + Write>(
+async fn receive_packet<'c, T: Read + ReadReady + Write>(
     buffer: &mut [u8],
     buffer_len: usize,
     recv_buffer: &mut [u8],
@@ -544,7 +552,7 @@ async fn receive_packet<'c, T: Read + Write>(
 }
 
 #[cfg(feature = "tls")]
-async fn receive_packet<'c, T: Read + Write>(
+async fn receive_packet<'c, T: Read + ReadReady + Write>(
     buffer: &mut [u8],
     buffer_len: usize,
     recv_buffer: &mut [u8],
