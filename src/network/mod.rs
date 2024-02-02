@@ -23,11 +23,11 @@
  */
 
 use crate::packet::v5::reason_codes::ReasonCode;
-use embedded_io_async::{Read, Write};
+use embedded_io_async::{Read, ReadReady, Write};
 
 pub struct NetworkConnection<T>
 where
-    T: Read + Write,
+    T: Read + ReadReady + Write,
 {
     io: T,
 }
@@ -35,7 +35,7 @@ where
 /// Network connection represents an established TCP connection.
 impl<T> NetworkConnection<T>
 where
-    T: Read + Write,
+    T: Read + ReadReady + Write,
 {
     /// Create a new network handle using the provided IO implementation.
     pub fn new(io: T) -> Self {
@@ -59,4 +59,11 @@ where
             .await
             .map_err(|_| ReasonCode::NetworkError)
     }
+
+    /// Get whether a TCP connection reader is ready.
+    pub fn read_ready(&mut self) -> Result<bool, ReasonCode> {
+        self.io.read_ready()
+            .map_err(|_| ReasonCode::NetworkError)
+    }
+
 }
