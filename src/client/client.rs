@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+use embedded_io::ReadReady;
 use embedded_io_async::{Read, Write};
 use heapless::Vec;
 use rand_core::RngCore;
@@ -217,6 +218,27 @@ where
         match self.raw.poll::<0>().await? {
             Event::Pingresp => Ok(()),
             Event::Disconnect(reason) => Err(reason),
+            // If an application message comes at this moment, it is lost.
+            _ => Err(ReasonCode::ImplementationSpecificError),
+        }
+    }
+}
+
+impl<'a, T, const MAX_PROPERTIES: usize, R> MqttClient<'a, T, MAX_PROPERTIES, R>
+where
+    T: Read + Write + ReadReady,
+    R: RngCore,
+{
+    /// Receive a message if one is ready. The work of this method strictly depends on the
+    /// network implementation passed in the `ClientConfig`. It expects the PUBLISH packet
+    /// from the broker.
+    pub async fn receive_message_if_ready<'b>(
+        &'b mut self,
+    ) -> Result<Option<(&'b str, &'b [u8])>, ReasonCode> {
+        match self.raw.poll_if_ready::<0>().await? {
+            None => Ok(None),
+            Some(Event::Message(topic, payload)) => Ok(Some((topic, payload))),
+            Some(Event::Disconnect(reason)) => Err(reason),
             // If an application message comes at this moment, it is lost.
             _ => Err(ReasonCode::ImplementationSpecificError),
         }
