@@ -148,6 +148,7 @@ impl<'a> BuffReader<'a> {
         }
 
         let res_bin = &(self.buffer[self.position..(self.position + len as usize)]);
+        self.increment_position(len.into());
         Ok(BinaryData { bin: res_bin, len })
     }
 
