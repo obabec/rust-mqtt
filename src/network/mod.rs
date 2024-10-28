@@ -44,11 +44,16 @@ where
 
     /// Send the data from `buffer` via TCP connection.
     pub async fn send(&mut self, buffer: &[u8]) -> Result<(), ReasonCode> {
-        let _ = self
-            .io
-            .write(buffer)
+        self.io
+            .write_all(buffer)
             .await
             .map_err(|_| ReasonCode::NetworkError)?;
+
+        self.io
+            .flush()
+            .await
+            .map_err(|_| ReasonCode::NetworkError)?;
+
         Ok(())
     }
 
