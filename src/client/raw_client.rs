@@ -559,7 +559,7 @@ async fn receive_packet<'c, T: Read + Write>(
             .await?;
         i += len;
         if let Err(_e) =
-            writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + i)])
+            writer.insert_ref(len, &recv_buffer[writer.position..(writer.position + len)])
         {
             error!("Error occurred during write to buffer!");
             return Err(ReasonCode::BuffError);
