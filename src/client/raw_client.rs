@@ -1,3 +1,4 @@
+use embedded_io::ReadReady;
 use embedded_io_async::{Read, Write};
 use heapless::Vec;
 use rand_core::RngCore;
@@ -468,6 +469,29 @@ where
                     }
                 }
             }
+        }
+    }
+}
+
+impl<'a, T, const MAX_PROPERTIES: usize, R> RawMqttClient<'a, T, MAX_PROPERTIES, R>
+where
+    T: Read + Write + ReadReady,
+    R: RngCore,
+{
+    pub async fn poll_if_ready<'b, const MAX_TOPICS: usize>(
+        &'b mut self,
+    ) -> Result<Option<Event<'b>>, ReasonCode> {
+        if self.connection.is_none() {
+            return Err(ReasonCode::NetworkError);
+        }
+
+        let conn = self.connection.as_mut().unwrap();
+
+        // If there's no data, just return None
+        if !conn.receive_ready()? {
+            Ok(None)
+        } else {
+            self.poll::<MAX_TOPICS>().await.map(Some)
         }
     }
 }
