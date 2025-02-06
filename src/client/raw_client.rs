@@ -29,7 +29,8 @@ use super::client_config::{ClientConfig, MqttVersion};
 
 pub enum Event<'a> {
     Connack,
-    Puback(u16),
+    /// event.0 is Packet identifier, event.1 is true if there were matching subscribers, false otherwise
+    Puback(u16, bool),
     Suback(u16),
     Unsuback(u16),
     Pingresp,
@@ -355,25 +356,27 @@ where
                 }
             }
             PacketType::Puback => {
-                let reason: Result<[u16; 2], BufferError> = {
+                let result = {
                     let mut packet = PubackPacket::<'b, MAX_PROPERTIES>::new();
                     packet
                         .decode(&mut BuffReader::new(self.buffer, read))
-                        .map(|_| [packet.packet_identifier, packet.reason_code as u16])
+                        .map(|_| {
+                            (
+                                packet.packet_identifier,
+                                ReasonCode::from(packet.reason_code),
+                            )
+                        })
                 };
 
-                if let Err(err) = reason {
-                    error!("[DECODE ERR]: {}", err);
-                    return Err(ReasonCode::BuffError);
+                match result {
+                    Ok((id, ReasonCode::Success)) => Ok(Event::Puback(id, true)),
+                    Ok((id, ReasonCode::NoMatchingSubscribers)) => Ok(Event::Puback(id, false)),
+                    Ok((_id, err)) => Err(err),
+                    Err(err) => {
+                        error!("[DECODE ERR]: {}", err);
+                        Err(ReasonCode::BuffError)
+                    }
                 }
-
-                let res = reason.unwrap();
-
-                if res[1] != 0 {
-                    return Err(ReasonCode::from(res[1] as u8));
-                }
-
-                Ok(Event::Puback(res[0]))
             }
             PacketType::Suback => {
                 let reason: Result<(u16, Vec<u8, MAX_TOPICS>), BufferError> = {
