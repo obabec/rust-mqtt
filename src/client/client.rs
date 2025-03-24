@@ -108,8 +108,10 @@ where
         // QoS1
         if qos == QoS1 {
             match self.raw.poll::<0>().await? {
-                Event::Puback(ack_identifier) => {
-                    if identifier == ack_identifier {
+                Event::Puback(ack_identifier, matching_subscriber) => {
+                    if !matching_subscriber {
+                        Err(ReasonCode::NoMatchingSubscribers)
+                    } else if identifier == ack_identifier {
                         Ok(())
                     } else {
                         Err(ReasonCode::PacketIdentifierNotFound)
