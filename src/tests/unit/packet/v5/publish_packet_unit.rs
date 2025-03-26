@@ -96,3 +96,31 @@ fn test_decode() {
         );
     }
 }
+
+#[test]
+fn test_decode_with_correlation_data() {
+    // mosquitto_pub -h test.mosquitto.org -t "senbax/bugfix" -m "payloadpayload" --property PUBLISH correlation-data correlation
+    let buffer: [u8; 46] = [
+        0x30, 0x2c, 0x00, 0x0d, 0x73, 0x65, 0x6e, 0x62, 0x61, 0x78, 0x2f, 0x62, 0x75, 0x67, 0x66,
+        0x69, 0x78, 0x0e, 0x09, 0x00, 0x0b, 0x63, 0x6f, 0x72, 0x72, 0x65, 0x6c, 0x61, 0x74, 0x69,
+        0x6f, 0x6e, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61,
+        0x64,
+    ];
+    let mut packet = PublishPacket::<2>::new();
+    let res = packet.decode(&mut BuffReader::new(&buffer, 46));
+    assert!(res.is_ok());
+    assert_eq!(packet.topic_name.len, 13);
+    assert_eq!(packet.topic_name.string, "senbax/bugfix");
+    assert_eq!(packet.property_len, 14);
+
+    assert!(packet.properties.len() == 1);
+
+    let prop = packet.properties.get(0);
+    assert!(prop.is_some());
+    if let Some(message) = packet.message {
+        assert_eq!(
+            *message,
+            [0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64, 0x70, 0x61, 0x79, 0x6c, 0x6f, 0x61, 0x64]
+        );
+    }
+}
