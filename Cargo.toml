@@ -33,4 +33,5 @@ serial_test = "3.0.0"
 default = ["std"]
 std = ["embedded-io/std", "log"]
 no_std = ["defmt"]
+defmt-timestamp-uptime = []
 tls = []

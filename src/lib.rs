@@ -25,7 +25,7 @@
 #![macro_use]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![allow(dead_code)]
-#![doc = include_str!("README.md")]
+#![doc = include_str!("../README.md")]
 
 pub(crate) mod fmt;
 

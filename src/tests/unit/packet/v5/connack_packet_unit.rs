@@ -57,7 +57,7 @@ fn test_encode() {
 
 #[test]
 fn test_decode() {
-    let mut buffer: [u8; 8] = [
+    let buffer: [u8; 8] = [
         0x20,
         0x06,
         0x45,
