@@ -24,9 +24,9 @@
 
 use heapless::Vec;
 
-use crate::encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerEncoder};
-use crate::packet::v5::property::Property;
-use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair, TopicFilter};
+use crate::encoding::{BinaryData, EncodedString, StringPair, TopicFilter, VariableByteInteger, VariableByteIntegerEncoder};
+use crate::interface::Property;
+use crate::io::Error;
 
 #[derive(Debug, Clone, Copy)]
 pub struct RemLenError;
@@ -86,9 +86,9 @@ impl<'a> BuffWriter<'a> {
     }
 
     /// Writes (part of) an array to the buffer.
-    pub fn insert_ref(&mut self, len: usize, array: &[u8]) -> Result<(), BufferError> {
+    pub fn insert_ref(&mut self, len: usize, array: &[u8]) -> Result<(), Error> {
         if self.position + len > self.len {
-            return Err(BufferError::InsufficientBufferSize);
+            return Err(Error::InsufficientBufferSize);
         }
         self.buffer[self.position..self.position + len].copy_from_slice(&array[0..len]);
         self.increment_position(len);
@@ -96,9 +96,9 @@ impl<'a> BuffWriter<'a> {
     }
 
     /// Writes a single Byte to the buffer.
-    pub fn write_u8(&mut self, byte: u8) -> Result<(), BufferError> {
+    pub fn write_u8(&mut self, byte: u8) -> Result<(), Error> {
         if self.position >= self.len {
-            Err(BufferError::InsufficientBufferSize)
+            Err(Error::InsufficientBufferSize)
         } else {
             self.buffer[self.position] = byte;
             self.increment_position(1);
@@ -107,19 +107,19 @@ impl<'a> BuffWriter<'a> {
     }
 
     /// Writes the two Byte value to the buffer.
-    pub fn write_u16(&mut self, two_bytes: u16) -> Result<(), BufferError> {
+    pub fn write_u16(&mut self, two_bytes: u16) -> Result<(), Error> {
         let bytes: [u8; 2] = two_bytes.to_be_bytes();
         self.insert_ref(2, &bytes)
     }
 
     /// Writes the four Byte value to the buffer.
-    pub fn write_u32(&mut self, four_bytes: u32) -> Result<(), BufferError> {
+    pub fn write_u32(&mut self, four_bytes: u32) -> Result<(), Error> {
         let bytes: [u8; 4] = four_bytes.to_be_bytes();
         self.insert_ref(4, &bytes)
     }
 
     /// Writes the UTF-8 string type to the buffer.
-    pub fn write_string_ref(&mut self, str: &EncodedString<'a>) -> Result<(), BufferError> {
+    pub fn write_string_ref(&mut self, str: &EncodedString<'a>) -> Result<(), Error> {
         self.write_u16(str.len)?;
         if str.len != 0 {
             let bytes = str.string.as_bytes();
@@ -134,7 +134,7 @@ impl<'a> BuffWriter<'a> {
     }
 
     /// Writes BinaryData to the buffer.
-    pub fn write_binary_ref(&mut self, bin: &BinaryData<'a>) -> Result<(), BufferError> {
+    pub fn write_binary_ref(&mut self, bin: &BinaryData<'a>) -> Result<(), Error> {
         self.write_u16(bin.len)?;
 
         let res = self.insert_ref(bin.len as usize, bin.bin);
@@ -145,7 +145,7 @@ impl<'a> BuffWriter<'a> {
     }
 
     /// Writes the string pair to the buffer.
-    pub fn write_string_pair_ref(&mut self, str_pair: &StringPair<'a>) -> Result<(), BufferError> {
+    pub fn write_string_pair_ref(&mut self, str_pair: &StringPair<'a>) -> Result<(), Error> {
         let starting_position = self.position;
         self.write_string_ref(&str_pair.name)?;
         let len_name = self.position - starting_position;
@@ -160,13 +160,13 @@ impl<'a> BuffWriter<'a> {
     }
 
     /// Encodes the u32 value into the VariableByteInteger and this value writes to the buffer.
-    pub fn write_variable_byte_int(&mut self, int: u32) -> Result<(), BufferError> {
+    pub fn write_variable_byte_int(&mut self, int: u32) -> Result<(), Error> {
         let x: VariableByteInteger = VariableByteIntegerEncoder::encode(int)?;
         let len = VariableByteIntegerEncoder::len(x);
         self.insert_ref(len, &x)
     }
 
-    fn write_property(&mut self, property: &Property<'a>) -> Result<(), BufferError> {
+    fn write_property(&mut self, property: &Property<'a>) -> Result<(), Error> {
         let x: u8 = property.into();
         self.write_u8(x)?;
         property.encode(self)
@@ -176,7 +176,7 @@ impl<'a> BuffWriter<'a> {
     pub fn write_properties<const LEN: usize>(
         &mut self,
         properties: &Vec<Property<'a>, LEN>,
-    ) -> Result<(), BufferError> {
+    ) -> Result<(), Error> {
         let starting_position = self.position;
         for prop in properties.iter() {
             if let Err(e) = self.write_property(prop) {
@@ -193,7 +193,7 @@ impl<'a> BuffWriter<'a> {
         &mut self,
         sub: bool,
         topic_filter: &TopicFilter<'a>,
-    ) -> Result<(), BufferError> {
+    ) -> Result<(), Error> {
         self.write_string_ref(&topic_filter.filter)?;
         if sub {
             self.write_u8(topic_filter.sub_options)?;
@@ -208,7 +208,7 @@ impl<'a> BuffWriter<'a> {
         sub: bool,
         _len: usize,
         filters: &Vec<TopicFilter<'a>, MAX>,
-    ) -> Result<(), BufferError> {
+    ) -> Result<(), Error> {
         let starting_position = self.position;
 
         for filter in filters {

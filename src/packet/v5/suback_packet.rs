@@ -24,13 +24,12 @@
 
 use heapless::Vec;
 
-use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
+use crate::encoding::VariableByteIntegerEncoder;
 use crate::packet::v5::mqtt_packet::Packet;
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::types::BufferError;
+use crate::io::{self, BuffReader};
 
 use super::packet_type::PacketType;
-use super::property::Property;
+use crate::interface::Property;
 
 pub struct SubackPacket<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize> {
     pub fixed_header: u8,
@@ -47,7 +46,7 @@ impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize>
     pub fn read_reason_codes(
         &mut self,
         buff_reader: &mut BuffReader<'a>,
-    ) -> Result<(), BufferError> {
+    ) -> Result<(), io::Error> {
         let rm_ln_ln = VariableByteIntegerEncoder::len(
             VariableByteIntegerEncoder::encode(self.remain_len).unwrap(),
         );
@@ -79,15 +78,15 @@ impl<'a, const MAX_REASONS: usize, const MAX_PROPERTIES: usize> Packet<'a>
         }
     }
 
-    fn encode(&mut self, _buffer: &mut [u8], _buffer_len: usize) -> Result<usize, BufferError> {
+    fn encode(&mut self, _buffer: &mut [u8], _buffer_len: usize) -> Result<usize, io::Error> {
         error!("SUBACK packet does not support encoding!");
-        Err(BufferError::WrongPacketToEncode)
+        Err(io::Error::WrongPacketToEncode)
     }
 
-    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), io::Error> {
         if self.decode_fixed_header(buff_reader)? != PacketType::Suback {
             error!("Packet you are trying to decode is not SUBACK packet!");
-            return Err(BufferError::PacketTypeMismatch);
+            return Err(io::Error::PacketTypeMismatch);
         }
         self.packet_identifier = buff_reader.read_u16()?;
         self.decode_properties(buff_reader)?;

@@ -1,27 +1,46 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) [2022] [Ondrej Babec <ond.babec@gmail.com>]
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 use embedded_io::ReadReady;
 use embedded_io_async::{Read, Write};
 use heapless::Vec;
 use rand_core::RngCore;
 
 use crate::{
-    encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerDecoder},
+    encoding::{TopicFilter, VariableByteInteger, VariableByteIntegerDecoder},
+    interface::{ClientConfig, MqttVersion, QualityOfService, ReasonCode, Topic},
+    io::{self, BuffReader},
     network::NetworkConnection,
     packet::v5::{
         connack_packet::ConnackPacket, connect_packet::ConnectPacket,
         disconnect_packet::DisconnectPacket, mqtt_packet::Packet, packet_type::PacketType,
         pingreq_packet::PingreqPacket, pingresp_packet::PingrespPacket,
-        puback_packet::PubackPacket, publish_packet::PublishPacket, reason_codes::ReasonCode,
+        puback_packet::PubackPacket, publish_packet::PublishPacket,
         suback_packet::SubackPacket, subscription_packet::SubscriptionPacket,
         unsuback_packet::UnsubackPacket, unsubscription_packet::UnsubscriptionPacket,
     },
-    utils::{
-        buffer_reader::BuffReader,
-        buffer_writer::BuffWriter,
-        types::{BufferError, QualityOfService, Topic, TopicFilter},
-    },
 };
-
-use super::client_config::{ClientConfig, MqttVersion};
 
 pub enum Event<'a> {
     Connack,
@@ -341,7 +360,7 @@ where
             PacketType::Connack => {
                 let mut packet = ConnackPacket::<'b, MAX_PROPERTIES>::new();
                 if let Err(err) = packet.decode(&mut BuffReader::new(self.buffer, read)) {
-                    // if err == BufferError::PacketTypeMismatch {
+                    // if err == io::Error::PacketTypeMismatch {
                     //     let mut disc = DisconnectPacket::<'b, MAX_PROPERTIES>::new();
                     //     if disc.decode(&mut BuffReader::new(self.buffer, read)).is_ok() {
                     //         error!("Client was disconnected with reason: ");
@@ -380,7 +399,7 @@ where
                 }
             }
             PacketType::Suback => {
-                let reason: Result<(u16, Vec<u8, MAX_TOPICS>), BufferError> = {
+                let reason: Result<(u16, Vec<u8, MAX_TOPICS>), io::Error> = {
                     let mut packet = SubackPacket::<'b, MAX_TOPICS, MAX_PROPERTIES>::new();
                     packet
                         .decode(&mut BuffReader::new(self.buffer, read))
@@ -402,7 +421,7 @@ where
                 Ok(Event::Suback(packet_identifier))
             }
             PacketType::Unsuback => {
-                let res: Result<u16, BufferError> = {
+                let res: Result<u16, io::Error> = {
                     let mut packet = UnsubackPacket::<'b, 1, MAX_PROPERTIES>::new();
                     packet
                         .decode(&mut BuffReader::new(self.buffer, read))
@@ -428,7 +447,7 @@ where
             PacketType::Publish => {
                 let mut packet = PublishPacket::<'b, 5>::new();
                 if let Err(err) = { packet.decode(&mut BuffReader::new(self.buffer, read)) } {
-                    // if err == BufferError::PacketTypeMismatch {
+                    // if err == io::Error::PacketTypeMismatch {
                     //     let mut disc = DisconnectPacket::<'b, 5>::new();
                     //     if disc.decode(&mut BuffReader::new(self.buffer, read)).is_ok() {
                     //         error!("Client was disconnected with reason: ");
@@ -506,7 +525,7 @@ async fn receive_packet<'c, T: Read + Write>(
     recv_buffer: &mut [u8],
     conn: &'c mut NetworkConnection<T>,
 ) -> Result<usize, ReasonCode> {
-    use crate::utils::buffer_writer::RemLenError;
+    use crate::io::{BuffWriter, RemLenError};
 
     let target_len: usize;
     let mut rem_len: Result<VariableByteInteger, RemLenError>;

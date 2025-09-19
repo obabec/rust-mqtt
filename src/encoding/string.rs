@@ -22,7 +22,40 @@
  * SOFTWARE.
  */
 
-pub mod buffer_reader;
-pub mod buffer_writer;
-pub mod rng_generator;
-pub mod types;
+/// Encoded string provides structure representing UTF-8 encoded string in MQTTv5 packets
+#[derive(Debug, Clone, Default)]
+pub struct EncodedString<'a> {
+    pub string: &'a str,
+    pub len: u16,
+}
+
+impl EncodedString<'_> {
+    pub fn new() -> Self {
+        Self { string: "", len: 0 }
+    }
+
+    /// Return length of string
+    pub fn encoded_len(&self) -> u16 {
+        self.len + 2
+    }
+}
+
+/// String pair struct represents `String pair` in MQTTv5 (2 UTF-8 encoded strings name-value)
+#[derive(Debug, Clone, Default)]
+pub struct StringPair<'a> {
+    pub name: EncodedString<'a>,
+    pub value: EncodedString<'a>,
+}
+
+impl StringPair<'_> {
+    pub fn new() -> Self {
+        Self {
+            name: EncodedString::new(),
+            value: EncodedString::new(),
+        }
+    }
+    /// Returns length which is equal to sum of the lenghts of UTF-8 encoded strings in pair
+    pub fn encoded_len(&self) -> u16 {
+        self.name.encoded_len() + self.value.encoded_len()
+    }
+}

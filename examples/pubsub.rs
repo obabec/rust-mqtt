@@ -4,10 +4,10 @@ use std::{
 };
 
 use embedded_io_adapters::tokio_1::FromTokio;
+use rand::{rngs::StdRng, SeedableRng};
 use rust_mqtt::{
-    client::{client::MqttClient, client_config::ClientConfig},
-    packet::v5::reason_codes::ReasonCode,
-    utils::{rng_generator::CountingRng, types::QualityOfService},
+    client::MqttClient,
+    interface::{ClientConfig, MqttVersion, QualityOfService, ReasonCode},
 };
 use tokio::net::TcpStream;
 
@@ -22,14 +22,13 @@ async fn main() {
         .map_err(|_| ReasonCode::NetworkError)
         .unwrap();
     let connection = FromTokio::<TcpStream>::new(connection);
-    let mut config = ClientConfig::new(
-        rust_mqtt::client::client_config::MqttVersion::MQTTv5,
-        CountingRng(20000),
-    );
+    let mut config = ClientConfig::new(MqttVersion::MQTTv5, StdRng::from_os_rng());
     config.add_max_subscribe_qos(QualityOfService::QoS1);
     config.add_client_id("client");
-    // config.add_username(USERNAME);
-    // config.add_password(PASSWORD);
+
+    config.add_username("test");
+    config.add_password("testPass");
+
     config.max_packet_size = 100;
     let mut recv_buffer = [0; 80];
     let mut write_buffer = [0; 80];

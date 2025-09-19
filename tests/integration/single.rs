@@ -25,8 +25,6 @@ extern crate alloc;
 
 use alloc::string::String;
 use core::time::Duration;
-use rust_mqtt::utils::types::{QualityOfService, Topic};
-use std::sync::Once;
 
 use futures::future::{join, join3};
 use heapless::Vec;
@@ -36,14 +34,19 @@ use tokio::time::sleep;
 use tokio::{net::TcpStream, task};
 use tokio_test::{assert_err, assert_ok};
 
+use rust_mqtt::{
+    client::MqttClient,
+    interface::ReasonCode,
+    interface::{
+        ClientConfig, MqttVersion::MQTTv5, Property, QualityOfService, ReasonCode::NotAuthorized,
+        Topic,
+    },
+};
+
 use embedded_io_adapters::tokio_1::FromTokio;
-use rust_mqtt::client::client::MqttClient;
-use rust_mqtt::client::client_config::ClientConfig;
-use rust_mqtt::client::client_config::MqttVersion::MQTTv5;
-use rust_mqtt::packet::v5::property::Property;
-use rust_mqtt::packet::v5::reason_codes::ReasonCode;
-use rust_mqtt::packet::v5::reason_codes::ReasonCode::NotAuthorized;
-use rust_mqtt::utils::rng_generator::CountingRng;
+
+use crate::common::rng::CountingRng;
+use crate::common::utils::setup;
 pub type TokioNetwork = FromTokio<TcpStream>;
 
 static IP: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
@@ -51,14 +54,6 @@ static PORT: u16 = 1883;
 static USERNAME: &str = "test";
 static PASSWORD: &str = "testPass";
 static MSG: &str = "testMessage";
-
-static INIT: Once = Once::new();
-
-fn setup() {
-    INIT.call_once(|| {
-        env_logger::init();
-    });
-}
 
 async fn publish_core<'b>(
     client: &mut MqttClient<'b, TokioNetwork, 5, CountingRng>,
@@ -172,7 +167,7 @@ async fn receive_core<'b>(
     assert_ok!(result);
 
     info!("[Receiver] Subscribing to topic {}", topic);
-    let topic = Topic::new_with_default_options(topic, QualityOfService::QoS2);
+    let topic = Topic::new(topic).quality_of_service(QualityOfService::QoS2);
     result = client.subscribe_to_topic(topic).await;
     assert_ok!(result);
     info!("[Receiver] Waiting for new message!");
@@ -208,7 +203,7 @@ async fn receive_core_multiple<'b, const TOPICS: usize>(
 
     let topics: Vec<_, TOPICS> = topic_names
         .iter()
-        .map(|s| Topic::new_with_default_options(s, QualityOfService::QoS2))
+        .map(|s| Topic::new(s).quality_of_service(QualityOfService::QoS2))
         .collect();
 
     result = client.subscribe_to_topics(&topics).await;
@@ -371,7 +366,7 @@ async fn receive_multiple_second_unsub<const TOPICS: usize>(
 
     let topics: Vec<_, TOPICS> = topic_names
         .iter()
-        .map(|s| Topic::new_with_default_options(s, qos))
+        .map(|s| Topic::new(s).quality_of_service(qos))
         .collect();
 
     result = client.subscribe_to_topics(&topics).await;

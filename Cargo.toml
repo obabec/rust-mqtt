@@ -29,6 +29,7 @@ env_logger = "0.11.8"
 futures = { version = "0.3.21" }
 log = { version = "0.4.14" }
 serial_test = "3.0.0"
+rand = "0.9.2"
 
 [features]
 default = ["std"]

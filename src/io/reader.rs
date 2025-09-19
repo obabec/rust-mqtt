@@ -25,8 +25,11 @@
 use core::mem;
 use core::str;
 
-use crate::encoding::variable_byte_integer::VariableByteIntegerDecoder;
-use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair};
+use crate::encoding::BinaryData;
+use crate::encoding::EncodedString;
+use crate::encoding::StringPair;
+use crate::encoding::VariableByteIntegerDecoder;
+use crate::io::Error;
 
 /// Buff reader is reading corresponding types from buffer (Byte array) and stores current position
 /// (later as cursor)
@@ -52,7 +55,7 @@ impl<'a> BuffReader<'a> {
 
     /// Variable byte integer can be 1-4 Bytes long. Buffer reader takes all 4 Bytes at first and
     /// than check what is true length of varbyteint and increment cursor by that
-    pub fn read_variable_byte_int(&mut self) -> Result<u32, BufferError> {
+    pub fn read_variable_byte_int(&mut self) -> Result<u32, Error> {
         let mut variable_byte_integer: [u8; 4] = [0; 4];
         let mut len: usize = 1;
 
@@ -63,7 +66,7 @@ impl<'a> BuffReader<'a> {
                 break;
             }
             if self.position + x >= self.len {
-                return Err(BufferError::InsufficientBufferSize);
+                return Err(Error::InsufficientBufferSize);
             }
             if self.buffer[self.position + x] & 0x80 != 0 {
                 variable_byte_integer[x] = self.buffer[self.position + x];
@@ -89,9 +92,9 @@ impl<'a> BuffReader<'a> {
     }
 
     /// Reading u32 from buffer as `Big endian`
-    pub fn read_u32(&mut self) -> Result<u32, BufferError> {
+    pub fn read_u32(&mut self) -> Result<u32, Error> {
         if self.position + 4 > self.len {
-            return Err(BufferError::InsufficientBufferSize);
+            return Err(Error::InsufficientBufferSize);
         }
         let (int_bytes, _rest) = self.buffer[self.position..].split_at(mem::size_of::<u32>());
         let ret: u32 = u32::from_be_bytes(int_bytes.try_into().unwrap());
@@ -100,9 +103,9 @@ impl<'a> BuffReader<'a> {
     }
 
     /// Reading u16 from buffer as `Big endinan`
-    pub fn read_u16(&mut self) -> Result<u16, BufferError> {
+    pub fn read_u16(&mut self) -> Result<u16, Error> {
         if self.position + 2 > self.len {
-            return Err(BufferError::InsufficientBufferSize);
+            return Err(Error::InsufficientBufferSize);
         }
         let (int_bytes, _rest) = self.buffer[self.position..].split_at(mem::size_of::<u16>());
         let ret: u16 = u16::from_be_bytes(int_bytes.try_into().unwrap());
@@ -111,9 +114,9 @@ impl<'a> BuffReader<'a> {
     }
 
     /// Reading one byte from buffer as `Big endian`
-    pub fn read_u8(&mut self) -> Result<u8, BufferError> {
+    pub fn read_u8(&mut self) -> Result<u8, Error> {
         if self.position >= self.len {
-            return Err(BufferError::InsufficientBufferSize);
+            return Err(Error::InsufficientBufferSize);
         }
         let ret: u8 = self.buffer[self.position];
         self.increment_position(1);
@@ -121,19 +124,19 @@ impl<'a> BuffReader<'a> {
     }
 
     /// Reading UTF-8 encoded string from buffer
-    pub fn read_string(&mut self) -> Result<EncodedString<'a>, BufferError> {
+    pub fn read_string(&mut self) -> Result<EncodedString<'a>, Error> {
         let len = self.read_u16()? as usize;
 
         if self.position + len > self.len {
             self.position -= 2;
-            return Err(BufferError::InsufficientBufferSize);
+            return Err(Error::InsufficientBufferSize);
         }
 
         let res_str = str::from_utf8(&(self.buffer[self.position..(self.position + len)]));
         if res_str.is_err() {
             self.position -= 2;
             error!("Could not parse utf-8 string");
-            return Err(BufferError::Utf8Error);
+            return Err(Error::Utf8Error);
         }
         self.increment_position(len);
         Ok(EncodedString {
@@ -143,12 +146,12 @@ impl<'a> BuffReader<'a> {
     }
 
     /// Read Binary data from buffer
-    pub fn read_binary(&mut self) -> Result<BinaryData<'a>, BufferError> {
+    pub fn read_binary(&mut self) -> Result<BinaryData<'a>, Error> {
         let len = self.read_u16()?;
 
         if self.position + len as usize > self.len {
             self.position -= 2;
-            return Err(BufferError::InsufficientBufferSize);
+            return Err(Error::InsufficientBufferSize);
         }
 
         let res_bin = &(self.buffer[self.position..(self.position + len as usize)]);
@@ -157,7 +160,7 @@ impl<'a> BuffReader<'a> {
     }
 
     /// Read string pair from buffer
-    pub fn read_string_pair(&mut self) -> Result<StringPair<'a>, BufferError> {
+    pub fn read_string_pair(&mut self) -> Result<StringPair<'a>, Error> {
         let starting_position = self.position;
         let name = self.read_string()?;
         let len_name = self.position - starting_position;
@@ -180,9 +183,9 @@ impl<'a> BuffReader<'a> {
     }
 
     /// Peeking (without incremental internal pointer) one byte from buffer as `Big endian`
-    pub fn peek_u8(&self) -> Result<u8, BufferError> {
+    pub fn peek_u8(&self) -> Result<u8, Error> {
         if self.position >= self.len {
-            return Err(BufferError::InsufficientBufferSize);
+            return Err(Error::InsufficientBufferSize);
         }
         Ok(self.buffer[self.position])
     }

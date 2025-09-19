@@ -28,10 +28,11 @@
 #![doc = include_str!("../README.md")]
 
 pub(crate) mod fmt;
+pub(crate) mod encoding;
+pub(crate) mod io;
+pub(crate) mod packet;
+pub(crate) mod tests;
 
 pub mod client;
-pub mod encoding;
+pub mod interface;
 pub mod network;
-pub mod packet;
-pub mod tests;
-pub mod utils;

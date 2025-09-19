@@ -22,4 +22,68 @@
  * SOFTWARE.
  */
 
-pub mod variable_byte_integer;
+mod binary;
+mod string;
+mod variable_byte_integer;
+
+pub(crate) use binary::*;
+pub(crate) use string::*;
+pub(crate) use variable_byte_integer::*;
+
+use crate::interface::{RetainHandling, Topic};
+
+
+/// Topic filter serves as bound for topic selection and subscription options for `SUBSCRIBE` packet
+#[derive(Debug, Default)]
+pub struct TopicFilter<'a> {
+    pub filter: EncodedString<'a>,
+    pub sub_options: u8,
+}
+
+impl TopicFilter<'_> {
+    pub fn new() -> Self {
+        Self {
+            filter: EncodedString::new(),
+            sub_options: 0,
+        }
+    }
+
+    pub fn encoded_len(&self) -> u16 {
+        self.filter.len + 3
+    }
+}
+
+
+impl<'a> From<Topic<'a>> for TopicFilter<'a> {
+    fn from(value: Topic<'a>) -> Self {
+        let retain_handling_bits = match value.retain_handling {
+            RetainHandling::AlwaysSend => 0x00,
+            RetainHandling::SendIfNotSubscribedBefore => 0x10,
+            RetainHandling::NeverSend => 0x20,
+        };
+
+        let retain_as_published_bit = match value.retain_as_published {
+            true => 0x08,
+            false => 0x00,
+        };
+
+        let no_local_bit = match value.no_local {
+            true => 0x04,
+            false => 0x00,
+        };
+
+        let qos_bits = value.qos.into_subscribe_bits();
+
+        let subscribe_options_bits =
+            retain_handling_bits | retain_as_published_bit | no_local_bit | qos_bits;
+
+        let mut filter = EncodedString::new();
+        filter.string = value.topic_name;
+        filter.len = value.topic_name.len() as u16;
+
+        Self {
+            filter,
+            sub_options: subscribe_options_bits,
+        }
+    }
+}

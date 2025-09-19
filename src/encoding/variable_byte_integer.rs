@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-use crate::utils::types::BufferError;
+use crate::io;
 
 /// VariableByteIntegerEncoder and VariableByteIntegerDecoder are implemented based on
 /// pseudo code which is introduced in MQTT version 5.0 OASIS standard accesible from
@@ -35,7 +35,6 @@ pub struct VariableByteIntegerEncoder;
 
 /// Variable byte integers error enumeration is used by both encoder and decoder for
 /// error notification.
-
 pub type VariableByteInteger = [u8; 4];
 
 impl VariableByteIntegerEncoder {
@@ -43,13 +42,13 @@ impl VariableByteIntegerEncoder {
     /// this integer into maximal 4 Bytes. MSb of each Byte is controll bit.
     /// This bit is saying if there is continuing Byte in stream or not, this way
     /// we can effectively use 1 to 4 Bytes based in integer len.
-    pub fn encode(mut target: u32) -> Result<VariableByteInteger, BufferError> {
+    pub fn encode(mut target: u32) -> Result<VariableByteInteger, io::Error> {
         // General known informations from OASIS
         const MAX_ENCODABLE: u32 = 268435455;
         const MOD: u32 = 128;
         if target > MAX_ENCODABLE {
             error!("Maximal value of integer for encoding was exceeded");
-            return Err(BufferError::EncodingError);
+            return Err(io::Error::EncodingError);
         }
 
         let mut res: [u8; 4] = [0; 4];
@@ -92,7 +91,7 @@ impl VariableByteIntegerDecoder {
     /// Decode function takes as paramater encoded integer represented
     /// as array of 4 unsigned numbers of exactly 1 Byte each -> 4 Bytes maximal
     /// same as maximal amount of bytes for variable byte encoding in MQTT.
-    pub fn decode(encoded: VariableByteInteger) -> Result<u32, BufferError> {
+    pub fn decode(encoded: VariableByteInteger) -> Result<u32, io::Error> {
         let mut multiplier: u32 = 1;
         let mut ret: u32 = 0;
 
@@ -104,7 +103,7 @@ impl VariableByteIntegerDecoder {
             i += 1;
             ret += (encoded_byte & 127) as u32 * multiplier;
             if multiplier > 128 * 128 * 128 {
-                return Err(BufferError::DecodingError);
+                return Err(io::Error::DecodingError);
             }
             multiplier *= 128;
             if (encoded_byte & 128) == 0 {

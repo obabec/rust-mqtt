@@ -22,11 +22,11 @@
  * SOFTWARE.
  */
 
+use crate::interface::Property;
+use crate::io::BuffReader;
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::packet_type::PacketType;
-use crate::packet::v5::property::Property;
 use crate::packet::v5::unsuback_packet::UnsubackPacket;
-use crate::utils::buffer_reader::BuffReader;
 
 #[test]
 fn test_decode() {

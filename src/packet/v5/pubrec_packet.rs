@@ -24,14 +24,12 @@
 
 use heapless::Vec;
 
-use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
+use crate::encoding::VariableByteIntegerEncoder;
 use crate::packet::v5::mqtt_packet::Packet;
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::buffer_writer::BuffWriter;
-use crate::utils::types::BufferError;
+use crate::io::{self, BuffReader, BuffWriter};
 
 use super::packet_type::PacketType;
-use super::property::Property;
+use crate::interface::Property;
 
 pub struct PubrecPacket<'a, const MAX_PROPERTIES: usize> {
     pub fixed_header: u8,
@@ -56,7 +54,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubrecPacket<'a, MAX_PROPER
         }
     }
 
-    fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
+    fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, io::Error> {
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
 
         let mut rm_ln = self.property_len;
@@ -73,10 +71,10 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for PubrecPacket<'a, MAX_PROPER
         Ok(buff_writer.position)
     }
 
-    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), io::Error> {
         if self.decode_fixed_header(buff_reader)? != PacketType::Pubrec {
             error!("Packet you are trying to decode is not PUBREC packet!");
-            return Err(BufferError::PacketTypeMismatch);
+            return Err(io::Error::PacketTypeMismatch);
         }
         self.packet_identifier = buff_reader.read_u16()?;
         self.reason_code = buff_reader.read_u8()?;

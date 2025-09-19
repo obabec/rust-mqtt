@@ -22,10 +22,13 @@
  * SOFTWARE.
  */
 extern crate alloc;
+mod common;
 
 use alloc::string::String;
 use core::time::Duration;
-use rust_mqtt::utils::types::{QualityOfService, Topic};
+use rust_mqtt::client::MqttClient;
+use rust_mqtt::interface::{ClientConfig, MqttVersion, ReasonCode};
+use rust_mqtt::interface::{QualityOfService, Topic};
 use std::sync::Once;
 
 use futures::future::join;
@@ -36,14 +39,11 @@ use tokio::task;
 use tokio::time::sleep;
 use tokio_test::assert_ok;
 
-use rust_mqtt::client::client::MqttClient;
-use rust_mqtt::client::client_config::ClientConfig;
-use rust_mqtt::client::client_config::MqttVersion::MQTTv5;
-use rust_mqtt::packet::v5::reason_codes::ReasonCode;
-use rust_mqtt::utils::rng_generator::CountingRng;
 use tokio::net::TcpStream;
 
 use embedded_io_adapters::tokio_1::FromTokio;
+
+use crate::common::rng::CountingRng;
 pub type TokioNetwork = FromTokio<TcpStream>;
 
 static IP: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
@@ -108,7 +108,7 @@ async fn publish(
         .await
         .map_err(|_| ReasonCode::NetworkError)?;
     let connection = TokioNetwork::new(connection);
-    let mut config = ClientConfig::new(MQTTv5, CountingRng(50000));
+    let mut config = ClientConfig::new(MqttVersion::MQTTv5, CountingRng(50000));
     config.add_max_subscribe_qos(qos);
     config.add_username(USERNAME);
     config.add_password(PASSWORD);
@@ -140,7 +140,7 @@ async fn receive_core<'b>(
     assert_ok!(result);
 
     info!("[Receiver] Subscribing to topic {}", topic);
-    let topic = Topic::new_with_default_options(topic, QualityOfService::QoS2);
+    let topic = Topic::new(topic).quality_of_service(QualityOfService::QoS2);
     result = client.subscribe_to_topic(topic).await;
     assert_ok!(result);
     info!("[Receiver] Waiting for new message!");
@@ -173,7 +173,7 @@ async fn receive(
         .await
         .map_err(|_| ReasonCode::NetworkError)?;
     let connection = TokioNetwork::new(connection);
-    let mut config = ClientConfig::new(MQTTv5, CountingRng(50000));
+    let mut config = ClientConfig::new(MqttVersion::MQTTv5, CountingRng(50000));
     config.add_max_subscribe_qos(qos);
     config.add_username(USERNAME);
     config.add_password(PASSWORD);

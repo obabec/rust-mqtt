@@ -22,9 +22,10 @@
  * SOFTWARE.
  */
 
-use crate::packet::v5::reason_codes::ReasonCode;
 use embedded_io::ReadReady;
 use embedded_io_async::{Read, Write};
+
+use crate::interface::ReasonCode;
 
 pub struct NetworkConnection<T>
 where

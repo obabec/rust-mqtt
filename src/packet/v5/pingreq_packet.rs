@@ -23,12 +23,10 @@
  */
 
 use crate::packet::v5::mqtt_packet::Packet;
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::buffer_writer::BuffWriter;
-use crate::utils::types::BufferError;
+use crate::io::{self, BuffReader, BuffWriter};
 
 use super::packet_type::PacketType;
-use super::property::Property;
+use crate::interface::Property;
 
 pub struct PingreqPacket {
     pub fixed_header: u8,
@@ -45,16 +43,16 @@ impl<'a> Packet<'a> for PingreqPacket {
         }
     }
 
-    fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
+    fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, io::Error> {
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
         buff_writer.write_u8(self.fixed_header)?;
         buff_writer.write_variable_byte_int(0)?;
         Ok(buff_writer.position)
     }
 
-    fn decode(&mut self, _buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
+    fn decode(&mut self, _buff_reader: &mut BuffReader<'a>) -> Result<(), io::Error> {
         error!("Pingreq Packet packet does not support decode funtion on client!");
-        Err(BufferError::WrongPacketToDecode)
+        Err(io::Error::WrongPacketToDecode)
     }
 
     fn set_property_len(&mut self, _value: u32) {

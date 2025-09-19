@@ -24,12 +24,13 @@
 
 use heapless::Vec;
 
+use crate::encoding::EncodedString;
+use crate::interface::Property;
+use crate::interface::QualityOfService;
+use crate::io::BuffReader;
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::packet_type::PacketType;
-use crate::packet::v5::property::Property;
 use crate::packet::v5::publish_packet::PublishPacket;
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::types::{EncodedString, QualityOfService};
 
 #[test]
 fn test_encode() {

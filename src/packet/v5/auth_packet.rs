@@ -24,14 +24,11 @@
 
 use heapless::Vec;
 
-use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
+use crate::encoding::VariableByteIntegerEncoder;
+use crate::interface::Property;
 use crate::packet::v5::mqtt_packet::Packet;
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::buffer_writer::BuffWriter;
-use crate::utils::types::BufferError;
-
-use super::packet_type::PacketType;
-use super::property::Property;
+use crate::io::{self, BuffReader, BuffWriter};
+use crate::packet::v5::packet_type::PacketType;
 
 /// Auth packets serves MQTTv5 extended authentication. This packet is not currently supported
 /// by rust-mqtt client but decoding and encoding of packet is prepared for future development.
@@ -72,7 +69,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTI
         }
     }
 
-    fn encode(&mut self, buffer: &mut [u8], buff_len: usize) -> Result<usize, BufferError> {
+    fn encode(&mut self, buffer: &mut [u8], buff_len: usize) -> Result<usize, io::Error> {
         let mut buff_writer = BuffWriter::new(buffer, buff_len);
 
         let mut rm_ln = self.property_len;
@@ -89,7 +86,7 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for AuthPacket<'a, MAX_PROPERTI
         Ok(buff_writer.position)
     }
 
-    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), io::Error> {
         self.decode_fixed_header(buff_reader)?;
         self.auth_reason = buff_reader.read_u8()?;
         self.decode_properties(buff_reader)

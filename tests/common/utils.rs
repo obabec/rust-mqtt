@@ -1,17 +1,45 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) [2022] [Ondrej Babec <ond.babec@gmail.com>]
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 use std::{
-    net::{Ipv4Addr, SocketAddrV4}, sync::Once, time::Duration
+    net::{Ipv4Addr, SocketAddrV4},
+    sync::Once,
+    time::Duration,
 };
 
 use embedded_io_adapters::tokio_1::FromTokio;
 use rust_mqtt::{
-    client::{
-        client::MqttClient,
-        client_config::{ClientConfig, MqttVersion},
-    },
-    utils::{rng_generator::CountingRng, types::{QualityOfService, RetainHandling, Topic}},
+    client::MqttClient,
+    interface::{ClientConfig, MqttVersion, QualityOfService, RetainHandling, Topic},
 };
-use tokio::{net::TcpStream, time::{sleep, timeout}};
+use tokio::{
+    net::TcpStream,
+    time::{sleep, timeout},
+};
 use tokio_test::{assert_err, assert_ok};
+
+use crate::common::rng::CountingRng;
 
 pub type TokioNetwork = FromTokio<TcpStream>;
 pub type TestClient<'a> = MqttClient<'a, TokioNetwork, MAX_PROPERTIES, CountingRng>;
@@ -50,7 +78,7 @@ pub async fn connected_client<'a>(
         config.add_client_id(client_id);
     }
 
-    let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
+    let mut client = MqttClient::<TokioNetwork, MAX_PROPERTIES, CountingRng>::new(
         connection,
         write_buffer,
         write_buffer.len(),
@@ -59,14 +87,15 @@ pub async fn connected_client<'a>(
         config,
     );
 
-    client.connect_to_broker().await.expect("Error while connecting over MQTT to broker");
+    client
+        .connect_to_broker()
+        .await
+        .expect("Error while connecting over MQTT to broker");
 
     client
 }
 
-pub async fn disconnect(
-    client: &mut TestClient<'_>,
-) {
+pub async fn disconnect(client: &mut TestClient<'_>) {
     let result = client.disconnect().await;
     assert_ok!(result);
 }
@@ -90,7 +119,6 @@ pub async fn publish(
     if should_err {
         assert_err!(result);
     } else if can_err {
-
     } else {
         assert_ok!(result);
     }
@@ -104,20 +132,19 @@ pub async fn subscribe(
     retain_as_published: bool,
     no_local: bool,
 ) {
-    let mut topic = Topic::new_with_default_options(topic, qos);
-    topic.retain_handling = retain_handling;
-    topic.retain_as_published = retain_as_published;
-    topic.no_local = no_local;
+    let topic = Topic::new(topic)
+        .quality_of_service(qos)
+        .retain_handling(retain_handling)
+        .retain_as_published(retain_as_published)
+        .no_local(no_local);
 
-    client.subscribe_to_topic(topic).await.expect("Error while subscribing");
+    client
+        .subscribe_to_topic(topic)
+        .await
+        .expect("Error while subscribing");
 }
 
-pub async fn assert_receive(
-    client: &mut TestClient<'_>,
-    within: u64,
-    topic: &str,
-    msg: &str,
-) {
+pub async fn assert_receive(client: &mut TestClient<'_>, within: u64, topic: &str, msg: &str) {
     let duration = Duration::from_secs(within);
 
     let result = timeout(duration, client.receive_message()).await;
@@ -129,11 +156,10 @@ pub async fn assert_receive(
     assert_eq!(msg.as_bytes(), recv_msg);
 }
 
-pub async fn assert_no_receive(
-    client: &mut TestClient<'_>,
-    within: u64,
-) {
+pub async fn assert_no_receive(client: &mut TestClient<'_>, within: u64) {
     let duration = Duration::from_secs(within);
 
-    timeout(duration, client.receive_message()).await.expect_err("Expected no event to come in");
+    timeout(duration, client.receive_message())
+        .await
+        .expect_err("Expected no event to come in");
 }

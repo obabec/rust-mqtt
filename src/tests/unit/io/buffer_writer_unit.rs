@@ -25,17 +25,16 @@
 use heapless::Vec;
 use tokio_test::{assert_err, assert_ok};
 
-use crate::encoding::variable_byte_integer::VariableByteInteger;
-use crate::packet::v5::property::Property;
-use crate::utils::buffer_writer::BuffWriter;
-use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair, TopicFilter};
+use crate::encoding::{BinaryData, EncodedString, StringPair, TopicFilter, VariableByteInteger};
+use crate::io::{self, BuffWriter};
+use crate::interface::Property;
 
 #[test]
 fn buffer_write_ref() {
     static BUFFER: [u8; 5] = [0x82, 0x82, 0x03, 0x85, 0x84];
     let mut res_buffer: [u8; 5] = [0; 5];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let mut writer = BuffWriter::new(&mut res_buffer, 5);
     let test_write = writer.insert_ref(5, &BUFFER);
     assert!(test_write.is_ok());
     assert_eq!(writer.position, 5);
@@ -47,13 +46,13 @@ fn buffer_write_ref_oob() {
     static BUFFER: [u8; 5] = [0x82, 0x82, 0x03, 0x85, 0x84];
     let mut res_buffer: [u8; 4] = [0; 4];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 4);
+    let mut writer = BuffWriter::new(&mut res_buffer, 4);
     let test_number = writer.insert_ref(5, &BUFFER);
     assert!(test_number.is_err());
     assert_eq!(writer.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
     assert_eq!(res_buffer, [0; 4])
 }
@@ -62,7 +61,7 @@ fn buffer_write_ref_oob() {
 fn buffer_write_u8() {
     let mut res_buffer: [u8; 1] = [0; 1];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 1);
+    let mut writer = BuffWriter::new(&mut res_buffer, 1);
     let test_write = writer.write_u8(0xFA);
     assert!(test_write.is_ok());
     assert_eq!(writer.position, 1);
@@ -73,13 +72,13 @@ fn buffer_write_u8() {
 fn buffer_write_u8_oob() {
     let mut res_buffer: [u8; 0] = [];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 0);
+    let mut writer = BuffWriter::new(&mut res_buffer, 0);
     let test_number = writer.write_u8(0xFA);
     assert!(test_number.is_err());
     assert_eq!(writer.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
 }
 
@@ -87,7 +86,7 @@ fn buffer_write_u8_oob() {
 fn buffer_write_u16() {
     let mut res_buffer: [u8; 2] = [0; 2];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 2);
+    let mut writer = BuffWriter::new(&mut res_buffer, 2);
     let test_write = writer.write_u16(0xFAED);
     assert!(test_write.is_ok());
     assert_eq!(writer.position, 2);
@@ -98,13 +97,13 @@ fn buffer_write_u16() {
 fn buffer_write_u16_oob() {
     let mut res_buffer: [u8; 1] = [0; 1];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 1);
+    let mut writer = BuffWriter::new(&mut res_buffer, 1);
     let test_number = writer.write_u16(0xFAED);
     assert!(test_number.is_err());
     assert_eq!(writer.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
 }
 
@@ -112,7 +111,7 @@ fn buffer_write_u16_oob() {
 fn buffer_write_u32() {
     let mut res_buffer: [u8; 4] = [0; 4];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 4);
+    let mut writer = BuffWriter::new(&mut res_buffer, 4);
     let test_write = writer.write_u32(0xFAEDCC09);
     assert!(test_write.is_ok());
     assert_eq!(writer.position, 4);
@@ -123,13 +122,13 @@ fn buffer_write_u32() {
 fn buffer_write_u32_oob() {
     let mut res_buffer: [u8; 3] = [0; 3];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 3);
+    let mut writer = BuffWriter::new(&mut res_buffer, 3);
     let test_number = writer.write_u32(0xFAEDCC08);
     assert!(test_number.is_err());
     assert_eq!(writer.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
 }
 
@@ -139,7 +138,7 @@ fn buffer_write_string() {
     let mut string = EncodedString::new();
     string.string = "😎";
     string.len = 4;
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 6);
+    let mut writer = BuffWriter::new(&mut res_buffer, 6);
     let test_write = writer.write_string_ref(&string);
     assert!(test_write.is_ok());
     assert_eq!(writer.position, 6);
@@ -152,11 +151,11 @@ fn buffer_write_string_oob() {
     let mut string = EncodedString::new();
     string.string = "😎";
     string.len = 4;
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let mut writer = BuffWriter::new(&mut res_buffer, 5);
     let test_write = writer.write_string_ref(&string);
     assert!(test_write.is_err());
     assert_eq!(writer.position, 0);
-    assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize);
+    assert_eq!(test_write.unwrap_err(), io::Error::InsufficientBufferSize);
 }
 
 #[test]
@@ -165,7 +164,7 @@ fn buffer_write_bin() {
     let mut bin = BinaryData::new();
     bin.bin = &[0xAB, 0xEF, 0x88, 0x43];
     bin.len = 4;
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 6);
+    let mut writer = BuffWriter::new(&mut res_buffer, 6);
     let test_write = writer.write_binary_ref(&bin);
     assert!(test_write.is_ok());
     assert_eq!(writer.position, 6);
@@ -178,11 +177,11 @@ fn buffer_write_bin_oob() {
     let mut bin = BinaryData::new();
     bin.bin = &[0xAB, 0xEF, 0x88, 0x43];
     bin.len = 4;
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let mut writer = BuffWriter::new(&mut res_buffer, 5);
     let test_write = writer.write_binary_ref(&bin);
     assert!(test_write.is_err());
     assert_eq!(writer.position, 0);
-    assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize);
+    assert_eq!(test_write.unwrap_err(), io::Error::InsufficientBufferSize);
 }
 
 #[test]
@@ -198,7 +197,7 @@ fn buffer_write_string_pair() {
     let mut pair = StringPair::new();
     pair.name = name;
     pair.value = value;
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 12);
+    let mut writer = BuffWriter::new(&mut res_buffer, 12);
     let test_write = writer.write_string_pair_ref(&pair);
     assert!(test_write.is_ok());
     assert_eq!(writer.position, 12);
@@ -221,18 +220,18 @@ fn buffer_write_string_pair_oob() {
     let mut pair = StringPair::new();
     pair.name = name;
     pair.value = value;
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 10);
+    let mut writer = BuffWriter::new(&mut res_buffer, 10);
     let test_write = writer.write_string_pair_ref(&pair);
     assert!(test_write.is_err());
     assert_eq!(writer.position, 0);
-    assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize)
+    assert_eq!(test_write.unwrap_err(), io::Error::InsufficientBufferSize)
 }
 
 #[test]
 fn buffer_write_var_byte() {
     let mut res_buffer: [u8; 2] = [0; 2];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 2);
+    let mut writer = BuffWriter::new(&mut res_buffer, 2);
     let test_write = writer.write_variable_byte_int(512);
     assert!(test_write.is_ok());
     assert_eq!(writer.position, 2);
@@ -243,14 +242,14 @@ fn buffer_write_var_byte() {
 fn buffer_write_var_byte_oob() {
     let mut res_buffer: [u8; 2] = [0; 2];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 2);
+    let mut writer = BuffWriter::new(&mut res_buffer, 2);
     let test_number = writer.write_variable_byte_int(453123);
     assert!(test_number.is_err());
     assert_eq!(writer.position, 0);
     
     assert_eq!(
         test_number.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
 }
 
@@ -261,7 +260,7 @@ fn buffer_write_property() {
     topic.string = "Name";
     topic.len = 4;
     let prop = Property::ResponseTopic(topic);
-    let mut writer: BuffWriter = BuffWriter::new(& mut res_buffer, 7);
+    let mut writer = BuffWriter::new(& mut res_buffer, 7);
     let test_write = writer.write_property(&prop);
     assert!(test_write.is_ok());
     assert_eq!(writer.position, 7);
@@ -275,10 +274,10 @@ fn buffer_write_property_oob() {
     topic.string = "Name";
     topic.len = 4;
     let prop = Property::ResponseTopic(topic);
-    let mut writer: BuffWriter = BuffWriter::new(& mut res_buffer, 4);
+    let mut writer = BuffWriter::new(& mut res_buffer, 4);
     let test_write = writer.write_property(&prop);
     assert!(test_write.is_err());
-    assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize);
+    assert_eq!(test_write.unwrap_err(), io::Error::InsufficientBufferSize);
 }*/
 
 #[test]
@@ -295,7 +294,7 @@ fn buffer_write_properties() {
     let mut properties = Vec::<Property, 2>::new();
     properties.push(prop);
     properties.push(prop2);
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 13);
+    let mut writer = BuffWriter::new(&mut res_buffer, 13);
     let test_write = writer.write_properties(&properties);
     assert!(test_write.is_ok());
     assert_eq!(writer.position, 13);
@@ -319,11 +318,11 @@ fn buffer_write_properties_oob() {
     let mut properties = Vec::<Property, 2>::new();
     properties.push(prop);
     properties.push(prop2);
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 10);
+    let mut writer = BuffWriter::new(&mut res_buffer, 10);
     let test_write = writer.write_properties(&properties);
     assert!(test_write.is_err());
     assert_eq!(writer.position, 0);
-    assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize);
+    assert_eq!(test_write.unwrap_err(), io::Error::InsufficientBufferSize);
 }
 
 #[test]
@@ -350,7 +349,7 @@ fn buffer_write_filters() {
     let mut filters = Vec::<TopicFilter, 2>::new();
     filters.push(filter1);
     filters.push(filter2);
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 15);
+    let mut writer = BuffWriter::new(&mut res_buffer, 15);
     let test_write = writer.write_topic_filters_ref(true, 2, &filters);
     assert!(test_write.is_ok());
     assert_eq!(writer.position, 15);
@@ -387,11 +386,11 @@ fn buffer_write_filters_oob() {
     let mut filters = Vec::<TopicFilter, 2>::new();
     filters.push(filter1);
     filters.push(filter2);
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let mut writer = BuffWriter::new(&mut res_buffer, 5);
     let test_write = writer.write_topic_filters_ref(true, 2, &filters);
     assert!(test_write.is_err());
     assert_eq!(writer.position, 0);
-    assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize)
+    assert_eq!(test_write.unwrap_err(), io::Error::InsufficientBufferSize)
 }
 
 #[test]
@@ -400,7 +399,7 @@ fn buffer_get_rem_len_one() {
     static REF: VariableByteInteger = [0x02, 0x00, 0x00, 0x00];
     let mut res_buffer: [u8; 5] = [0; 5];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let mut writer = BuffWriter::new(&mut res_buffer, 5);
     let test_write = writer.insert_ref(5, &BUFFER);
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
@@ -415,7 +414,7 @@ fn buffer_get_rem_len_two() {
     static REF: VariableByteInteger = [0x82, 0x03, 0x00, 0x00];
     let mut res_buffer: [u8; 5] = [0; 5];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let mut writer = BuffWriter::new(&mut res_buffer, 5);
     let test_write = writer.insert_ref(5, &BUFFER);
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
@@ -430,7 +429,7 @@ fn buffer_get_rem_len_three() {
     static REF: VariableByteInteger = [0x82, 0x83, 0x05, 0x00];
     let mut res_buffer: [u8; 5] = [0; 5];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let mut writer = BuffWriter::new(&mut res_buffer, 5);
     let test_write = writer.insert_ref(5, &BUFFER);
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
@@ -445,7 +444,7 @@ fn buffer_get_rem_len_all() {
     static REF: VariableByteInteger = [0x82, 0x83, 0x85, 0x04];
     let mut res_buffer: [u8; 5] = [0; 5];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
+    let mut writer = BuffWriter::new(&mut res_buffer, 5);
     let test_write = writer.insert_ref(5, &BUFFER);
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
@@ -460,7 +459,7 @@ fn buffer_get_rem_len_over() {
     static REF: VariableByteInteger = [0x82, 0x83, 0x85, 0x84];
     let mut res_buffer: [u8; 6] = [0; 6];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 6);
+    let mut writer = BuffWriter::new(&mut res_buffer, 6);
     let test_write = writer.insert_ref(6, &BUFFER);
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
@@ -475,7 +474,7 @@ fn buffer_get_rem_len_zero_end() {
     static REF: VariableByteInteger = [0x82, 0x83, 0x85, 0x04];
     let mut res_buffer: [u8; 6] = [0; 6];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 6);
+    let mut writer = BuffWriter::new(&mut res_buffer, 6);
     let test_write = writer.insert_ref(6, &BUFFER);
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
@@ -490,7 +489,7 @@ fn buffer_get_rem_len_zero() {
     static REF: VariableByteInteger = [0x00, 0x00, 0x00, 0x00];
     let mut res_buffer: [u8; 6] = [0; 6];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 6);
+    let mut writer = BuffWriter::new(&mut res_buffer, 6);
     let test_write = writer.insert_ref(6, &BUFFER);
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
@@ -505,7 +504,7 @@ fn buffer_get_rem_len_cont() {
     static REF: VariableByteInteger = [0x00, 0x00, 0x00, 0x00];
     let mut res_buffer: [u8; 6] = [0; 6];
 
-    let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 6);
+    let mut writer = BuffWriter::new(&mut res_buffer, 6);
     let test_write = writer.insert_ref(2, &[0x82, 0x81]);
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);

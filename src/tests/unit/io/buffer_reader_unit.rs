@@ -22,8 +22,7 @@
  * SOFTWARE.
  */
 
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::types::BufferError;
+use crate::io::{self, BuffReader};
 
 #[test]
 fn buffer_read_variable_byte() {
@@ -44,7 +43,7 @@ fn buffer_read_invalid_size() {
     assert_eq!(reader.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
 }
 
@@ -77,7 +76,7 @@ fn test_var_empty_buffer() {
     assert_eq!(reader.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
 }
 
@@ -100,7 +99,7 @@ fn test_read_u32_oob() {
     assert_eq!(reader.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
 }
 
@@ -123,7 +122,7 @@ fn test_read_u16_oob() {
     assert_eq!(reader.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
 }
 
@@ -146,7 +145,7 @@ fn test_read_u8_oob() {
     assert_eq!(reader.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
 }
 
@@ -169,7 +168,7 @@ fn test_read_string_utf8_wrong() {
     let test_string = reader.read_string();
     assert!(test_string.is_err());
     assert_eq!(reader.position, 0);
-    assert_eq!(test_string.unwrap_err(), BufferError::Utf8Error);
+    assert_eq!(test_string.unwrap_err(), io::Error::Utf8Error);
 }
 
 #[test]
@@ -181,7 +180,7 @@ fn test_read_string_oob() {
     assert_eq!(reader.position, 0);
     assert_eq!(
         test_string.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
 }
 
@@ -204,7 +203,7 @@ fn test_read_binary_oob() {
     let test_bin = reader.read_binary();
     assert!(test_bin.is_err());
     assert_eq!(reader.position, 0);
-    assert_eq!(test_bin.unwrap_err(), BufferError::InsufficientBufferSize);
+    assert_eq!(test_bin.unwrap_err(), io::Error::InsufficientBufferSize);
 }
 
 #[test]
@@ -232,7 +231,7 @@ fn test_read_string_pair_wrong_utf8() {
     let string_pair = reader.read_string_pair();
     assert!(string_pair.is_err());
     assert_eq!(reader.position, 0);
-    assert_eq!(string_pair.unwrap_err(), BufferError::Utf8Error)
+    assert_eq!(string_pair.unwrap_err(), io::Error::Utf8Error)
 }
 
 #[test]
@@ -246,6 +245,6 @@ fn test_read_string_pair_oob() {
     assert_eq!(reader.position, 0);
     assert_eq!(
         string_pair.unwrap_err(),
-        BufferError::InsufficientBufferSize
+        io::Error::InsufficientBufferSize
     );
 }

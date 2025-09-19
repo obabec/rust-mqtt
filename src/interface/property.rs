@@ -22,10 +22,8 @@
  * SOFTWARE.
  */
 
-use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::buffer_writer::BuffWriter;
-use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair};
+use crate::encoding::{VariableByteIntegerEncoder, BinaryData, EncodedString, StringPair};
+use crate::io::{self, BuffReader, BuffWriter};
 
 #[derive(Debug, Clone)]
 pub enum Property<'a> {
@@ -261,7 +259,7 @@ impl<'a> Property<'a> {
         }
     }
 
-    pub fn encode(&self, buff_writer: &mut BuffWriter<'a>) -> Result<(), BufferError> {
+    pub fn encode(&self, buff_writer: &mut BuffWriter<'a>) -> Result<(), io::Error> {
         match self {
             Property::PayloadFormat(u) => buff_writer.write_u8(*u),
             Property::MessageExpiryInterval(u) => buff_writer.write_u32(*u),
@@ -290,11 +288,11 @@ impl<'a> Property<'a> {
             Property::WildcardSubscriptionAvailable(u) => buff_writer.write_u8(*u),
             Property::SubscriptionIdentifierAvailable(u) => buff_writer.write_u8(*u),
             Property::SharedSubscriptionAvailable(u) => buff_writer.write_u8(*u),
-            _ => Err(BufferError::PropertyNotFound),
+            _ => Err(io::Error::PropertyNotFound),
         }
     }
 
-    pub fn decode(buff_reader: &mut BuffReader<'a>) -> Result<Property<'a>, BufferError> {
+    pub fn decode(buff_reader: &mut BuffReader<'a>) -> Result<Property<'a>, io::Error> {
         let property_identifier = buff_reader.read_u8();
         return match property_identifier {
             Ok(0x01) => Ok(Property::PayloadFormat(buff_reader.read_u8()?)),
@@ -335,7 +333,7 @@ impl<'a> Property<'a> {
                 buff_reader.read_u8()?,
             )),
             Err(err) => Err(err),
-            _ => Err(BufferError::IdNotFound),
+            _ => Err(io::Error::IdNotFound),
         };
     }
 }

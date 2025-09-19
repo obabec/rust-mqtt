@@ -23,5 +23,5 @@
  */
 
 pub mod encoding;
+pub mod io;
 pub mod packet;
-pub mod utils;

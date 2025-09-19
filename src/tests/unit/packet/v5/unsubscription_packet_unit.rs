@@ -24,11 +24,11 @@
 
 use heapless::Vec;
 
+use crate::encoding::{EncodedString, StringPair};
+use crate::interface::Property;
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::packet_type::PacketType;
-use crate::packet::v5::property::Property;
 use crate::packet::v5::unsubscription_packet::UnsubscriptionPacket;
-use crate::utils::types::{EncodedString, StringPair};
 
 #[test]
 fn test_encode() {

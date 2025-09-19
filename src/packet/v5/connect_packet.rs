@@ -24,14 +24,12 @@
 
 use heapless::Vec;
 
-use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
+use crate::encoding::{BinaryData, EncodedString, VariableByteIntegerEncoder};
 use crate::packet::v5::mqtt_packet::Packet;
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::buffer_writer::BuffWriter;
-use crate::utils::types::{BinaryData, BufferError, EncodedString};
+use crate::io::{self, BuffReader, BuffWriter};
 
 use super::packet_type::PacketType;
-use super::property::Property;
+use crate::interface::Property;
 
 pub struct ConnectPacket<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> {
     pub fixed_header: u8,
@@ -138,7 +136,7 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
         }
     }
 
-    fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, BufferError> {
+    fn encode(&mut self, buffer: &mut [u8], buffer_len: usize) -> Result<usize, io::Error> {
         let mut buff_writer = BuffWriter::new(buffer, buffer_len);
 
         let mut rm_ln = self.property_len;
@@ -196,9 +194,9 @@ impl<'a, const MAX_PROPERTIES: usize, const MAX_WILL_PROPERTIES: usize> Packet<'
         Ok(buff_writer.position)
     }
 
-    fn decode(&mut self, _buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
+    fn decode(&mut self, _buff_reader: &mut BuffReader<'a>) -> Result<(), io::Error> {
         error!("Decode function is not available for control packet!");
-        Err(BufferError::WrongPacketToDecode)
+        Err(io::Error::WrongPacketToDecode)
     }
 
     fn set_property_len(&mut self, value: u32) {

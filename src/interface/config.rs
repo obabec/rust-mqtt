@@ -22,17 +22,125 @@
  * SOFTWARE.
  */
 
-use heapless::Vec;
 use rand_core::RngCore;
 
-use crate::packet::v5::property::Property;
-use crate::utils::types::{BinaryData, EncodedString, QualityOfService};
+use heapless::Vec;
+
+use crate::{encoding::{BinaryData, EncodedString}, interface::Property};
 
 #[derive(Clone, PartialEq)]
 pub enum MqttVersion {
     MQTTv3,
     MQTTv5,
 }
+
+#[derive(Clone, Copy, Default, Debug)]
+pub enum RetainHandling {
+    #[default]
+    AlwaysSend = 0,
+    SendIfNotSubscribedBefore = 1,
+    NeverSend = 2,
+}
+
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Default, Debug)]
+pub enum QualityOfService {
+    #[default]
+    QoS0 = 0,
+    QoS1 = 1,
+    QoS2 = 2,
+    INVALID = 3,
+}
+
+impl QualityOfService {
+    pub fn into_publish_bits(&self) -> u8 {
+        match self {
+            Self::QoS0 => 0x00,
+            Self::QoS1 => 0x02,
+            Self::QoS2 => 0x04,
+            Self::INVALID => 0x06,
+        }
+    }
+
+    pub fn into_subscribe_bits(&self) -> u8 {
+        match self {
+            Self::QoS0 => 0x00,
+            Self::QoS1 => 0x01,
+            Self::QoS2 => 0x02,
+            Self::INVALID => 0x03,
+        }
+    }
+
+    pub fn from_publish_fixed_header(bits: u8) -> Self {
+        let qos_bits = bits & 0x06;
+        match qos_bits {
+            0x00 => Self::QoS0,
+            0x02 => Self::QoS1,
+            0x04 => Self::QoS2,
+            _ => Self::INVALID,
+        }
+    }
+
+    pub fn from_subscribe_options(bits: u8) -> Self {
+        let qos_bits = bits & 0x03;
+        match qos_bits {
+            0x00 => Self::QoS0,
+            0x01 => Self::QoS1,
+            0x02 => Self::QoS2,
+            _ => Self::INVALID,
+        }
+    }
+
+    pub fn from_suback_reason_code(bits: u8) -> Self {
+        Self::from_subscribe_options(bits)
+    }
+}
+
+/// Topic filter serves as public interface for topic selection and subscription options for `SUBSCRIBE` packet
+#[derive(Clone, Copy, Debug)]
+pub struct Topic<'a> {
+    pub topic_name: &'a str,
+    pub retain_handling: RetainHandling,
+    pub retain_as_published: bool,
+    pub no_local: bool,
+    pub qos: QualityOfService,
+}
+
+impl<'a> Topic<'a> {
+    /// Constructs a topic with the given name and defaults:
+    /// - Retain Handling: always send
+    /// - Retain As Published: false
+    /// - No Local: false
+    /// - Quality of Service: Quality of Service Level 0
+    ///
+    /// The defaults can be changed using builder methods
+    pub fn new(topic_name: &'a str) -> Self {
+        Self {
+            topic_name,
+            retain_handling: RetainHandling::default(),
+            retain_as_published: bool::default(),
+            no_local: bool::default(),
+            qos: QualityOfService::default(),
+        }
+    }
+
+    pub fn retain_handling(mut self, retain_handling: RetainHandling) -> Self {
+        self.retain_handling = retain_handling;
+        self
+    }
+    pub fn retain_as_published(mut self, retain_as_published: bool) -> Self {
+        self.retain_as_published = retain_as_published;
+        self
+    }
+    pub fn no_local(mut self, no_local: bool) -> Self {
+        self.no_local = no_local;
+        self
+    }
+    pub fn quality_of_service(mut self, quality_of_service: QualityOfService) -> Self {
+        self.qos = quality_of_service;
+        self
+    }
+}
+
 /// Client config is main configuration for the `MQTTClient` structure.
 /// All of the properties are optional if they are not set they are not gonna
 /// be used. Configuration contains also MQTTv5 properties. Generic constant
@@ -124,7 +232,7 @@ impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIE
     /// Method adds the property to the properties Vec if there is still space. Otherwise do nothing.
     pub fn add_property(&mut self, prop: Property<'a>) {
         if self.properties.len() < MAX_PROPERTIES {
-            self.properties.push(prop);
+            let _ = self.properties.push(prop);
         }
     }
 
@@ -132,7 +240,7 @@ impl<'a, const MAX_PROPERTIES: usize, T: RngCore> ClientConfig<'a, MAX_PROPERTIE
     pub fn add_max_packet_size_as_prop(&mut self) -> u32 {
         if self.properties.len() < MAX_PROPERTIES {
             let prop = Property::MaximumPacketSize(self.max_packet_size);
-            self.properties.push(prop);
+            let _ = self.properties.push(prop);
             return 5;
         }
         0

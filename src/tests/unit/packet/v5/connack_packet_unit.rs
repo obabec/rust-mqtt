@@ -22,11 +22,10 @@
  * SOFTWARE.
  */
 
+use crate::interface::{Property, ReasonCode};
+use crate::io::BuffReader;
 use crate::packet::v5::connack_packet::ConnackPacket;
 use crate::packet::v5::mqtt_packet::Packet;
-use crate::packet::v5::property::Property;
-use crate::packet::v5::reason_codes::ReasonCode;
-use crate::utils::buffer_reader::BuffReader;
 
 #[test]
 fn test_encode() {

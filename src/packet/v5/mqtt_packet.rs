@@ -25,19 +25,18 @@
 use heapless::Vec;
 
 use crate::packet::v5::packet_type::PacketType;
-use crate::utils::buffer_reader::BuffReader;
-use crate::utils::types::BufferError;
+use crate::io::{self, BuffReader};
 
-use super::property::Property;
+use crate::interface::Property;
 
 /// This trait provide interface for mapping MQTTv5 packets to human readable structures
 /// which can be later modified and used for communication purposes.
 pub trait Packet<'a> {
     fn new() -> Self;
     /// Method encode provide way how to transfer Packet struct into Byte array (buffer)
-    fn encode(&mut self, buffer: &mut [u8], buff_len: usize) -> Result<usize, BufferError>;
+    fn encode(&mut self, buffer: &mut [u8], buff_len: usize) -> Result<usize, io::Error>;
     /// Decode method is opposite of encode - decoding Byte array and mapping it into corresponding Packet struct
-    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError>;
+    fn decode(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), io::Error>;
 
     /// Setter method for packet properties len - not all Packet types support this
     fn set_property_len(&mut self, value: u32);
@@ -69,7 +68,7 @@ pub trait Packet<'a> {
 
     /// Method is decoding Byte array pointing to properties into heapless Vec
     /// in packet. If decoding goes wrong method is returning Error
-    fn decode_properties(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), BufferError> {
+    fn decode_properties(&mut self, buff_reader: &mut BuffReader<'a>) -> Result<(), io::Error> {
         self.set_property_len(buff_reader.read_variable_byte_int()?);
         let mut x: u32 = 0;
         let mut prop: Property;
@@ -92,7 +91,7 @@ pub trait Packet<'a> {
     fn decode_fixed_header(
         &mut self,
         buff_reader: &mut BuffReader,
-    ) -> Result<PacketType, BufferError> {
+    ) -> Result<PacketType, io::Error> {
         let first_byte: u8 = buff_reader.read_u8()?;
         trace!("First byte of accepted packet: {:02X}", first_byte);
         self.set_fixed_header(first_byte);

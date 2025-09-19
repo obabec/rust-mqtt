@@ -22,10 +22,9 @@
  * SOFTWARE.
  */
 
-use crate::encoding::variable_byte_integer::{
+use crate::{encoding::{
     VariableByteInteger, VariableByteIntegerDecoder, VariableByteIntegerEncoder,
-};
-use crate::utils::types::BufferError;
+}, io};
 
 #[test]
 fn test_decode() {
@@ -76,5 +75,5 @@ fn test_encode_extra_small() {
 fn test_encode_max() {
     let encoded = VariableByteIntegerEncoder::encode(288_435_455);
     assert!(encoded.is_err());
-    assert_eq!(encoded.unwrap_err(), BufferError::EncodingError);
+    assert_eq!(encoded.unwrap_err(), io::Error::EncodingError);
 }
