@@ -30,6 +30,7 @@ use crate::utils::types::{BinaryData, BufferError, EncodedString, StringPair};
 
 /// Buff reader is reading corresponding types from buffer (Byte array) and stores current position
 /// (later as cursor)
+/// In case of failure, the BuffReader remains in the same state as before the method call.
 pub struct BuffReader<'a> {
     buffer: &'a [u8],
     pub position: usize,
@@ -124,11 +125,13 @@ impl<'a> BuffReader<'a> {
         let len = self.read_u16()? as usize;
 
         if self.position + len > self.len {
+            self.position -= 2;
             return Err(BufferError::InsufficientBufferSize);
         }
 
         let res_str = str::from_utf8(&(self.buffer[self.position..(self.position + len)]));
         if res_str.is_err() {
+            self.position -= 2;
             error!("Could not parse utf-8 string");
             return Err(BufferError::Utf8Error);
         }
@@ -144,6 +147,7 @@ impl<'a> BuffReader<'a> {
         let len = self.read_u16()?;
 
         if self.position + len as usize > self.len {
+            self.position -= 2;
             return Err(BufferError::InsufficientBufferSize);
         }
 
@@ -154,9 +158,17 @@ impl<'a> BuffReader<'a> {
 
     /// Read string pair from buffer
     pub fn read_string_pair(&mut self) -> Result<StringPair<'a>, BufferError> {
+        let starting_position = self.position;
         let name = self.read_string()?;
-        let value = self.read_string()?;
-        Ok(StringPair { name, value })
+        let len_name = self.position - starting_position;
+
+        match self.read_string() {
+            Ok(value) => Ok(StringPair { name, value }),
+            Err(e) => {
+                self.position -= len_name;
+                Err(e)
+            },
+        }
     }
 
     /// Read payload message from buffer

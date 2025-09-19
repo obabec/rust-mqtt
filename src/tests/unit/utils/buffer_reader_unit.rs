@@ -41,6 +41,7 @@ fn buffer_read_invalid_size() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 2);
     let test_number = reader.read_variable_byte_int();
     assert!(test_number.is_err());
+    assert_eq!(reader.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
         BufferError::InsufficientBufferSize
@@ -73,6 +74,7 @@ fn test_var_empty_buffer() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 0);
     let test_number = reader.read_variable_byte_int();
     assert!(test_number.is_err());
+    assert_eq!(reader.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
         BufferError::InsufficientBufferSize
@@ -85,6 +87,7 @@ fn test_read_u32() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 4);
     let test_number = reader.read_u32();
     assert!(test_number.is_ok());
+    assert_eq!(reader.position, 4);
     assert_eq!(test_number.unwrap(), 155329);
 }
 
@@ -94,6 +97,7 @@ fn test_read_u32_oob() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 3);
     let test_number = reader.read_u32();
     assert!(test_number.is_err());
+    assert_eq!(reader.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
         BufferError::InsufficientBufferSize
@@ -106,6 +110,7 @@ fn test_read_u16() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 2);
     let test_number = reader.read_u16();
     assert!(test_number.is_ok());
+    assert_eq!(reader.position, 2);
     assert_eq!(test_number.unwrap(), 18527);
 }
 
@@ -115,6 +120,7 @@ fn test_read_u16_oob() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 1);
     let test_number = reader.read_u16();
     assert!(test_number.is_err());
+    assert_eq!(reader.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
         BufferError::InsufficientBufferSize
@@ -127,6 +133,7 @@ fn test_read_u8() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 1);
     let test_number = reader.read_u8();
     assert!(test_number.is_ok());
+    assert_eq!(reader.position, 1);
     assert_eq!(test_number.unwrap(), 253);
 }
 
@@ -136,6 +143,7 @@ fn test_read_u8_oob() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 0);
     let test_number = reader.read_u8();
     assert!(test_number.is_err());
+    assert_eq!(reader.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
         BufferError::InsufficientBufferSize
@@ -148,6 +156,7 @@ fn test_read_string() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 6);
     let test_string = reader.read_string();
     assert!(test_string.is_ok());
+    assert_eq!(reader.position, 6);
     let unw = test_string.unwrap();
     assert_eq!(unw.string, "💖");
     assert_eq!(unw.len, 4);
@@ -159,6 +168,7 @@ fn test_read_string_utf8_wrong() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 5);
     let test_string = reader.read_string();
     assert!(test_string.is_err());
+    assert_eq!(reader.position, 0);
     assert_eq!(test_string.unwrap_err(), BufferError::Utf8Error);
 }
 
@@ -168,6 +178,7 @@ fn test_read_string_oob() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 5);
     let test_string = reader.read_string();
     assert!(test_string.is_err());
+    assert_eq!(reader.position, 0);
     assert_eq!(
         test_string.unwrap_err(),
         BufferError::InsufficientBufferSize
@@ -180,6 +191,7 @@ fn test_read_binary() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 6);
     let test_bin = reader.read_binary();
     assert!(test_bin.is_ok());
+    assert_eq!(reader.position, 6);
     let unw = test_bin.unwrap();
     assert_eq!(unw.bin, [0xFF, 0xEE, 0xDD, 0xCC]);
     assert_eq!(unw.len, 4);
@@ -191,6 +203,7 @@ fn test_read_binary_oob() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 5);
     let test_bin = reader.read_binary();
     assert!(test_bin.is_err());
+    assert_eq!(reader.position, 0);
     assert_eq!(test_bin.unwrap_err(), BufferError::InsufficientBufferSize);
 }
 
@@ -202,6 +215,7 @@ fn test_read_string_pair() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 11);
     let string_pair = reader.read_string_pair();
     assert!(string_pair.is_ok());
+    assert_eq!(reader.position, 11);
     let unw = string_pair.unwrap();
     assert_eq!(unw.name.string, "😎");
     assert_eq!(unw.name.len, 4);
@@ -217,6 +231,7 @@ fn test_read_string_pair_wrong_utf8() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 11);
     let string_pair = reader.read_string_pair();
     assert!(string_pair.is_err());
+    assert_eq!(reader.position, 0);
     assert_eq!(string_pair.unwrap_err(), BufferError::Utf8Error)
 }
 
@@ -228,6 +243,7 @@ fn test_read_string_pair_oob() {
     let mut reader: BuffReader = BuffReader::new(&BUFFER, 11);
     let string_pair = reader.read_string_pair();
     assert!(string_pair.is_err());
+    assert_eq!(reader.position, 0);
     assert_eq!(
         string_pair.unwrap_err(),
         BufferError::InsufficientBufferSize
