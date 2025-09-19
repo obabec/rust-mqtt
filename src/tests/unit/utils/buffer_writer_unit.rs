@@ -50,6 +50,7 @@ fn buffer_write_ref_oob() {
     let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 4);
     let test_number = writer.insert_ref(5, &BUFFER);
     assert!(test_number.is_err());
+    assert_eq!(writer.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
         BufferError::InsufficientBufferSize
@@ -75,6 +76,7 @@ fn buffer_write_u8_oob() {
     let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 0);
     let test_number = writer.write_u8(0xFA);
     assert!(test_number.is_err());
+    assert_eq!(writer.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
         BufferError::InsufficientBufferSize
@@ -99,6 +101,7 @@ fn buffer_write_u16_oob() {
     let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 1);
     let test_number = writer.write_u16(0xFAED);
     assert!(test_number.is_err());
+    assert_eq!(writer.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
         BufferError::InsufficientBufferSize
@@ -123,6 +126,7 @@ fn buffer_write_u32_oob() {
     let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 3);
     let test_number = writer.write_u32(0xFAEDCC08);
     assert!(test_number.is_err());
+    assert_eq!(writer.position, 0);
     assert_eq!(
         test_number.unwrap_err(),
         BufferError::InsufficientBufferSize
@@ -151,6 +155,7 @@ fn buffer_write_string_oob() {
     let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
     let test_write = writer.write_string_ref(&string);
     assert!(test_write.is_err());
+    assert_eq!(writer.position, 0);
     assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize);
 }
 
@@ -176,6 +181,7 @@ fn buffer_write_bin_oob() {
     let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
     let test_write = writer.write_binary_ref(&bin);
     assert!(test_write.is_err());
+    assert_eq!(writer.position, 0);
     assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize);
 }
 
@@ -218,6 +224,7 @@ fn buffer_write_string_pair_oob() {
     let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 10);
     let test_write = writer.write_string_pair_ref(&pair);
     assert!(test_write.is_err());
+    assert_eq!(writer.position, 0);
     assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize)
 }
 
@@ -239,6 +246,8 @@ fn buffer_write_var_byte_oob() {
     let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 2);
     let test_number = writer.write_variable_byte_int(453123);
     assert!(test_number.is_err());
+    assert_eq!(writer.position, 0);
+    
     assert_eq!(
         test_number.unwrap_err(),
         BufferError::InsufficientBufferSize
@@ -313,6 +322,7 @@ fn buffer_write_properties_oob() {
     let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 10);
     let test_write = writer.write_properties(&properties);
     assert!(test_write.is_err());
+    assert_eq!(writer.position, 0);
     assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize);
 }
 
@@ -380,6 +390,7 @@ fn buffer_write_filters_oob() {
     let mut writer: BuffWriter = BuffWriter::new(&mut res_buffer, 5);
     let test_write = writer.write_topic_filters_ref(true, 2, &filters);
     assert!(test_write.is_err());
+    assert_eq!(writer.position, 0);
     assert_eq!(test_write.unwrap_err(), BufferError::InsufficientBufferSize)
 }
 
@@ -394,6 +405,7 @@ fn buffer_get_rem_len_one() {
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
     assert_ok!(rm_len);
+    assert_eq!(writer.position, 5);
     assert_eq!(rm_len.unwrap(), REF);
 }
 
@@ -408,6 +420,7 @@ fn buffer_get_rem_len_two() {
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
     assert_ok!(rm_len);
+    assert_eq!(writer.position, 5);
     assert_eq!(rm_len.unwrap(), REF);
 }
 
@@ -422,6 +435,7 @@ fn buffer_get_rem_len_three() {
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
     assert_ok!(rm_len);
+    assert_eq!(writer.position, 5);
     assert_eq!(rm_len.unwrap(), REF);
 }
 
@@ -436,6 +450,7 @@ fn buffer_get_rem_len_all() {
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
     assert_ok!(rm_len);
+    assert_eq!(writer.position, 5);
     assert_eq!(rm_len.unwrap(), REF);
 }
 
@@ -450,6 +465,7 @@ fn buffer_get_rem_len_over() {
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
     assert_ok!(rm_len);
+    assert_eq!(writer.position, 6);
     assert_eq!(rm_len.unwrap(), REF);
 }
 
@@ -464,6 +480,7 @@ fn buffer_get_rem_len_zero_end() {
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
     assert_ok!(rm_len);
+    assert_eq!(writer.position, 6);
     assert_eq!(rm_len.unwrap(), REF);
 }
 
@@ -478,6 +495,7 @@ fn buffer_get_rem_len_zero() {
     let rm_len = writer.get_rem_len();
     assert_ok!(test_write);
     assert_ok!(rm_len);
+    assert_eq!(writer.position, 6);
     assert_eq!(rm_len.unwrap(), REF);
 }
 
@@ -495,5 +513,6 @@ fn buffer_get_rem_len_cont() {
     writer.insert_ref(2, &[0x82, 0x01]);
     let rm_len_sec = writer.get_rem_len();
     assert_ok!(rm_len_sec);
+    assert_eq!(writer.position, 4);
     assert_eq!(rm_len_sec.unwrap(), [0x81, 0x82, 0x01, 0x00]);
 }

@@ -90,7 +90,7 @@ impl<'a> BuffWriter<'a> {
         if self.position + len > self.len {
             return Err(BufferError::InsufficientBufferSize);
         }
-        self.buffer[self.position..self.position+len].copy_from_slice(&array[0..len]);
+        self.buffer[self.position..self.position + len].copy_from_slice(&array[0..len]);
         self.increment_position(len);
         Ok(())
     }
@@ -123,21 +123,40 @@ impl<'a> BuffWriter<'a> {
         self.write_u16(str.len)?;
         if str.len != 0 {
             let bytes = str.string.as_bytes();
-            return self.insert_ref(str.len as usize, bytes);
+            let result = self.insert_ref(str.len as usize, bytes);
+            if result.is_err() {
+                self.position -= 2;
+            }
+            result
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     /// Writes BinaryData to the buffer.
     pub fn write_binary_ref(&mut self, bin: &BinaryData<'a>) -> Result<(), BufferError> {
         self.write_u16(bin.len)?;
-        self.insert_ref(bin.len as usize, bin.bin)
+
+        let res = self.insert_ref(bin.len as usize, bin.bin);
+        if res.is_err() {
+            self.position -= 2;
+        }
+        res
     }
 
     /// Writes the string pair to the buffer.
     pub fn write_string_pair_ref(&mut self, str_pair: &StringPair<'a>) -> Result<(), BufferError> {
+        let starting_position = self.position;
         self.write_string_ref(&str_pair.name)?;
-        self.write_string_ref(&str_pair.value)
+        let len_name = self.position - starting_position;
+
+        match self.write_string_ref(&str_pair.value) {
+            Ok(_) => Ok(()),
+            Err(e) => {
+                self.position -= len_name;
+                Err(e)
+            }
+        }
     }
 
     /// Encodes the u32 value into the VariableByteInteger and this value writes to the buffer.
@@ -158,8 +177,12 @@ impl<'a> BuffWriter<'a> {
         &mut self,
         properties: &Vec<Property<'a>, LEN>,
     ) -> Result<(), BufferError> {
+        let starting_position = self.position;
         for prop in properties.iter() {
-            self.write_property(prop)?;
+            if let Err(e) = self.write_property(prop) {
+                self.position = starting_position;
+                return Err(e);
+            }
         }
         Ok(())
     }
@@ -186,8 +209,13 @@ impl<'a> BuffWriter<'a> {
         _len: usize,
         filters: &Vec<TopicFilter<'a>, MAX>,
     ) -> Result<(), BufferError> {
+        let starting_position = self.position;
+
         for filter in filters {
-            self.write_topic_filter_ref(sub, filter)?;
+            if let Err(e) = self.write_topic_filter_ref(sub, filter) {
+                self.position = starting_position;
+                return Err(e);
+            }
         }
         Ok(())
     }
