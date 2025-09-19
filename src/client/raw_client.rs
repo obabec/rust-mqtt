@@ -394,7 +394,7 @@ where
                 let (packet_identifier, reasons) = reason.unwrap();
                 for reason_code in &reasons {
                     if QualityOfService::from_suback_reason_code(*reason_code)
-                        != self.config.max_subscribe_qos
+                        > self.config.max_subscribe_qos
                     {
                         return Err(ReasonCode::from(*reason_code));
                     }
