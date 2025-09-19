@@ -25,6 +25,7 @@ extern crate alloc;
 
 use alloc::string::String;
 use core::time::Duration;
+use rust_mqtt::utils::types::{QualityOfService, Topic};
 use std::sync::Once;
 
 use futures::future::{join, join3};
@@ -40,7 +41,6 @@ use rust_mqtt::client::client::MqttClient;
 use rust_mqtt::client::client_config::ClientConfig;
 use rust_mqtt::client::client_config::MqttVersion::MQTTv5;
 use rust_mqtt::packet::v5::property::Property;
-use rust_mqtt::packet::v5::publish_packet::QualityOfService;
 use rust_mqtt::packet::v5::reason_codes::ReasonCode;
 use rust_mqtt::packet::v5::reason_codes::ReasonCode::NotAuthorized;
 use rust_mqtt::utils::rng_generator::CountingRng;
@@ -172,6 +172,7 @@ async fn receive_core<'b>(
     assert_ok!(result);
 
     info!("[Receiver] Subscribing to topic {}", topic);
+    let topic = Topic::new_with_default_options(topic, QualityOfService::QoS2);
     result = client.subscribe_to_topic(topic).await;
     assert_ok!(result);
     info!("[Receiver] Waiting for new message!");
@@ -204,7 +205,13 @@ async fn receive_core_multiple<'b, const TOPICS: usize>(
         topic_names.get(0).unwrap(),
         topic_names.get(1).unwrap()
     );
-    result = client.subscribe_to_topics(topic_names).await;
+
+    let topics: Vec<_, TOPICS> = topic_names
+        .iter()
+        .map(|s| Topic::new_with_default_options(s, QualityOfService::QoS2))
+        .collect();
+
+    result = client.subscribe_to_topics(&topics).await;
 
     assert_ok!(result);
     info!("[Receiver] Waiting for new message!");
@@ -361,7 +368,13 @@ async fn receive_multiple_second_unsub<const TOPICS: usize>(
         topic_names.get(0).unwrap(),
         topic_names.get(1).unwrap()
     );
-    result = client.subscribe_to_topics(topic_names).await;
+
+    let topics: Vec<_, TOPICS> = topic_names
+        .iter()
+        .map(|s| Topic::new_with_default_options(s, qos))
+        .collect();
+
+    result = client.subscribe_to_topics(&topics).await;
 
     assert_ok!(result);
     info!("[Receiver] Waiting for new message!");

@@ -26,43 +26,12 @@ use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::v5::mqtt_packet::Packet;
-use crate::packet::v5::publish_packet::QualityOfService::{QoS0, QoS1, QoS2, INVALID};
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
-use crate::utils::types::{BufferError, EncodedString};
+use crate::utils::types::{BufferError, EncodedString, QualityOfService};
 
 use super::packet_type::PacketType;
 use super::property::Property;
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum QualityOfService {
-    QoS0,
-    QoS1,
-    QoS2,
-    INVALID,
-}
-
-impl From<u8> for QualityOfService {
-    fn from(orig: u8) -> Self {
-        match orig {
-            0 => QoS0,
-            2 => QoS1,
-            4 => QoS2,
-            _ => INVALID,
-        }
-    }
-}
-
-impl From<QualityOfService> for u8 {
-    fn from(value: QualityOfService) -> Self {
-        match value {
-            QoS0 => 0,
-            QoS1 => 2,
-            QoS2 => 4,
-            INVALID => 3,
-        }
-    }
-}
 
 pub struct PublishPacket<'a, const MAX_PROPERTIES: usize> {
     pub fixed_header: u8,
@@ -85,7 +54,7 @@ impl<'a, const MAX_PROPERTIES: usize> PublishPacket<'a, MAX_PROPERTIES> {
     }
 
     pub fn add_qos(&mut self, qos: QualityOfService) {
-        self.fixed_header |= <QualityOfService as Into<u8>>::into(qos);
+        self.fixed_header |= qos.into_publish_bits();
     }
 
     pub fn add_retain(&mut self, retain: bool) {

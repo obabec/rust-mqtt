@@ -25,6 +25,7 @@ extern crate alloc;
 
 use alloc::string::String;
 use core::time::Duration;
+use rust_mqtt::utils::types::{QualityOfService, Topic};
 use std::sync::Once;
 
 use futures::future::join;
@@ -38,7 +39,6 @@ use tokio_test::assert_ok;
 use rust_mqtt::client::client::MqttClient;
 use rust_mqtt::client::client_config::ClientConfig;
 use rust_mqtt::client::client_config::MqttVersion::MQTTv5;
-use rust_mqtt::packet::v5::publish_packet::QualityOfService;
 use rust_mqtt::packet::v5::reason_codes::ReasonCode;
 use rust_mqtt::utils::rng_generator::CountingRng;
 use tokio::net::TcpStream;
@@ -140,6 +140,7 @@ async fn receive_core<'b>(
     assert_ok!(result);
 
     info!("[Receiver] Subscribing to topic {}", topic);
+    let topic = Topic::new_with_default_options(topic, QualityOfService::QoS2);
     result = client.subscribe_to_topic(topic).await;
     assert_ok!(result);
     info!("[Receiver] Waiting for new message!");

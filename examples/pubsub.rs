@@ -7,7 +7,7 @@ use embedded_io_adapters::tokio_1::FromTokio;
 use rust_mqtt::{
     client::{client::MqttClient, client_config::ClientConfig},
     packet::v5::reason_codes::ReasonCode,
-    utils::rng_generator::CountingRng,
+    utils::{rng_generator::CountingRng, types::QualityOfService},
 };
 use tokio::net::TcpStream;
 
@@ -26,7 +26,7 @@ async fn main() {
         rust_mqtt::client::client_config::MqttVersion::MQTTv5,
         CountingRng(20000),
     );
-    config.add_max_subscribe_qos(rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS1);
+    config.add_max_subscribe_qos(QualityOfService::QoS1);
     config.add_client_id("client");
     // config.add_username(USERNAME);
     // config.add_password(PASSWORD);
@@ -47,12 +47,7 @@ async fn main() {
 
     loop {
         client
-            .send_message(
-                "hello",
-                b"hello2",
-                rust_mqtt::packet::v5::publish_packet::QualityOfService::QoS0,
-                true,
-            )
+            .send_message("hello", b"hello2", QualityOfService::QoS0, true)
             .await
             .unwrap();
         tokio::time::sleep(Duration::from_millis(500)).await;

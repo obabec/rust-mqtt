@@ -26,7 +26,6 @@ use heapless::Vec;
 
 use crate::encoding::variable_byte_integer::VariableByteIntegerEncoder;
 use crate::packet::v5::mqtt_packet::Packet;
-use crate::packet::v5::publish_packet::QualityOfService;
 use crate::utils::buffer_reader::BuffReader;
 use crate::utils::buffer_writer::BuffWriter;
 use crate::utils::types::{BufferError, TopicFilter};
@@ -47,13 +46,8 @@ pub struct SubscriptionPacket<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES
 impl<'a, const MAX_FILTERS: usize, const MAX_PROPERTIES: usize>
     SubscriptionPacket<'a, MAX_FILTERS, MAX_PROPERTIES>
 {
-    pub fn add_new_filter(&mut self, topic_name: &'a str, qos: QualityOfService) {
-        let len = topic_name.len();
-        let mut new_filter = TopicFilter::new();
-        new_filter.filter.string = topic_name;
-        new_filter.filter.len = len as u16;
-        new_filter.sub_options |= <QualityOfService as Into<u8>>::into(qos) >> 1;
-        self.topic_filters.push(new_filter);
+    pub fn add_new_filter(&mut self, topic_filter: TopicFilter<'a>) {
+        self.topic_filters.push(topic_filter);
         self.topic_filter_len += 1;
     }
 }

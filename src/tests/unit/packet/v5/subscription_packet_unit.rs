@@ -27,8 +27,9 @@ use heapless::Vec;
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::packet_type::PacketType;
 use crate::packet::v5::property::Property;
-use crate::packet::v5::publish_packet::QualityOfService::{QoS0, QoS1};
 use crate::packet::v5::subscription_packet::SubscriptionPacket;
+use crate::utils::types::QualityOfService::{QoS0, QoS1};
+use crate::utils::types::Topic;
 
 #[test]
 fn test_encode() {
@@ -39,8 +40,11 @@ fn test_encode() {
     let mut props = Vec::<Property, 2>::new();
     props.push(Property::SubscriptionIdentifier(2432));
     packet.property_len = packet.add_properties(&props);
-    packet.add_new_filter("test/topic", QoS0);
-    packet.add_new_filter("hehe/#", QoS1);
+    let filter = Topic::new_with_default_options("test/topic", QoS0);
+    packet.add_new_filter(filter.into());
+
+    let filter = Topic::new_with_default_options("hehe/#", QoS1);
+    packet.add_new_filter(filter.into());
     let res = packet.encode(&mut buffer, 30);
     assert!(res.is_ok());
     assert_eq!(res.unwrap(), 30);

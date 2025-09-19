@@ -7,22 +7,18 @@ use crate::{
     encoding::variable_byte_integer::{VariableByteInteger, VariableByteIntegerDecoder},
     network::NetworkConnection,
     packet::v5::{
-        connack_packet::ConnackPacket,
-        connect_packet::ConnectPacket,
-        disconnect_packet::DisconnectPacket,
-        mqtt_packet::Packet,
-        packet_type::PacketType,
-        pingreq_packet::PingreqPacket,
-        pingresp_packet::PingrespPacket,
-        puback_packet::PubackPacket,
-        publish_packet::{PublishPacket, QualityOfService},
-        reason_codes::ReasonCode,
-        suback_packet::SubackPacket,
-        subscription_packet::SubscriptionPacket,
-        unsuback_packet::UnsubackPacket,
-        unsubscription_packet::UnsubscriptionPacket,
+        connack_packet::ConnackPacket, connect_packet::ConnectPacket,
+        disconnect_packet::DisconnectPacket, mqtt_packet::Packet, packet_type::PacketType,
+        pingreq_packet::PingreqPacket, pingresp_packet::PingrespPacket,
+        puback_packet::PubackPacket, publish_packet::PublishPacket, reason_codes::ReasonCode,
+        suback_packet::SubackPacket, subscription_packet::SubscriptionPacket,
+        unsuback_packet::UnsubackPacket, unsubscription_packet::UnsubscriptionPacket,
     },
-    utils::{buffer_reader::BuffReader, buffer_writer::BuffWriter, types::BufferError},
+    utils::{
+        buffer_reader::BuffReader,
+        buffer_writer::BuffWriter,
+        types::{BufferError, QualityOfService, Topic, TopicFilter},
+    },
 };
 
 use super::client_config::{ClientConfig, MqttVersion};
@@ -206,7 +202,7 @@ where
 
     async fn subscribe_to_topics_v5<'b, const TOPICS: usize>(
         &'b mut self,
-        topic_names: &'b Vec<&'b str, TOPICS>,
+        topics: &'b Vec<Topic<'b>, TOPICS>,
     ) -> Result<u16, ReasonCode> {
         if self.connection.is_none() {
             return Err(ReasonCode::NetworkError);
@@ -216,8 +212,13 @@ where
         let len = {
             let mut subs = SubscriptionPacket::<'b, TOPICS, MAX_PROPERTIES>::new();
             subs.packet_identifier = identifier;
-            for topic_name in topic_names.iter() {
-                subs.add_new_filter(topic_name, self.config.max_subscribe_qos);
+            for topic in topics.into_iter() {
+                let desired_qos = topic.qos;
+                let final_qos = core::cmp::min(desired_qos, self.config.max_subscribe_qos);
+
+                let mut topic = topic.clone();
+                topic.qos = final_qos;
+                subs.add_new_filter(<Topic as Into<TopicFilter>>::into(topic));
             }
             subs.encode(self.buffer, self.buffer_len)
         };
@@ -238,7 +239,7 @@ where
     /// is selected automatically.
     pub async fn subscribe_to_topics<'b, const TOPICS: usize>(
         &'b mut self,
-        topic_names: &'b Vec<&'b str, TOPICS>,
+        topic_names: &'b Vec<Topic<'b>, TOPICS>,
     ) -> Result<u16, ReasonCode> {
         match self.config.mqtt_version {
             MqttVersion::MQTTv3 => Err(ReasonCode::UnsupportedProtocolVersion),
@@ -392,9 +393,8 @@ where
                 }
                 let (packet_identifier, reasons) = reason.unwrap();
                 for reason_code in &reasons {
-                    if *reason_code
-                        != (<QualityOfService as Into<u8>>::into(self.config.max_subscribe_qos)
-                            >> 1)
+                    if QualityOfService::from_suback_reason_code(*reason_code)
+                        != self.config.max_subscribe_qos
                     {
                         return Err(ReasonCode::from(*reason_code));
                     }
@@ -439,8 +439,8 @@ where
                     return Err(ReasonCode::BuffError);
                 }
 
-                if (packet.fixed_header & 0x06)
-                    == <QualityOfService as Into<u8>>::into(QualityOfService::QoS1)
+                if QualityOfService::from_publish_fixed_header(packet.fixed_header)
+                    == QualityOfService::QoS1
                 {
                     let mut puback = PubackPacket::<'b, MAX_PROPERTIES>::new();
                     puback.packet_identifier = packet.packet_identifier;

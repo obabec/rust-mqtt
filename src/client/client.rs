@@ -27,9 +27,9 @@ use embedded_io_async::{Read, Write};
 use heapless::Vec;
 use rand_core::RngCore;
 
-use crate::client::client_config::ClientConfig;
-use crate::packet::v5::publish_packet::QualityOfService::{self, QoS1};
 use crate::packet::v5::reason_codes::ReasonCode;
+use crate::utils::types::Topic;
+use crate::{client::client_config::ClientConfig, utils::types::QualityOfService};
 
 use super::raw_client::{Event, RawMqttClient};
 
@@ -106,7 +106,7 @@ where
             .await?;
 
         // QoS1
-        if qos == QoS1 {
+        if qos == QualityOfService::QoS1 {
             match self.raw.poll::<0>().await? {
                 Event::Puback(ack_identifier, matching_subscriber) => {
                     if !matching_subscriber {
@@ -132,9 +132,9 @@ where
     /// is selected automatically.
     pub async fn subscribe_to_topics<'b, const TOPICS: usize>(
         &'b mut self,
-        topic_names: &'b Vec<&'b str, TOPICS>,
+        topics: &'b Vec<Topic<'b>, TOPICS>,
     ) -> Result<(), ReasonCode> {
-        let identifier = self.raw.subscribe_to_topics(topic_names).await?;
+        let identifier = self.raw.subscribe_to_topics(topics).await?;
 
         match self.raw.poll::<TOPICS>().await? {
             Event::Suback(ack_identifier) => {
@@ -176,14 +176,11 @@ where
     /// Method allows client subscribe to multiple topics specified in the parameter
     /// `topic_name` on the broker specified in the `ClientConfig`. MQTT protocol implementation
     /// is selected automatically.
-    pub async fn subscribe_to_topic<'b>(
-        &'b mut self,
-        topic_name: &'b str,
-    ) -> Result<(), ReasonCode> {
-        let mut topic_names = Vec::<&'b str, 1>::new();
-        topic_names.push(topic_name).unwrap();
+    pub async fn subscribe_to_topic<'b>(&'b mut self, topic: Topic<'b>) -> Result<(), ReasonCode> {
+        let mut topics = Vec::<Topic<'b>, 1>::new();
+        topics.push(topic).unwrap();
 
-        let identifier = self.raw.subscribe_to_topics(&topic_names).await?;
+        let identifier = self.raw.subscribe_to_topics(&topics).await?;
 
         match self.raw.poll::<1>().await? {
             Event::Suback(ack_identifier) => {

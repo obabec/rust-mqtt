@@ -24,6 +24,8 @@
 
 use core::fmt::{Display, Formatter};
 
+use crate::utils::types::QualityOfService::{QoS0, QoS1, QoS2, INVALID};
+
 #[derive(core::fmt::Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum BufferError {
@@ -107,6 +109,122 @@ impl StringPair<'_> {
     /// Returns length which is equal to sum of the lenghts of UTF-8 encoded strings in pair
     pub fn encoded_len(&self) -> u16 {
         self.name.encoded_len() + self.value.encoded_len()
+    }
+}
+
+/// Topic filter serves as public interface for topic selection and subscription options for `SUBSCRIPTION` packet
+#[derive(Clone, Copy, Debug)]
+pub struct Topic<'a> {
+    pub topic_name: &'a str,
+    pub retain_handling: RetainHandling,
+    pub retain_as_published: bool,
+    pub no_local: bool,
+    pub qos: QualityOfService,
+}
+
+impl<'a> Topic<'a> {
+    pub fn new_with_default_options(topic_name: &'a str, qos: QualityOfService) -> Self {
+        Self {
+            topic_name,
+            retain_handling: RetainHandling::default(),
+            retain_as_published: bool::default(),
+            no_local: bool::default(),
+            qos,
+        }
+    }
+}
+
+impl<'a> From<Topic<'a>> for TopicFilter<'a> {
+    fn from(value: Topic<'a>) -> Self {
+        let retain_handling_bits = match value.retain_handling {
+            RetainHandling::AlwaysSend => 0x00,
+            RetainHandling::SendIfNotSubscribedBefore => 0x10,
+            RetainHandling::NeverSend => 0x20,
+        };
+
+        let retain_as_published_bit = match value.retain_as_published {
+            true => 0x08,
+            false => 0x00,
+        };
+
+        let no_local_bit = match value.no_local {
+            true => 0x04,
+            false => 0x00,
+        };
+
+        let qos_bits = value.qos.into_subscribe_bits();
+
+        let subscribe_options_bits =
+            retain_handling_bits | retain_as_published_bit | no_local_bit | qos_bits;
+
+        let mut filter = EncodedString::new();
+        filter.string = value.topic_name;
+        filter.len = value.topic_name.len() as u16;
+
+        Self {
+            filter,
+            sub_options: subscribe_options_bits,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Default, Debug)]
+pub enum RetainHandling {
+    #[default]
+    AlwaysSend = 0,
+    SendIfNotSubscribedBefore = 1,
+    NeverSend = 2,
+}
+
+#[derive(Clone, Copy, PartialEq, PartialOrd, Eq, Ord, Debug)]
+pub enum QualityOfService {
+    QoS0 = 0,
+    QoS1 = 1,
+    QoS2 = 2,
+    INVALID = 3,
+}
+
+impl QualityOfService {
+    pub fn into_publish_bits(&self) -> u8 {
+        match self {
+            QoS0 => 0x00,
+            QoS1 => 0x02,
+            QoS2 => 0x04,
+            INVALID => 0x06,
+        }
+    }
+
+    pub fn into_subscribe_bits(&self) -> u8 {
+        match self {
+            QoS0 => 0x00,
+            QoS1 => 0x01,
+            QoS2 => 0x02,
+            INVALID => 0x03,
+        }
+    }
+
+    pub fn from_publish_fixed_header(bits: u8) -> Self {
+        let qos_bits = bits & 0x06;
+        match qos_bits {
+            0x00 => QoS0,
+            0x02 => QoS1,
+            0x04 => QoS2,
+            _ => INVALID,
+        }
+    }
+
+    pub fn from_subscribe_options(bits: u8) -> Self {
+        let qos_bits = bits & 0x03;
+        match qos_bits {
+            0x00 => QoS0,
+            0x01 => QoS1,
+            0x02 => QoS2,
+            _ => INVALID,
+        }
+    }
+
+    pub fn from_suback_reason_code(bits: u8) -> Self {
+        Self::from_subscribe_options(bits)
     }
 }
 

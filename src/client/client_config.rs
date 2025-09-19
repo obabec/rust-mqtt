@@ -26,8 +26,7 @@ use heapless::Vec;
 use rand_core::RngCore;
 
 use crate::packet::v5::property::Property;
-use crate::packet::v5::publish_packet::QualityOfService;
-use crate::utils::types::{BinaryData, EncodedString};
+use crate::utils::types::{BinaryData, EncodedString, QualityOfService};
 
 #[derive(Clone, PartialEq)]
 pub enum MqttVersion {
