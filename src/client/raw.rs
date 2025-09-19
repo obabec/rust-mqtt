@@ -36,9 +36,9 @@ use crate::{
         connack_packet::ConnackPacket, connect_packet::ConnectPacket,
         disconnect_packet::DisconnectPacket, mqtt_packet::Packet, packet_type::PacketType,
         pingreq_packet::PingreqPacket, pingresp_packet::PingrespPacket,
-        puback_packet::PubackPacket, publish_packet::PublishPacket,
-        suback_packet::SubackPacket, subscription_packet::SubscriptionPacket,
-        unsuback_packet::UnsubackPacket, unsubscription_packet::UnsubscriptionPacket,
+        puback_packet::PubackPacket, publish_packet::PublishPacket, suback_packet::SubackPacket,
+        subscription_packet::SubscriptionPacket, unsuback_packet::UnsubackPacket,
+        unsubscription_packet::UnsubscriptionPacket,
     },
 };
 
@@ -59,9 +59,7 @@ where
 {
     connection: Option<NetworkConnection<T>>,
     buffer: &'a mut [u8],
-    buffer_len: usize,
     recv_buffer: &'a mut [u8],
-    recv_buffer_len: usize,
     config: ClientConfig<'a, MAX_PROPERTIES, R>,
 }
 
@@ -73,17 +71,13 @@ where
     pub fn new(
         network_driver: T,
         buffer: &'a mut [u8],
-        buffer_len: usize,
         recv_buffer: &'a mut [u8],
-        recv_buffer_len: usize,
         config: ClientConfig<'a, MAX_PROPERTIES, R>,
     ) -> Self {
         Self {
             connection: Some(NetworkConnection::new(network_driver)),
             buffer,
-            buffer_len,
             recv_buffer,
-            recv_buffer_len,
             config,
         }
     }
@@ -111,7 +105,7 @@ where
                 )
             }
             connect.add_client_id(&self.config.client_id);
-            connect.encode(self.buffer, self.buffer_len)
+            connect.encode(self.buffer, self.buffer.len())
         };
 
         if let Err(err) = len {
@@ -143,7 +137,7 @@ where
         let conn = self.connection.as_mut().unwrap();
         trace!("Creating disconnect packet!");
         let mut disconnect = DisconnectPacket::<'b, MAX_PROPERTIES>::new();
-        let len = disconnect.encode(self.buffer, self.buffer_len);
+        let len = disconnect.encode(self.buffer, self.buffer.len());
         if let Err(err) = len {
             warn!("[DECODE ERR]: {}", err);
             let _ = self.connection.take();
@@ -190,7 +184,7 @@ where
             packet.add_identifier(identifier);
             packet.add_message(message);
             packet.add_retain(retain);
-            packet.encode(self.buffer, self.buffer_len)
+            packet.encode(self.buffer, self.buffer.len())
         };
 
         if let Err(err) = len {
@@ -239,7 +233,7 @@ where
                 topic.qos = final_qos;
                 subs.add_new_filter(<Topic as Into<TopicFilter>>::into(topic));
             }
-            subs.encode(self.buffer, self.buffer_len)
+            subs.encode(self.buffer, self.buffer.len())
         };
 
         if let Err(err) = len {
@@ -293,7 +287,7 @@ where
             let mut unsub = UnsubscriptionPacket::<'b, 1, MAX_PROPERTIES>::new();
             unsub.packet_identifier = identifier;
             unsub.add_new_filter(topic_name);
-            unsub.encode(self.buffer, self.buffer_len)
+            unsub.encode(self.buffer, self.buffer.len())
         };
 
         if let Err(err) = len {
@@ -312,7 +306,7 @@ where
         let conn = self.connection.as_mut().unwrap();
         let len = {
             let mut packet = PingreqPacket::new();
-            packet.encode(self.buffer, self.buffer_len)
+            packet.encode(self.buffer, self.buffer.len())
         };
 
         if let Err(err) = len {
@@ -344,7 +338,8 @@ where
 
         trace!("Waiting for a packet");
 
-        let read = { receive_packet(self.buffer, self.buffer_len, self.recv_buffer, conn).await? };
+        let read =
+            { receive_packet(self.buffer, self.buffer.len(), self.recv_buffer, conn).await? };
 
         let buf_reader = BuffReader::new(self.buffer, read);
 
@@ -465,7 +460,7 @@ where
                     puback.packet_identifier = packet.packet_identifier;
                     puback.reason_code = 0x00;
                     {
-                        let len = { puback.encode(self.recv_buffer, self.recv_buffer_len) };
+                        let len = { puback.encode(self.recv_buffer, self.recv_buffer.len()) };
                         if let Err(err) = len {
                             error!("[DECODE ERR]: {}", err);
                             return Err(ReasonCode::BuffError);

@@ -36,9 +36,7 @@ async fn main() {
     let mut client = MqttClient::<_, 5, _>::new(
         connection,
         &mut write_buffer,
-        80,
         &mut recv_buffer,
-        80,
         config,
     );
 

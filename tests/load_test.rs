@@ -119,9 +119,7 @@ async fn publish(
     let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
         connection,
         &mut write_buffer,
-        80,
         &mut recv_buffer,
-        80,
         config,
     );
     publish_core(&mut client, wait, topic, amount).await
@@ -186,9 +184,7 @@ async fn receive(
     let mut client = MqttClient::<TokioNetwork, 5, CountingRng>::new(
         connection,
         &mut write_buffer,
-        500,
         &mut recv_buffer,
-        500,
         config,
     );
 

@@ -81,9 +81,7 @@ pub async fn connected_client<'a>(
     let mut client = MqttClient::<TokioNetwork, MAX_PROPERTIES, CountingRng>::new(
         connection,
         write_buffer,
-        write_buffer.len(),
         recv_buffer,
-        recv_buffer.len(),
         config,
     );
 
