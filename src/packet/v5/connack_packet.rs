@@ -33,6 +33,18 @@ use crate::utils::types::BufferError;
 use super::packet_type::PacketType;
 use super::property::Property;
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ConnectAcknowledgeFlags {
+    pub session_present: bool,
+}
+
+impl From<u8> for ConnectAcknowledgeFlags {
+    fn from(value: u8) -> Self {
+        let session_present = value & 0x01 != 0;
+        Self { session_present }
+    }
+}
+
 pub struct ConnackPacket<'a, const MAX_PROPERTIES: usize> {
     pub fixed_header: u8,
     pub remain_len: u32,

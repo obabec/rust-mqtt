@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-use crate::packet::v5::connack_packet::ConnackPacket;
+use crate::packet::v5::connack_packet::{ConnackPacket, ConnectAcknowledgeFlags};
 use crate::packet::v5::mqtt_packet::Packet;
 use crate::packet::v5::property::Property;
 use crate::packet::v5::reason_codes::ReasonCode;
@@ -83,4 +83,31 @@ fn test_decode() {
     if let Property::ReceiveMaximum(u) = *prop {
         assert_eq!(u, 21);
     }
+}
+
+#[test]
+fn test_connect_ack_flags() {
+    let want = ConnectAcknowledgeFlags {
+        session_present: true,
+    };
+
+    let ack_flags = 0x01;
+    let mut have = <u8 as Into<ConnectAcknowledgeFlags>>::into(ack_flags);
+    assert_eq!(have, want);
+
+    let ack_flags = 0xFF;
+    have = <u8 as Into<ConnectAcknowledgeFlags>>::into(ack_flags);
+    assert_eq!(have, want);
+
+    let want = ConnectAcknowledgeFlags {
+        session_present: false,
+    };
+
+    let ack_flags = 0x00;
+    have = <u8 as Into<ConnectAcknowledgeFlags>>::into(ack_flags);
+    assert_eq!(have, want);
+
+    let ack_flags = 0xFE;
+    have = <u8 as Into<ConnectAcknowledgeFlags>>::into(ack_flags);
+    assert_eq!(have, want);
 }

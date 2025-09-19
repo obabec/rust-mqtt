@@ -70,7 +70,7 @@ async fn publish_core<'b>(
         "[Publisher] Connection to broker with username {} and password {}",
         USERNAME, PASSWORD
     );
-    let mut result = client.connect_to_broker().await;
+    let result = client.connect_to_broker().await;
     assert_ok!(result);
     info!("[Publisher] Waiting {} seconds before sending", wait);
     sleep(Duration::from_secs(wait)).await;
@@ -78,7 +78,7 @@ async fn publish_core<'b>(
     info!("[Publisher] Sending new message {} to topic {}", MSG, topic);
     let mut count = 0;
     loop {
-        result = client
+        let result = client
             .send_message(topic, MSG.as_bytes(), QualityOfService::QoS0, false)
             .await;
         info!("[PUBLISHER] sent {}", count);
@@ -91,7 +91,7 @@ async fn publish_core<'b>(
     }
 
     info!("[Publisher] Disconnecting!");
-    result = client.disconnect().await;
+    let result = client.disconnect().await;
     assert_ok!(result);
     Ok(())
 }
@@ -136,11 +136,11 @@ async fn receive_core<'b>(
         "[Receiver] Connection to broker with username {} and password {}",
         USERNAME, PASSWORD
     );
-    let mut result = client.connect_to_broker().await;
+    let result = client.connect_to_broker().await;
     assert_ok!(result);
 
     info!("[Receiver] Subscribing to topic {}", topic);
-    result = client.subscribe_to_topic(topic).await;
+    let result = client.subscribe_to_topic(topic).await;
     assert_ok!(result);
     info!("[Receiver] Waiting for new message!");
     let mut count = 0;
@@ -156,7 +156,7 @@ async fn receive_core<'b>(
         }
     }
     info!("[Receiver] Disconnecting");
-    result = client.disconnect().await;
+    let result = client.disconnect().await;
     assert_ok!(result);
     Ok(())
 }
