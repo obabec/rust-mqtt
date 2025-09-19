@@ -1,7 +1,7 @@
 // This code is handed from Embedded Rust documentation and
 // is accessible from https://docs.rust-embedded.org/cortex-m-rt/0.6.0/rand/trait.RngCore.html
 
-use rand_core::{impls, Error, RngCore};
+use rand_core::{impls, RngCore};
 
 pub struct CountingRng(pub u64);
 
@@ -20,10 +20,5 @@ impl RngCore for CountingRng {
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
         impls::fill_bytes_via_next(self, dest)
-    }
-
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
-        self.fill_bytes(dest);
-        Ok(())
     }
 }
