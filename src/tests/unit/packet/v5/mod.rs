@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+pub mod auth_packet;
 pub mod connack_packet_unit;
 pub mod connect_packet_unit;
 pub mod disconnect_packet_unit;
