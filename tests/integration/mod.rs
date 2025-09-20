@@ -23,4 +23,3 @@
  */
 
 pub mod tests;
-pub mod single;

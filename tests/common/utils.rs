@@ -23,15 +23,18 @@
  */
 
 use std::{
+    collections::HashMap,
     net::{Ipv4Addr, SocketAddrV4},
+    str::from_utf8,
     sync::Once,
     time::Duration,
 };
 
 use embedded_io_adapters::tokio_1::FromTokio;
+use log::{error, info};
 use rust_mqtt::{
     client::MqttClient,
-    interface::{ClientConfig, MqttVersion, QualityOfService, RetainHandling, Topic},
+    interface::{ClientConfig, MqttVersion, QualityOfService, ReasonCode, RetainHandling, Topic},
 };
 use tokio::{
     net::TcpStream,
@@ -57,21 +60,33 @@ pub fn setup() {
     });
 }
 
-pub async fn connected_client<'a>(
+pub(crate) async fn connect_core<'a>(
     recv_buffer: &'a mut [u8],
     write_buffer: &'a mut [u8],
     client_id: Option<&'a str>,
-) -> TestClient<'a> {
-    let connection = TcpStream::connect(BROKER)
-        .await
-        .expect("Error while connecting over TCP to broker");
+    username: &'a str,
+    password: &'a str,
+) -> Result<TestClient<'a>, ReasonCode> {
+    info!(
+        "[CONNECT] Connecting to broker at {} with username {} and password {}",
+        BROKER, username, password
+    );
 
-    let connection = TokioNetwork::new(connection);
+    let connection = TcpStream::connect(BROKER).await;
+
+    if let Err(e) = connection {
+        panic!(
+            "[CONNECT] Error while connecting TCP session to {}: {}",
+            BROKER, e
+        );
+    }
+
+    let connection = TokioNetwork::new(connection.unwrap());
 
     let mut config = ClientConfig::new(MqttVersion::MQTTv5, CountingRng(20000));
     config.add_max_subscribe_qos(QualityOfService::QoS1);
-    config.add_username(USERNAME);
-    config.add_password(PASSWORD);
+    config.add_username(username);
+    config.add_password(password);
     config.max_packet_size = 100;
 
     if let Some(client_id) = client_id {
@@ -85,40 +100,29 @@ pub async fn connected_client<'a>(
         config,
     );
 
-    client
-        .connect_to_broker()
-        .await
-        .expect("Error while connecting over MQTT to broker");
+    client.connect_to_broker().await.map(|_| client)
+}
 
-    client
+pub async fn connected_client<'a>(
+    recv_buffer: &'a mut [u8],
+    write_buffer: &'a mut [u8],
+    client_id: Option<&'a str>,
+) -> TestClient<'a> {
+    let result = connect_core(recv_buffer, write_buffer, client_id, USERNAME, PASSWORD).await;
+    if let Err(e) = result {
+        panic!("[CONNECT] MQTT handshake failed {}", e);
+    } else {
+        info!("[CONNECT] MQTT connection established");
+    }
+    result.unwrap()
 }
 
 pub async fn disconnect(client: &mut TestClient<'_>) {
     let result = client.disconnect().await;
-    assert_ok!(result);
-}
-
-pub async fn publish(
-    client: &mut TestClient<'_>,
-    wait: u64,
-    topic: &str,
-    msg: &str,
-    qos: QualityOfService,
-    retain: bool,
-    should_err: bool,
-    can_err: bool,
-) {
-    sleep(Duration::from_secs(wait)).await;
-
-    let result = client
-        .send_message(topic, msg.as_bytes(), qos, retain)
-        .await;
-
-    if should_err {
-        assert_err!(result);
-    } else if can_err {
+    if let Err(e) = result {
+        panic!("[DISCONNECT] MQTT Disconnect failed: {}", e);
     } else {
-        assert_ok!(result);
+        info!("[DISCONNECT] Disconnected from broker");
     }
 }
 
@@ -136,28 +140,21 @@ pub async fn subscribe(
         .retain_as_published(retain_as_published)
         .no_local(no_local);
 
-    client
-        .subscribe_to_topic(topic)
-        .await
-        .expect("Error while subscribing");
+    let result = client.subscribe_to_topic(topic).await;
+
+    if let Err(e) = result {
+        panic!("[SUBSCRIBE] Subscribing to topic {:?} failed: {}", topic, e);
+    } else {
+        info!("[SUBSCRIBE] Subscribed to topic {:?}", topic);
+    }
 }
 
-pub async fn assert_receive(client: &mut TestClient<'_>, within: u64, topic: &str, msg: &str) {
-    let duration = Duration::from_secs(within);
+pub async fn unsubscribe(client: &mut TestClient<'_>, topic: &str) {
+    let result = client.unsubscribe_from_topic(topic).await;
 
-    let result = timeout(duration, client.receive_message()).await;
-
-    let result = result.expect("Timeout while receiving");
-
-    let (recv_topic, recv_msg) = result.expect("Error while receiving");
-    assert_eq!(topic, recv_topic);
-    assert_eq!(msg.as_bytes(), recv_msg);
-}
-
-pub async fn assert_no_receive(client: &mut TestClient<'_>, within: u64) {
-    let duration = Duration::from_secs(within);
-
-    timeout(duration, client.receive_message())
-        .await
-        .expect_err("Expected no event to come in");
+    if let Err(e) = result {
+        panic!("[UNSUBSCRIBE] Unsubscribing from topic {} failed: {}", topic, e);
+    } else {
+        info!("[UNSUBSCRIBE] Unsubscribed from topic {}", topic);
+    }
 }

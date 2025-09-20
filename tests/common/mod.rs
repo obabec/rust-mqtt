@@ -23,6 +23,8 @@
  */
 
 #[allow(unused)]
-pub mod utils;
+pub mod assert;
 #[allow(unused)]
 pub mod rng;
+#[allow(unused)]
+pub mod utils;
