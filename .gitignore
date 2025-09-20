@@ -1,4 +1,6 @@
-/target
 .idea
 .vscode
+
+.ci/mqtt_pass_hashed.txt
+target
 Cargo.lock

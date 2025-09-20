@@ -4,41 +4,43 @@ name: IntegrationTests
 
 jobs:
   integration_tests_mosquitto:
-    name: Integration tests with mosquitto
+    name: Integration tests with Mosquitto
     runs-on: ubuntu-latest
     steps:
-      - name: Git checkout
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
       - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Build embedded
         run: cargo build --target thumbv7em-none-eabihf --features "no_std" --no-default-features
 
-      - name: Start Mosquitto
+      - name: Install Mosquitto
         run: |
+          sudo apt-get update
           sudo apt-get install mosquitto
           sudo service mosquitto stop
-          mosquitto_passwd -U .ci/mqtt_pass.txt
+
+      - name: Configure & Start Mosquitto
+        run: |
+          cp .ci/mqtt_pass_plain.txt .ci/mqtt_pass_hashed.txt
+          chmod 700 .ci/mqtt_pass_hashed.txt
+          mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
           mosquitto -c .ci/mosquitto.conf -d
 
-      - name: Run integration-tests tests
+      - name: Run integration tests
         run: RUST_LOG=trace cargo test integration
 
   integration_tests_hive:
     name: Integration tests with HiveMQ
     runs-on: ubuntu-latest
     steps:
-      - name: Git checkout
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
       - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Build embedded
         run: cargo build --target thumbv7em-none-eabihf --features "no_std" --no-default-features
@@ -54,5 +56,5 @@ jobs:
           cp .ci/hive_extension_config.xml hivemq-ce-2021.3/extensions/hivemq-file-rbac-extension/extension-config.xml
           hivemq-ce-2021.3/bin/run.sh &
 
-      - name: Run integration-tests tests
+      - name: Run integration tests
         run: RUST_LOG=trace cargo test integration

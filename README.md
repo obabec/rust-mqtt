@@ -1,35 +1,45 @@
 # Rust-mqtt
 
-## About
+The `rust-mqtt` crate is a native async MQTT client for both std and no_std environments.
+The client library provides an async API which can be used with various executors.
 
-Rust-mqtt is native MQTT client for both std and no_std environments.
-Client library provides async API which can be used with various executors.
-Currently, supporting only MQTTv5 but everything is prepared to extend support also
-for MQTTv3 which is planned during year 2022.
+## MQTT Standard
 
-## Async executors
+### Supported features
 
-For desktop usage I recommend using Tokio async executor and for embedded there is prepared wrapper for Drogue device
-framework in the Drogue-IoT project [examples](https://github.com/drogue-iot/drogue-device/tree/main/device/src/network/clients) mqtt module.
+- QoS 0 & QoS 1
+- Basic Authentication via Connect
+- Subscription Options (Retain Handling, Retain as Published & No Local)
 
-## Restrains
+### Missing features
 
-Client supports following:
+- Quality of Service Level 2
+- Non-clean session
+- Auth packet
 
-- QoS 0 & QoS 1 (All QoS 2 packets are mapped for future client extension)
-- Only clean session
-- Auth packet not supported
+## Implementation & Usage details
+
 - Packet size is not limited, it is totally up to user (packet size and buffer sizes have to align)
 
-## Building
+## Tests
+
+Integration tests are written using tokio network tcp stack.
+
+For local testing, using Mosquitto is recommended. Run the following commands once to set up Mosquitto
 
 ```bash
-cargo build
+cp .ci/mqtt_pass_plain.txt .ci/mqtt_pass_hashed.txt
+chmod 700 .ci/mqtt_pass_hashed.txt
+mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
 ```
 
-## Running tests
+Start Mosquitto
 
-Integration tests are written using tokio network tcp stack and can be find under tokio_net.
+```bash
+mosquitto -c .ci/mosquitto.conf
+```
+
+The test categories can be executed separately using these arguments
 
 ```bash
 cargo test unit
@@ -37,9 +47,15 @@ cargo test integration
 cargo test load
 ```
 
+Individual tests can be run as follows
+
+```bash
+RUST_LOG=info cargo test -- integration::tests::pubsub::publish_recv --exact
+```
+
 ## Minimum supported Rust version (MSRV)
 
-Rust-mqtt is guaranteed to compile on stable Rust 1.75 and up.
+Rust-mqtt is guaranteed to compile on stable Rust 1.86 and up.
 It might compile with older versions but that may change in any new patch release.
 
 ## Acknowledgment
