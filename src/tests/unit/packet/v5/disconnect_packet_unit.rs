@@ -63,3 +63,29 @@ fn test_decode() {
         assert_eq!(u, 1024);
     }
 }
+
+#[test]
+fn test_decode_minimal() {
+    let buffer = [0xE0, 0x00];
+    let mut packet = DisconnectPacket::<1>::new();
+    let res = packet.decode(&mut BuffReader::new(&buffer, 2));
+    assert!(res.is_ok());
+    assert_eq!(packet.fixed_header, PacketType::Disconnect.into());
+    assert_eq!(packet.remain_len, 0);
+    assert_eq!(packet.disconnect_reason, 0x00);
+    assert_eq!(packet.property_len, 0);
+    assert!(packet.properties.is_empty())
+}
+
+#[test]
+fn test_decode_short() {
+    let buffer = [0xE0, 0x01, 0x8E];
+    let mut packet = DisconnectPacket::<1>::new();
+    let res = packet.decode(&mut BuffReader::new(&buffer, 3));
+    assert!(res.is_ok());
+    assert_eq!(packet.fixed_header, PacketType::Disconnect.into());
+    assert_eq!(packet.remain_len, 1);
+    assert_eq!(packet.disconnect_reason, 0x8E);
+    assert_eq!(packet.property_len, 0);
+    assert!(packet.properties.is_empty())
+}

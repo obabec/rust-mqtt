@@ -87,6 +87,9 @@ impl<'a, const MAX_PROPERTIES: usize> Packet<'a> for DisconnectPacket<'a, MAX_PR
             return Ok(());
         }
         self.disconnect_reason = buff_reader.read_u8()?;
+        if self.remain_len == 1 {
+            return Ok(());
+        }
         self.decode_properties(buff_reader)
     }
 
