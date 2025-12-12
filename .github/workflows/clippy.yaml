@@ -1,0 +1,21 @@
+on: [pull_request, workflow_dispatch]
+name: Clippy
+
+env:
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  clippy_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@1.92
+
+      - name: Run clippy with alloc & log features
+        run: cargo clippy --all-targets --features "log"
+
+      - name: Run clippy with bump & defmt features
+        run: cargo clippy --all-targets --no-default-features --features "v5 bump log"
