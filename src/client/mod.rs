@@ -468,10 +468,10 @@ impl<
         match identified_qos {
             IdentifiedQoS::AtMostOnce => {}
             IdentifiedQoS::AtLeastOnce(packet_identifier) =>
-            // Safety: `remaining_send_quota()` > 0 confirms that there is space.
+            // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
             unsafe { self.session.await_puback(packet_identifier) },
             IdentifiedQoS::ExactlyOnce(packet_identifier) =>
-            // Safety: `remaining_send_quota()` > 0 confirms that there is space.
+            // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
             unsafe { self.session.await_pubrec(packet_identifier) },
         }
 
@@ -765,7 +765,7 @@ impl<
 
                         let pubrec = PubrecPacket::new(pid, ReasonCode::Success);
 
-                        // Safety: `spublish_capacity()` > 0 confirms that there is space.
+                        // Safety: `spublish_remaining_capacity()` > 0 confirms that there is space.
                         unsafe { self.session.await_pubrel(pid) };
 
                         debug!("sending PUBREC packet");
