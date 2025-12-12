@@ -1,37 +1,45 @@
-/*
- * MIT License
- *
- * Copyright (c) [2022] [Ondrej Babec <ond.babec@gmail.com>]
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
-#![macro_use]
-#![cfg_attr(not(feature = "std"), no_std)]
-#![allow(dead_code)]
+#![no_std]
 #![doc = include_str!("../README.md")]
+#![warn(missing_docs)]
+#![warn(clippy::missing_safety_doc)]
+#![deny(clippy::unnecessary_safety_doc)]
+#![deny(clippy::unnecessary_safety_comment)]
 
-pub(crate) mod fmt;
+#[cfg(test)]
+extern crate std;
 
+#[cfg(feature = "alloc")]
+extern crate alloc;
+
+use embedded_io_async as eio;
+
+#[cfg(all(feature = "bump", feature = "alloc"))]
+compile_error!("You may not enable both `bump` and `alloc` features.");
+
+#[cfg(all(feature = "log", feature = "defmt"))]
+compile_error!("You may not enable both `log` and `defmt` features.");
+
+#[cfg(all(test, not(any(feature = "bump", feature = "alloc"))))]
+compile_error!("Enable either one of `bump` or `alloc` features for testing.");
+
+mod bytes;
+mod fmt;
+mod header;
+mod io;
+mod packet;
+
+pub mod buffer;
 pub mod client;
-pub mod encoding;
-pub mod network;
-pub mod packet;
-pub mod tests;
-pub mod utils;
+pub mod config;
+pub mod session;
+pub mod types;
+
+pub use bytes::Bytes;
+
+#[cfg(test)]
+mod test;
+
+#[cfg(feature = "v3")]
+mod v3;
+#[cfg(feature = "v5")]
+mod v5;
