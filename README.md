@@ -1,42 +1,110 @@
-# Rust-mqtt
-## About
-Rust-mqtt is native MQTT client for both std and no_std environments.
-Client library provides async API which can be used with various executors.
-Currently, supporting only MQTTv5 but everything is prepared to extend support also
-for MQTTv3 which is planned during year 2022.
+# rust-mqtt
 
-## Async executors
-For desktop usage I recommend using Tokio async executor and for embedded there is prepared wrapper for Drogue device
-framework in the Drogue-IoT project [examples](https://github.com/drogue-iot/drogue-device/tree/main/device/src/network/clients) mqtt module.
+rust-mqtt is an MQTT client primarily for no_std environments. The library provides an async API depending on `embedded_io_async`'s traits. As of now, only MQTT version 5.0 is supported.
 
-## Restrains
-Client supports following:
-- QoS 0 & QoS 1 (All QoS 2 packets are mapped for future client extension)
-- Only clean session
-- Retain not supported
-- Auth packet not supported
-- Packet size is not limited, it is totally up to user (packet size and buffer sizes have to align)
+## Library state
 
-## Building
+### Supported MQTT features
+
+- Will
+- Bidirectional publications with Quality of Service 0, 1 and 2
+- Flow control
+- Configuration & session tracking
+- Session recovery
+
+### Currently unsupported MQTT features & limitations
+
+- AUTH packet
+- User properties
+- Serverside maximum packet size
+- Request/Response
+- Subscription identifiers
+- Topic alias
+- Subscribing to multiple topics in a single packet
+- Message expiry interval
+
+### Extension plans (more or less by priority)
+
+- Receive the 'remaining length' (variable header & payload) of an mqtt packet using a buffer instead of calling `Read::read` very frequently.
+- Refrain from sending packets exceeding server's maximum packet size.
+- MQTT version 3
+- Sync implementation.
+
+### Feature flags
+
+- `log`: Enables logging via the `log` crate
+- `defmt`: Implements `defmt::Format` for crate items & enables logging via the `defmt` crate (version 1)
+- `bump`: Adds a simple bump allocator `BufferProvider` implementation
+- `alloc`: Adds a heap-allocation based `BufferProvider` implementation using the `alloc` crate
+- `v3`: Unused
+- `v5`: Enables MQTT version 5.0
+
+## Usage
+
+### Examples
+
+The example 'demo' contains most of rust-mqtt's features. Note that the example is very specific and showcases the client API and is not a good way to use the client.
+Out of the box, it connects to a broker on localhost:1883 with basic authentication. The easiest way to set this up is by installing, configuring and running Mosquitto using the CI configuration:
+
+```bash
+cp .ci/mqtt_pass_plain.txt .ci/mqtt_pass_hashed.txt
+chmod 700 .ci/mqtt_pass_hashed.txt
+mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
+mosquitto -c .ci/mosquitto.conf -v
 ```
-cargo build
+
+Then you can run the example with different logging configs and the bump/alloc features:
+
+```bash
+RUST_LOG=debug cargo run --example demo
+RUST_LOG=trace cargo run --example demo --no-default-features --features "v5 log bump"
 ```
 
-## Running tests
-Integration tests are written using tokio network tcp stack and can be find under tokio_net.
-```
+### Tests
+
+Unit tests should be ran using both the 'alloc' and 'bump' features.
+
+```bash
 cargo test unit
-cargo test integration
-cargo test load
+cargo test unit --no-default-features --features "v5 bump"
 ```
 
-## Minimum supported Rust version (MSRV)
-Rust-mqtt is guaranteed to compile on stable Rust 1.75 and up.
-It might compile with older versions but that may change in any new patch release.
+For integration tests, you can set up the mosquitto broker as used in the CI pipeline.
+You should restart the broker after every run of the integration test suite as it
+carries non-idempotent state that will impact the tests.
+
+```bash
+cp .ci/mqtt_pass_plain.txt .ci/mqtt_pass_hashed.txt
+chmod 700 .ci/mqtt_pass_hashed.txt
+mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
+mosquitto -c .ci/mosquitto.conf [-d]
+```
+
+Then you can run integration tests with the alloc feature.
+
+```bash
+cargo test integration
+```
+
+It can be helpful to see logging output when running tests.
+
+```bash
+RUST_LOG=trace cargo test unit --no-default-features --features "v5 bump" -- --show-output
+RUST_LOG=warn cargo test -- --show-output
+RUST_LOG=info cargo test integration -- --show-output
+```
+
+The full test suite can run with the alloc feature, just make sure a fresh broker is up and running.
+
+```bash
+cargo test
+```
 
 ## Acknowledgment
-This project could not be in state in which currently is without Ulf Lilleengen and rest of the community
+
+This project could not be in state in which currently is without Ulf Lilleengen and the rest of the community
 from [Drogue IoT](https://github.com/drogue-iot).
 
 ## Contact
-For any information contact me on email <ond.babec@gmail.com>
+
+For any information, open an issue if your matter could be helpful or interesting for others or should be documented. Otherwise contact us on email <julian.jg.graf@gmail.com>, <ond.babec@gmail.com>.
