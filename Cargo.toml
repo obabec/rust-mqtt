@@ -50,3 +50,6 @@ alloc = []
 v3 = []
 v5 = []
 
+
+[[example]]
+name = "demo"
