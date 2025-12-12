@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Extensive rewrite
+- Trait based buffer provision in deserialization
+- More robust packet deserialization regarding protocol errors and malformed packets
+- Newtype abstraction of types in the mqtt protocol
+- Improved error handling with non-recoverable and recoverable errors
+- Quality of service 2
+- More lightweight mqtt features such as flags in packets
+- Remove support for user properties
+- Upgrade to Rust 1.92
+
 ## 0.3.1 - 2025-12-11
 
 - Add support for the embedded_io_async::ReadReady trait
