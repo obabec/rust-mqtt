@@ -8,6 +8,7 @@ mod string;
 mod topic;
 mod will;
 
+pub(crate) use topic::SubscriptionFilter;
 pub(crate) use will::Will;
 
 pub use binary::MqttBinary;
@@ -15,7 +16,7 @@ pub use int::VarByteInt;
 pub use qos::QoS;
 pub use reason_code::ReasonCode;
 pub use string::MqttString;
-pub use topic::{Topic, TopicFilter};
+pub use topic::{TopicFilter, TopicName};
 
 /// Variable byte integer: If `VarByteInt::MAX_ENCODABLE` is exceeded, an error of this type is returned.
 /// MQTT string: If `MqttString::MAX_LENGTH` is exceeded, an error of this type is returned.

@@ -5,14 +5,14 @@ use crate::{
     header::{FixedHeader, PacketType},
     io::write::Writable,
     packet::{Packet, TxError, TxPacket},
-    types::{MqttString, TooLargeToEncode, Topic, VarByteInt},
+    types::{MqttString, TooLargeToEncode, TopicFilter, VarByteInt},
 };
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct UnsubscribePacket<'p, const MAX_TOPIC_FILTERS: usize> {
     packet_identifier: u16,
-    topic_filters: Vec<Topic<'p>, MAX_TOPIC_FILTERS>,
+    topic_filters: Vec<TopicFilter<'p>, MAX_TOPIC_FILTERS>,
 }
 
 impl<'p, const MAX_TOPIC_FILTERS: usize> Packet for UnsubscribePacket<'p, MAX_TOPIC_FILTERS> {
@@ -46,7 +46,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS
         let body_length: usize = self
             .topic_filters
             .iter()
-            .map(Topic::as_ref)
+            .map(TopicFilter::as_ref)
             .map(MqttString::written_len)
             .sum();
 
@@ -68,7 +68,10 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS
 }
 
 impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS> {
-    pub fn new(packet_identifier: u16, topic_filters: Vec<Topic<'p>, MAX_TOPIC_FILTERS>) -> Self {
+    pub fn new(
+        packet_identifier: u16,
+        topic_filters: Vec<TopicFilter<'p>, MAX_TOPIC_FILTERS>,
+    ) -> Self {
         Self {
             packet_identifier,
             topic_filters,
@@ -82,7 +85,7 @@ mod unit {
 
     use crate::{
         test::tx::encode,
-        types::{MqttString, Topic},
+        types::{MqttString, TopicFilter},
         v5::packet::UnsubscribePacket,
     };
 
@@ -92,10 +95,12 @@ mod unit {
         let mut topics = Vec::new();
 
         topics
-            .push(unsafe { Topic::new_unchecked(MqttString::try_from("test/+/topic").unwrap()) })
+            .push(unsafe {
+                TopicFilter::new_unchecked(MqttString::try_from("test/+/topic").unwrap())
+            })
             .unwrap();
         topics
-            .push(unsafe { Topic::new_unchecked(MqttString::try_from("test/#").unwrap()) })
+            .push(unsafe { TopicFilter::new_unchecked(MqttString::try_from("test/#").unwrap()) })
             .unwrap();
 
         let packet: UnsubscribePacket<'_, 2> = UnsubscribePacket::new(9874, topics);

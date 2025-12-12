@@ -17,7 +17,7 @@ use crate::{
     io::net::Transport,
     packet::Packet,
     session::{CPublishFlightState, SPublishFlightState, Session},
-    types::{MqttString, QoS, ReasonCode, Topic, TopicFilter},
+    types::{MqttString, QoS, ReasonCode, SubscriptionFilter, TopicFilter},
     v5::{
         packet::{
             ConnackPacket, ConnectPacket, DisconnectPacket, PingreqPacket, PingrespPacket,
@@ -368,7 +368,7 @@ impl<
     /// - The packet identifier of the sent SUBSCRIBE packet.
     pub async fn subscribe(
         &mut self,
-        topic: Topic<'_>,
+        topic_filter: TopicFilter<'_>,
         options: SubscriptionOptions,
     ) -> Result<u16, MqttError<'c>> {
         if self.pending_suback.len() == MAX_SUBSCRIBES {
@@ -376,12 +376,12 @@ impl<
             return Err(MqttError::SessionBuffer);
         }
 
-        let topic_filter = TopicFilter::new(topic, &options);
+        let subscribe_filter = SubscriptionFilter::new(topic_filter, &options);
 
         let pid = self.packet_identifier();
-        let mut topic_filters = Vec::<_, 1>::new();
-        let _ = topic_filters.push(topic_filter);
-        let packet = SubscribePacket::new(pid, topic_filters);
+        let mut subscribe_filters = Vec::<_, 1>::new();
+        let _ = subscribe_filters.push(subscribe_filter);
+        let packet = SubscribePacket::new(pid, subscribe_filters);
 
         debug!("sending SUBSCRIBE packet");
 
@@ -392,7 +392,7 @@ impl<
         Ok(pid)
     }
 
-    /// Unsubscribes from a single topic.
+    /// Unsubscribes from a single topic filter.
     ///
     /// The client keeps track of the packet identifier sent in the UNSUBSCRIBE packet.
     /// If no `Event::Unsuback` is received within a custom time,
@@ -400,16 +400,19 @@ impl<
     ///
     /// # Returns:
     /// - The packet identifier of the sent UNSUBSCRIBE packet.
-    pub async fn unsubscribe(&mut self, topic: Topic<'_>) -> Result<u16, MqttError<'c>> {
+    pub async fn unsubscribe(
+        &mut self,
+        topic_filter: TopicFilter<'_>,
+    ) -> Result<u16, MqttError<'c>> {
         if self.pending_unsuback.len() == MAX_SUBSCRIBES {
             warn!("maximum concurrent unsubscriptions reached");
             return Err(MqttError::SessionBuffer);
         }
 
         let pid = self.packet_identifier();
-        let mut topics = Vec::<_, 1>::new();
-        let _ = topics.push(topic);
-        let packet = UnsubscribePacket::new(pid, topics);
+        let mut topic_filters = Vec::<_, 1>::new();
+        let _ = topic_filters.push(topic_filter);
+        let packet = UnsubscribePacket::new(pid, topic_filters);
 
         debug!("sending UNSUBSCRIBE packet");
 

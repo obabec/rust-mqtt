@@ -23,7 +23,7 @@ use crate::common::{
 #[tokio::test]
 #[test_log::test]
 async fn publish_recv_qos0() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "test message";
 
     let mut tx =
@@ -34,7 +34,7 @@ async fn publish_recv_qos0() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic.clone(),
+            topic: topic_name.clone(),
             qos: QoS::AtMostOnce,
         };
 
@@ -44,7 +44,7 @@ async fn publish_recv_qos0() {
     };
 
     let receiver = async {
-        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic.clone());
+        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter.clone());
         let Publish {
             packet_identifier: _,
             dup,
@@ -52,7 +52,7 @@ async fn publish_recv_qos0() {
             qos,
             topic: _,
             message,
-        } = assert_recv_excl!(rx, topic);
+        } = assert_recv_excl!(rx, topic_filter);
 
         assert!(!dup);
         assert!(!retain);
@@ -67,7 +67,7 @@ async fn publish_recv_qos0() {
 #[tokio::test]
 #[test_log::test]
 async fn publish_recv_qos1() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "lorem ipsum";
 
     let mut tx =
@@ -78,7 +78,7 @@ async fn publish_recv_qos1() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic.clone(),
+            topic: topic_name.clone(),
             qos: QoS::AtLeastOnce,
         };
 
@@ -91,7 +91,7 @@ async fn publish_recv_qos1() {
         let mut options = DEFAULT_QOS0_SUB_OPTIONS;
         options.qos = QoS::AtLeastOnce;
 
-        assert_subscribe!(rx, options, topic.clone());
+        assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
             packet_identifier: _,
             dup,
@@ -99,7 +99,7 @@ async fn publish_recv_qos1() {
             qos,
             topic: _,
             message,
-        } = assert_recv_excl!(rx, topic);
+        } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
@@ -114,7 +114,7 @@ async fn publish_recv_qos1() {
 #[tokio::test]
 #[test_log::test]
 async fn publish_recv_qos2() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "01001000 01101001 (Hi in binary)";
 
     let mut tx =
@@ -125,7 +125,7 @@ async fn publish_recv_qos2() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic.clone(),
+            topic: topic_name.clone(),
             qos: QoS::ExactlyOnce,
         };
 
@@ -138,7 +138,7 @@ async fn publish_recv_qos2() {
         let mut options = DEFAULT_QOS0_SUB_OPTIONS;
         options.qos = QoS::ExactlyOnce;
 
-        assert_subscribe!(rx, options, topic.clone());
+        assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
             packet_identifier: _,
             dup,
@@ -146,7 +146,7 @@ async fn publish_recv_qos2() {
             qos,
             topic: _,
             message,
-        } = assert_recv_excl!(rx, topic);
+        } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
@@ -161,8 +161,8 @@ async fn publish_recv_qos2() {
 #[tokio::test]
 #[test_log::test]
 async fn publish_recv_multiple_qos0() {
-    let topic1 = unique_topic();
-    let topic2 = unique_topic();
+    let (topic_name1, topic_filter1) = unique_topic();
+    let (topic_name2, topic_filter2) = unique_topic();
     let msg = "418 I'm a teapot.";
 
     let mut tx1 =
@@ -175,7 +175,7 @@ async fn publish_recv_multiple_qos0() {
     let publisher1 = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic1.clone(),
+            topic: topic_name1.clone(),
             qos: QoS::AtMostOnce,
         };
 
@@ -186,7 +186,7 @@ async fn publish_recv_multiple_qos0() {
     let publisher2 = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic2.clone(),
+            topic: topic_name2.clone(),
             qos: QoS::AtMostOnce,
         };
 
@@ -196,13 +196,10 @@ async fn publish_recv_multiple_qos0() {
     };
 
     let receiver = async {
-        let topic1 = topic1.clone();
-        let topic2 = topic2.clone();
+        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter1.clone());
+        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter2.clone());
 
-        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic1.clone());
-        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic2.clone());
-
-        let mut messages = vec![(topic1, msg), (topic2, msg)];
+        let mut messages = vec![(topic_filter1, msg), (topic_filter2, msg)];
 
         let _ = timeout(Duration::from_secs(5), async {
             while !messages.is_empty() {
@@ -232,8 +229,8 @@ async fn publish_recv_multiple_qos0() {
 #[tokio::test]
 #[test_log::test]
 async fn publish_recv_multiple_qos1() {
-    let topic1 = unique_topic();
-    let topic2 = unique_topic();
+    let (topic_name1, topic_filter1) = unique_topic();
+    let (topic_name2, topic_filter2) = unique_topic();
     let msg = "= note: Send would have to be implemented for the type MqttBinary<'_> \n\
                      = note: ...but Send is actually implemented for the type MqttBinary<'0>, for some specific lifetime '0";
 
@@ -247,7 +244,7 @@ async fn publish_recv_multiple_qos1() {
     let publisher1 = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic1.clone(),
+            topic: topic_name1.clone(),
             qos: QoS::AtLeastOnce,
         };
 
@@ -258,7 +255,7 @@ async fn publish_recv_multiple_qos1() {
     let publisher2 = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic2.clone(),
+            topic: topic_name2.clone(),
             qos: QoS::AtLeastOnce,
         };
 
@@ -268,16 +265,13 @@ async fn publish_recv_multiple_qos1() {
     };
 
     let receiver = async {
-        let topic1 = topic1.clone();
-        let topic2 = topic2.clone();
-
         let mut options = DEFAULT_QOS0_SUB_OPTIONS;
         options.qos = QoS::AtLeastOnce;
 
-        assert_subscribe!(rx, options, topic1.clone());
-        assert_subscribe!(rx, options, topic2.clone());
+        assert_subscribe!(rx, options, topic_filter1.clone());
+        assert_subscribe!(rx, options, topic_filter2.clone());
 
-        let mut messages = vec![(topic1, msg), (topic2, msg)];
+        let mut messages = vec![(topic_name1.clone(), msg), (topic_name2.clone(), msg)];
 
         let _ = timeout(Duration::from_secs(5), async {
             while !messages.is_empty() {
@@ -308,8 +302,8 @@ async fn publish_recv_multiple_qos1() {
 #[tokio::test]
 #[test_log::test]
 async fn publish_recv_multiple_qos2() {
-    let topic1 = unique_topic();
-    let topic2 = unique_topic();
+    let (topic_name1, topic_filter1) = unique_topic();
+    let (topic_name2, topic_filter2) = unique_topic();
     let msg = "Standard Library? Where we're going, we don't need std.";
 
     let mut tx1 =
@@ -322,7 +316,7 @@ async fn publish_recv_multiple_qos2() {
     let publisher1 = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic1.clone(),
+            topic: topic_name1.clone(),
             qos: QoS::ExactlyOnce,
         };
 
@@ -333,7 +327,7 @@ async fn publish_recv_multiple_qos2() {
     let publisher2 = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic2.clone(),
+            topic: topic_name2.clone(),
             qos: QoS::ExactlyOnce,
         };
 
@@ -343,16 +337,13 @@ async fn publish_recv_multiple_qos2() {
     };
 
     let receiver = async {
-        let topic1 = topic1.clone();
-        let topic2 = topic2.clone();
-
         let mut options = DEFAULT_QOS0_SUB_OPTIONS;
         options.qos = QoS::ExactlyOnce;
 
-        assert_subscribe!(rx, options, topic1.clone());
-        assert_subscribe!(rx, options, topic2.clone());
+        assert_subscribe!(rx, options, topic_filter1.clone());
+        assert_subscribe!(rx, options, topic_filter2.clone());
 
-        let mut messages = vec![(topic1, msg), (topic2, msg)];
+        let mut messages = vec![(topic_name1.clone(), msg), (topic_name2.clone(), msg)];
 
         let _ = timeout(Duration::from_secs(5), async {
             while !messages.is_empty() {
@@ -383,8 +374,8 @@ async fn publish_recv_multiple_qos2() {
 #[tokio::test]
 #[test_log::test]
 async fn unsub_no_recv() {
-    let topic1 = unique_topic();
-    let topic2 = unique_topic();
+    let (topic_name1, topic_filter1) = unique_topic();
+    let (topic_name2, topic_filter2) = unique_topic();
     let msg1 = "Smart Fridge: You are out of milk. And hope.";
     let msg2 = "Motion detected: It's the cat again, isn't it?";
 
@@ -398,7 +389,7 @@ async fn unsub_no_recv() {
     let publisher1 = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic1.clone(),
+            topic: topic_name1.clone(),
             qos: QoS::AtLeastOnce,
         };
 
@@ -412,7 +403,7 @@ async fn unsub_no_recv() {
     let publisher2 = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic2.clone(),
+            topic: topic_name2.clone(),
             qos: QoS::AtLeastOnce,
         };
 
@@ -425,23 +416,20 @@ async fn unsub_no_recv() {
     };
 
     let receiver = async {
-        let topic1 = topic1.clone();
-        let topic2 = topic2.clone();
-
         let mut options = DEFAULT_QOS0_SUB_OPTIONS;
         options.qos = QoS::AtLeastOnce;
-        assert_subscribe!(rx, options, topic1.clone());
-        assert_subscribe!(rx, options, topic2.clone());
+        assert_subscribe!(rx, options, topic_filter1.clone());
+        assert_subscribe!(rx, options, topic_filter2.clone());
 
-        let m = assert_recv_excl!(rx, topic1);
+        let m = assert_recv_excl!(rx, topic_name1);
         assert_eq!(&*m.message, msg1.as_bytes());
 
-        let m = assert_recv_excl!(rx, topic2);
+        let m = assert_recv_excl!(rx, topic_name2);
         assert_eq!(&*m.message, msg2.as_bytes());
 
-        assert_unsubscribe!(rx, topic2);
+        assert_unsubscribe!(rx, topic_filter2.clone());
 
-        let m = assert_recv_excl!(rx, topic1);
+        let m = assert_recv_excl!(rx, topic_name1);
         assert_eq!(&*m.message, msg1.as_bytes());
 
         assert_err!(
@@ -460,7 +448,7 @@ async fn unsub_no_recv() {
 #[tokio::test]
 #[test_log::test]
 async fn recv_min_sub_qos0() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "(╯°□°）╯︵ ┻━┻";
 
     let mut tx =
@@ -471,7 +459,7 @@ async fn recv_min_sub_qos0() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic.clone(),
+            topic: topic_name.clone(),
             qos: QoS::ExactlyOnce,
         };
 
@@ -483,7 +471,7 @@ async fn recv_min_sub_qos0() {
     let receiver = async {
         let options = DEFAULT_QOS0_SUB_OPTIONS;
 
-        assert_subscribe!(rx, options, topic.clone());
+        assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
             packet_identifier: _,
             dup,
@@ -491,7 +479,7 @@ async fn recv_min_sub_qos0() {
             qos,
             topic: _,
             message,
-        } = assert_recv_excl!(rx, topic);
+        } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
@@ -506,7 +494,7 @@ async fn recv_min_sub_qos0() {
 #[tokio::test]
 #[test_log::test]
 async fn recv_min_sub_qos1() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "¯\\_(ツ)_/¯";
 
     let mut tx =
@@ -517,7 +505,7 @@ async fn recv_min_sub_qos1() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic.clone(),
+            topic: topic_name.clone(),
             qos: QoS::ExactlyOnce,
         };
 
@@ -530,7 +518,7 @@ async fn recv_min_sub_qos1() {
         let mut options = DEFAULT_QOS0_SUB_OPTIONS;
         options.qos = QoS::AtLeastOnce;
 
-        assert_subscribe!(rx, options, topic.clone());
+        assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
             packet_identifier: _,
             dup,
@@ -538,7 +526,7 @@ async fn recv_min_sub_qos1() {
             qos,
             topic: _,
             message,
-        } = assert_recv_excl!(rx, topic);
+        } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
@@ -553,7 +541,7 @@ async fn recv_min_sub_qos1() {
 #[tokio::test]
 #[test_log::test]
 async fn recv_min_pub_qos0() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "ʕ•ᴥ•ʔ";
 
     let mut tx =
@@ -564,7 +552,7 @@ async fn recv_min_pub_qos0() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic.clone(),
+            topic: topic_name.clone(),
             qos: QoS::AtMostOnce,
         };
 
@@ -577,7 +565,7 @@ async fn recv_min_pub_qos0() {
         let mut options = DEFAULT_QOS0_SUB_OPTIONS;
         options.qos = QoS::ExactlyOnce;
 
-        assert_subscribe!(rx, options, topic.clone());
+        assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
             packet_identifier: _,
             dup,
@@ -585,7 +573,7 @@ async fn recv_min_pub_qos0() {
             qos,
             topic: _,
             message,
-        } = assert_recv_excl!(rx, topic);
+        } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
@@ -600,7 +588,7 @@ async fn recv_min_pub_qos0() {
 #[tokio::test]
 #[test_log::test]
 async fn recv_min_pub_qos1() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "┬─┬ ノ( ゜-゜ノ)";
 
     let mut tx =
@@ -611,7 +599,7 @@ async fn recv_min_pub_qos1() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
-            topic: topic.clone(),
+            topic: topic_name.clone(),
             qos: QoS::AtLeastOnce,
         };
 
@@ -624,7 +612,7 @@ async fn recv_min_pub_qos1() {
         let mut options = DEFAULT_QOS0_SUB_OPTIONS;
         options.qos = QoS::ExactlyOnce;
 
-        assert_subscribe!(rx, options, topic.clone());
+        assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
             packet_identifier: _,
             dup,
@@ -632,7 +620,7 @@ async fn recv_min_pub_qos1() {
             qos,
             topic: _,
             message,
-        } = assert_recv_excl!(rx, topic);
+        } = assert_recv_excl!(rx, topic_filter);
 
         assert!(!dup);
         assert!(!retain);

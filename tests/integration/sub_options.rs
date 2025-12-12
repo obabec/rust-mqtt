@@ -19,7 +19,7 @@ use crate::common::{
 #[tokio::test]
 #[test_log::test]
 async fn publish_no_local() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "Mosquitto bit me.";
 
     let mut c =
@@ -28,11 +28,11 @@ async fn publish_no_local() {
     let mut options = DEFAULT_QOS0_SUB_OPTIONS;
     options.qos = QoS::ExactlyOnce;
     options.no_local = true;
-    assert_subscribe!(c, options, topic.clone());
+    assert_subscribe!(c, options, topic_filter.clone());
 
     let pub_options = PublicationOptions {
         retain: false,
-        topic: topic.clone(),
+        topic: topic_name.clone(),
         qos: QoS::ExactlyOnce,
     };
 
@@ -52,7 +52,7 @@ async fn publish_no_local() {
 #[tokio::test]
 #[test_log::test]
 async fn subscribe_retain_handling_default() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "Retained message for AlwaysSend.";
 
     let mut tx =
@@ -71,7 +71,7 @@ async fn subscribe_retain_handling_default() {
 
     let pub_options = PublicationOptions {
         retain: true,
-        topic: topic.clone(),
+        topic: topic_name.clone(),
         qos: QoS::AtLeastOnce,
     };
     assert_published!(tx, pub_options, msg.into());
@@ -82,14 +82,14 @@ async fn subscribe_retain_handling_default() {
     let mut options = DEFAULT_QOS0_SUB_OPTIONS;
     options.qos = QoS::AtLeastOnce;
     options.retain_handling = RetainHandling::AlwaysSend;
-    assert_subscribe!(rx, options, topic.clone());
+    assert_subscribe!(rx, options, topic_filter.clone());
 
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());
     assert!(publish.retain);
 
     // Subscribe again - should receive retained message again with RetainHandling::AlwaysSend
-    assert_subscribe!(rx, options, topic.clone());
+    assert_subscribe!(rx, options, topic_filter.clone());
 
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());
@@ -106,7 +106,7 @@ async fn subscribe_retain_handling_default() {
         )
         .await
     );
-    assert_subscribe!(rx, options, topic.clone());
+    assert_subscribe!(rx, options, topic_filter.clone());
 
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());
@@ -119,7 +119,7 @@ async fn subscribe_retain_handling_default() {
 #[tokio::test]
 #[test_log::test]
 async fn subscribe_retain_handling_never() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "Retained message for NeverSend.";
 
     let mut tx =
@@ -131,7 +131,7 @@ async fn subscribe_retain_handling_never() {
 
     let pub_options = PublicationOptions {
         retain: true,
-        topic: topic.clone(),
+        topic: topic_name.clone(),
         qos: QoS::AtLeastOnce,
     };
     assert_published!(tx, pub_options, msg.into());
@@ -142,7 +142,7 @@ async fn subscribe_retain_handling_never() {
     let mut options = DEFAULT_QOS0_SUB_OPTIONS;
     options.qos = QoS::AtLeastOnce;
     options.retain_handling = RetainHandling::NeverSend;
-    assert_subscribe!(rx, options, topic.clone());
+    assert_subscribe!(rx, options, topic_filter.clone());
 
     assert_err!(
         timeout(Duration::from_secs(5), async {
@@ -153,7 +153,7 @@ async fn subscribe_retain_handling_never() {
     );
 
     // Subscribe again - should still NOT receive retained message
-    assert_subscribe!(rx, options, topic.clone());
+    assert_subscribe!(rx, options, topic_filter.clone());
 
     assert_err!(
         timeout(Duration::from_secs(5), async {
@@ -170,7 +170,7 @@ async fn subscribe_retain_handling_never() {
 #[tokio::test]
 #[test_log::test]
 async fn subscribe_retain_handling_clean_only() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "Retained message for SendIfNotSubscribedBefore.";
 
     let mut tx =
@@ -182,7 +182,7 @@ async fn subscribe_retain_handling_clean_only() {
 
     let pub_options = PublicationOptions {
         retain: true,
-        topic: topic.clone(),
+        topic: topic_name.clone(),
         qos: QoS::AtLeastOnce,
     };
     assert_published!(tx, pub_options, msg.into());
@@ -193,14 +193,14 @@ async fn subscribe_retain_handling_clean_only() {
     let mut options = DEFAULT_QOS0_SUB_OPTIONS;
     options.qos = QoS::AtLeastOnce;
     options.retain_handling = RetainHandling::SendIfNotSubscribedBefore;
-    assert_subscribe!(rx, options, topic.clone());
+    assert_subscribe!(rx, options, topic_filter.clone());
 
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());
     assert!(publish.retain);
 
     // Subscribe again - should NOT receive retained message (already subscribed before)
-    assert_subscribe!(rx, options, topic.clone());
+    assert_subscribe!(rx, options, topic_filter.clone());
 
     assert_err!(
         timeout(Duration::from_secs(5), async {
@@ -217,7 +217,7 @@ async fn subscribe_retain_handling_clean_only() {
 #[tokio::test]
 #[test_log::test]
 async fn subscribe_retain_as_published_false() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "Retained message for SendIfNotSubscribedBefore.";
 
     let mut tx =
@@ -228,7 +228,7 @@ async fn subscribe_retain_as_published_false() {
 
     let pub_options = PublicationOptions {
         retain: true,
-        topic: topic.clone(),
+        topic: topic_name.clone(),
         qos: QoS::AtLeastOnce,
     };
     assert_published!(tx, pub_options.clone(), msg.into());
@@ -236,7 +236,7 @@ async fn subscribe_retain_as_published_false() {
     sleep(Duration::from_secs(1)).await;
 
     let options = DEFAULT_QOS0_SUB_OPTIONS;
-    assert_subscribe!(rx, options, topic.clone());
+    assert_subscribe!(rx, options, topic_filter.clone());
 
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());
@@ -258,7 +258,7 @@ async fn subscribe_retain_as_published_false() {
 #[tokio::test]
 #[test_log::test]
 async fn subscribe_retain_as_published_true() {
-    let topic = unique_topic();
+    let (topic_name, topic_filter) = unique_topic();
     let msg = "Retained message for SendIfNotSubscribedBefore.";
 
     let mut tx =
@@ -269,7 +269,7 @@ async fn subscribe_retain_as_published_true() {
 
     let pub_options = PublicationOptions {
         retain: true,
-        topic: topic.clone(),
+        topic: topic_name.clone(),
         qos: QoS::AtLeastOnce,
     };
     assert_published!(tx, pub_options.clone(), msg.into());
@@ -278,7 +278,7 @@ async fn subscribe_retain_as_published_true() {
 
     let mut options = DEFAULT_QOS0_SUB_OPTIONS;
     options.retain_as_published = true;
-    assert_subscribe!(rx, options, topic.clone());
+    assert_subscribe!(rx, options, topic_filter.clone());
 
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());

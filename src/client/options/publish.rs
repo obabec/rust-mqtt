@@ -1,4 +1,4 @@
-use crate::types::{QoS, Topic};
+use crate::types::{QoS, TopicName};
 
 /// Options for a publication.
 #[derive(Debug, Clone)]
@@ -11,7 +11,7 @@ pub struct Options<'p> {
     pub retain: bool,
 
     /// The topic that the message is published on.
-    pub topic: Topic<'p>,
+    pub topic: TopicName<'p>,
 
     /// The quality of service that the message is published with to the server.
     /// The quality of service level used by the server to send this publication

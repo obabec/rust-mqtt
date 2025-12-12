@@ -21,7 +21,7 @@ use rust_mqtt::{
         },
     },
     config::{KeepAlive, SessionExpiryInterval},
-    types::{MqttBinary, MqttString, QoS, Topic},
+    types::{MqttBinary, MqttString, QoS, TopicName},
 };
 use tokio::{net::TcpStream, select, time::sleep};
 
@@ -94,9 +94,9 @@ async fn main() {
     };
 
     let topic =
-        unsafe { Topic::new_unchecked(MqttString::from_slice("rust-mqtt/is/great").unwrap()) };
+        unsafe { TopicName::new_unchecked(MqttString::from_slice("rust-mqtt/is/great").unwrap()) };
 
-    match client.subscribe(topic.clone(), sub_options).await {
+    match client.subscribe(topic.clone().into(), sub_options).await {
         Ok(_) => info!("Sent Subscribe"),
         Err(e) => {
             error!("Failed to subscribe: {:?}", e);
@@ -203,7 +203,7 @@ async fn main() {
         };
     }
 
-    match client.unsubscribe(topic).await {
+    match client.unsubscribe(topic.into()).await {
         Ok(_) => info!("Sent Unsubscribe"),
         Err(e) => {
             error!("Failed to unsubscribe: {:?}", e);

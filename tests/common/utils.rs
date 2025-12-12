@@ -9,7 +9,7 @@ use rust_mqtt::{
         event::{Event, Publish, Suback},
         options::{ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions},
     },
-    types::{MqttString, QoS, ReasonCode, Topic},
+    types::{MqttString, QoS, ReasonCode, TopicFilter, TopicName},
 };
 use tokio::net::TcpStream;
 
@@ -25,12 +25,15 @@ fn unique_number() -> u64 {
 
     number
 }
-pub fn unique_topic() -> Topic<'static> {
+pub fn unique_topic() -> (TopicName<'static>, TopicFilter<'static>) {
     let s = format!("rust/mqtt/is-amazing/{}", unique_number());
     let b = s.into_bytes().into_boxed_slice();
     let s = MqttString::new(Bytes::Owned(b)).unwrap();
 
-    unsafe { Topic::new_unchecked(s) }
+    let n = unsafe { TopicName::new_unchecked(s) };
+    let f = n.clone().into();
+
+    (n, f)
 }
 
 struct StaticAlloc(AllocBuffer);
@@ -72,7 +75,7 @@ pub async fn disconnect(client: &mut TestClient<'_>, options: &DisconnectOptions
 pub async fn subscribe<'c>(
     client: &mut TestClient<'c>,
     options: SubscriptionOptions,
-    topic: Topic<'_>,
+    topic: TopicFilter<'_>,
 ) -> Result<QoS, MqttError<'c>> {
     let pid = warn_inspect!(
         client.subscribe(topic, options).await,
@@ -107,7 +110,7 @@ pub async fn subscribe<'c>(
 
 pub async fn unsubscribe<'c>(
     client: &mut TestClient<'c>,
-    topic: Topic<'_>,
+    topic: TopicFilter<'_>,
 ) -> Result<(), MqttError<'c>> {
     let pid = warn_inspect!(
         client.unsubscribe(topic).await,

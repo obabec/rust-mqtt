@@ -10,16 +10,22 @@ use crate::{
     types::MqttString,
 };
 
-/// A topic filter string for subscribing to certain topics with correct syntax according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901241>.
+/// A topic name string for that messages can be published on according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901241>.
+/// Cannot contain wildcard characters.
+///
+/// Examples:
+/// - "sport/tennis/player1"
+/// - "sport/tennis/player1/ranking"
+/// - "sport/tennis/player1/score/wimbledon"
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Topic<'t>(MqttString<'t>);
+pub struct TopicName<'t>(MqttString<'t>);
 
-impl<'t> Topic<'t> {
-    /// Creates a new topic without checking for correct syntax of the topic filter string.
+impl<'t> TopicName<'t> {
+    /// Creates a new topic name without checking for correct syntax of the topic name string.
     ///
     /// # Safety
-    /// The syntax of the topic is valid.
+    /// The syntax of the topic name is valid.
     pub unsafe fn new_unchecked(topic: MqttString<'t>) -> Self {
         Self(topic)
     }
@@ -31,30 +37,69 @@ impl<'t> Topic<'t> {
     }
 }
 
-impl<'t> AsRef<MqttString<'t>> for Topic<'t> {
+impl<'t> AsRef<MqttString<'t>> for TopicName<'t> {
     fn as_ref(&self) -> &MqttString<'t> {
         &self.0
     }
 }
-impl<'t> From<Topic<'t>> for MqttString<'t> {
-    fn from(value: Topic<'t>) -> Self {
+impl<'t> From<TopicName<'t>> for MqttString<'t> {
+    fn from(value: TopicName<'t>) -> Self {
         value.0
     }
 }
 
-/// A topic filter for subscribing to certain topics with subscription options.
+/// A topic filter string for subscribing to certain topics according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901241>.
+/// Can contain wildcard characters.
 ///
-/// It combines:
-/// - A topic string (can include MQTT's wildcards)
-/// - Subscription options
-#[derive(Debug, Clone)]
+/// Examples:
+/// - "sport/tennis/#"
+/// - "sport/+/player1"
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct TopicFilter<'t> {
-    topic: Topic<'t>,
+pub struct TopicFilter<'t>(MqttString<'t>);
+
+impl<'t> TopicFilter<'t> {
+    /// Creates a new topic filter without checking for correct syntax of the topic filter string.
+    ///
+    /// # Safety
+    /// The syntax of the topic filter is valid.
+    pub unsafe fn new_unchecked(topic: MqttString<'t>) -> Self {
+        Self(topic)
+    }
+
+    /// Delegates to `Bytes::as_borrowed()`.
+    #[inline]
+    pub fn as_borrowed(&'t self) -> Self {
+        Self(self.as_ref().as_borrowed())
+    }
+}
+
+impl<'t> AsRef<MqttString<'t>> for TopicFilter<'t> {
+    fn as_ref(&self) -> &MqttString<'t> {
+        &self.0
+    }
+}
+impl<'t> From<TopicFilter<'t>> for MqttString<'t> {
+    fn from(value: TopicFilter<'t>) -> Self {
+        value.0
+    }
+}
+impl<'t> From<TopicName<'t>> for TopicFilter<'t> {
+    fn from(value: TopicName<'t>) -> Self {
+        Self(value.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct SubscriptionFilter<'t> {
+    topic: TopicFilter<'t>,
     subscription_options: u8,
 }
 
-impl<'p, const MAX_TOPIC_FILTERS: usize> Writable for Vec<TopicFilter<'p>, MAX_TOPIC_FILTERS> {
+impl<'p, const MAX_TOPIC_FILTERS: usize> Writable
+    for Vec<SubscriptionFilter<'p>, MAX_TOPIC_FILTERS>
+{
     fn written_len(&self) -> usize {
         self.iter()
             .map(|t| &t.topic)
@@ -72,9 +117,8 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> Writable for Vec<TopicFilter<'p>, MAX_T
     }
 }
 
-impl<'t> TopicFilter<'t> {
-    /// Creates a new topic filter.
-    pub fn new(topic: Topic<'t>, options: &SubscriptionOptions) -> Self {
+impl<'t> SubscriptionFilter<'t> {
+    pub fn new(topic: TopicFilter<'t>, options: &SubscriptionOptions) -> Self {
         let retain_handling_bits = match options.retain_handling {
             RetainHandling::AlwaysSend => 0x00,
             RetainHandling::SendIfNotSubscribedBefore => 0x10,
@@ -99,14 +143,6 @@ impl<'t> TopicFilter<'t> {
         Self {
             topic,
             subscription_options: subscribe_options_bits,
-        }
-    }
-
-    /// Delegates to `Bytes::as_borrowed()` for the topic and copies subscription options.
-    pub fn as_borrowed(&'t self) -> Self {
-        Self {
-            topic: self.topic.as_borrowed(),
-            subscription_options: self.subscription_options,
         }
     }
 }

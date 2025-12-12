@@ -5,7 +5,7 @@ use crate::{
     header::{FixedHeader, PacketType},
     io::write::Writable,
     packet::{Packet, TxError, TxPacket},
-    types::{TooLargeToEncode, TopicFilter, VarByteInt},
+    types::{SubscriptionFilter, TooLargeToEncode, VarByteInt},
     v5::property::SubscriptionIdentifier,
 };
 
@@ -15,7 +15,7 @@ pub struct SubscribePacket<'p, const MAX_TOPIC_FILTERS: usize> {
     packet_identifier: u16,
 
     subscription_identifier: Option<SubscriptionIdentifier>,
-    topic_filters: Vec<TopicFilter<'p>, MAX_TOPIC_FILTERS>,
+    subscribe_filters: Vec<SubscriptionFilter<'p>, MAX_TOPIC_FILTERS>,
 }
 
 impl<'p, const MAX_TOPIC_FILTERS: usize> Packet for SubscribePacket<'p, MAX_TOPIC_FILTERS> {
@@ -31,7 +31,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> TxPacket for SubscribePacket<'p, MAX_TO
         self.packet_identifier.write(write).await?;
         self.properties_length().write(write).await?;
         self.subscription_identifier.write(write).await?;
-        self.topic_filters.write(write).await?;
+        self.subscribe_filters.write(write).await?;
 
         Ok(())
     }
@@ -44,12 +44,12 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> 
     /// so that the packets complete length doesn't exceed `VarByteInt::MAX_ENCODABLE`.
     pub fn new(
         packet_identifier: u16,
-        topic_filters: Vec<TopicFilter<'p>, MAX_TOPIC_FILTERS>,
+        subscribe_filters: Vec<SubscriptionFilter<'p>, MAX_TOPIC_FILTERS>,
     ) -> Self {
         Self {
             packet_identifier,
             subscription_identifier: None,
-            topic_filters,
+            subscribe_filters,
         }
     }
 
@@ -64,7 +64,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> 
         let properties_length = self.properties_length();
         let total_properties_length = properties_length.size() + properties_length.written_len();
 
-        let body_length = self.topic_filters.written_len();
+        let body_length = self.subscribe_filters.written_len();
 
         let total_length = variable_header_length + total_properties_length + body_length;
 
@@ -93,8 +93,8 @@ mod unit {
     use crate::{
         client::options::{RetainHandling, SubscriptionOptions},
         test::tx::encode,
-        types::{MqttString, QoS, Topic, VarByteInt},
-        v5::packet::{SubscribePacket, subscribe::TopicFilter},
+        types::{MqttString, QoS, SubscriptionFilter, TopicFilter, VarByteInt},
+        v5::packet::SubscribePacket,
     };
 
     #[tokio::test]
@@ -103,8 +103,8 @@ mod unit {
         let mut topics = Vec::new();
 
         topics
-            .push(TopicFilter::new(
-                unsafe { Topic::new_unchecked(MqttString::try_from("test/hello").unwrap()) },
+            .push(SubscriptionFilter::new(
+                unsafe { TopicFilter::new_unchecked(MqttString::try_from("test/hello").unwrap()) },
                 &SubscriptionOptions {
                     retain_handling: RetainHandling::AlwaysSend,
                     retain_as_published: false,
@@ -115,8 +115,8 @@ mod unit {
             .unwrap();
 
         topics
-            .push(TopicFilter::new(
-                unsafe { Topic::new_unchecked(MqttString::try_from("asdfjklo/#").unwrap()) },
+            .push(SubscriptionFilter::new(
+                unsafe { TopicFilter::new_unchecked(MqttString::try_from("asdfjklo/#").unwrap()) },
                 &SubscriptionOptions {
                     retain_handling: RetainHandling::NeverSend,
                     retain_as_published: true,
@@ -169,8 +169,8 @@ mod unit {
     async fn encode_properties() {
         let mut topics = Vec::new();
         topics
-            .push(TopicFilter::new(
-                unsafe { Topic::new_unchecked(MqttString::try_from("abc/+/y").unwrap()) },
+            .push(SubscriptionFilter::new(
+                unsafe { TopicFilter::new_unchecked(MqttString::try_from("abc/+/y").unwrap()) },
                 &SubscriptionOptions {
                     retain_handling: RetainHandling::SendIfNotSubscribedBefore,
                     retain_as_published: true,

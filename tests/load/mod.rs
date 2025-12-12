@@ -1,7 +1,7 @@
 use log::info;
 use rust_mqtt::{
     client::options::{PublicationOptions, SubscriptionOptions},
-    types::{QoS, Topic},
+    types::{QoS, TopicName},
 };
 use tokio::{
     join,
@@ -17,7 +17,7 @@ use crate::common::{
 const MSG: &str = "testMessage";
 
 async fn publish_multiple(
-    topic: Topic<'_>,
+    topic: TopicName<'_>,
     qos: QoS,
     count: u16,
     ready_rx: Receiver<()>,
@@ -53,7 +53,7 @@ async fn publish_multiple(
 }
 
 async fn receive_multiple(
-    topic: Topic<'static>,
+    topic_name: TopicName<'static>,
     qos: QoS,
     count: u16,
     ready_tx: Sender<()>,
@@ -68,9 +68,8 @@ async fn receive_multiple(
         qos,
     };
 
-    let topic_name = topic.as_ref();
-    info!("[Receiver] Subscribing to topic {:?}", topic_name);
-    assert_subscribe!(client, options, topic.clone());
+    info!("[Receiver] Subscribing to topic {:?}", topic_name.as_ref());
+    assert_subscribe!(client, options, topic_name.into());
 
     info!("[Receiver] Subscription confirmed, signaling ready");
     let _ = ready_tx.send(());
@@ -97,13 +96,12 @@ async fn receive_multiple(
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[test_log::test]
 async fn load_test_ten_qos0() {
-    let topic1 = unique_topic();
-    let topic2 = topic1.clone();
+    let (topic_name, _) = unique_topic();
     let (ready_tx, ready_rx) = channel();
 
     let (r, p) = join!(
-        receive_multiple(topic1, QoS::AtMostOnce, 10, ready_tx),
-        publish_multiple(topic2, QoS::AtMostOnce, 10, ready_rx)
+        receive_multiple(topic_name.clone(), QoS::AtMostOnce, 10, ready_tx),
+        publish_multiple(topic_name, QoS::AtMostOnce, 10, ready_rx)
     );
     assert_ok!(r);
     assert_ok!(p);
@@ -112,13 +110,12 @@ async fn load_test_ten_qos0() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[test_log::test]
 async fn load_test_ten_qos1() {
-    let topic1 = unique_topic();
-    let topic2 = topic1.clone();
+    let (topic_name, _) = unique_topic();
     let (ready_tx, ready_rx) = channel();
 
     let (r, p) = join!(
-        receive_multiple(topic1, QoS::AtLeastOnce, 10, ready_tx),
-        publish_multiple(topic2, QoS::AtLeastOnce, 10, ready_rx)
+        receive_multiple(topic_name.clone(), QoS::AtLeastOnce, 10, ready_tx),
+        publish_multiple(topic_name, QoS::AtLeastOnce, 10, ready_rx)
     );
     assert_ok!(r);
     assert_ok!(p);
@@ -127,13 +124,12 @@ async fn load_test_ten_qos1() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[test_log::test]
 async fn load_test_ten_qos2() {
-    let topic1 = unique_topic();
-    let topic2 = topic1.clone();
+    let (topic_name, _) = unique_topic();
     let (ready_tx, ready_rx) = channel();
 
     let (r, p) = join!(
-        receive_multiple(topic1, QoS::ExactlyOnce, 10, ready_tx),
-        publish_multiple(topic2, QoS::ExactlyOnce, 10, ready_rx)
+        receive_multiple(topic_name.clone(), QoS::ExactlyOnce, 10, ready_tx),
+        publish_multiple(topic_name, QoS::ExactlyOnce, 10, ready_rx)
     );
     assert_ok!(r);
     assert_ok!(p);
@@ -142,13 +138,12 @@ async fn load_test_ten_qos2() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[test_log::test]
 async fn load_test_fifty_qos0() {
-    let topic1 = unique_topic();
-    let topic2 = topic1.clone();
+    let (topic_name, _) = unique_topic();
     let (ready_tx, ready_rx) = channel();
 
     let (r, p) = join!(
-        receive_multiple(topic1, QoS::AtMostOnce, 50, ready_tx),
-        publish_multiple(topic2, QoS::AtMostOnce, 50, ready_rx)
+        receive_multiple(topic_name.clone(), QoS::AtMostOnce, 50, ready_tx),
+        publish_multiple(topic_name, QoS::AtMostOnce, 50, ready_rx)
     );
     assert_ok!(r);
     assert_ok!(p);
@@ -157,13 +152,12 @@ async fn load_test_fifty_qos0() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[test_log::test]
 async fn load_test_fifty_qos1() {
-    let topic1 = unique_topic();
-    let topic2 = topic1.clone();
+    let (topic_name, _) = unique_topic();
     let (ready_tx, ready_rx) = channel();
 
     let (r, p) = join!(
-        receive_multiple(topic1, QoS::AtLeastOnce, 50, ready_tx),
-        publish_multiple(topic2, QoS::AtLeastOnce, 50, ready_rx)
+        receive_multiple(topic_name.clone(), QoS::AtLeastOnce, 50, ready_tx),
+        publish_multiple(topic_name, QoS::AtLeastOnce, 50, ready_rx)
     );
     assert_ok!(r);
     assert_ok!(p);
@@ -172,13 +166,12 @@ async fn load_test_fifty_qos1() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[test_log::test]
 async fn load_test_fifty_qos2() {
-    let topic1 = unique_topic();
-    let topic2 = topic1.clone();
+    let (topic_name, _) = unique_topic();
     let (ready_tx, ready_rx) = channel();
 
     let (r, p) = join!(
-        receive_multiple(topic1, QoS::ExactlyOnce, 50, ready_tx),
-        publish_multiple(topic2, QoS::ExactlyOnce, 50, ready_rx)
+        receive_multiple(topic_name.clone(), QoS::ExactlyOnce, 50, ready_tx),
+        publish_multiple(topic_name, QoS::ExactlyOnce, 50, ready_rx)
     );
     assert_ok!(r);
     assert_ok!(p);
@@ -187,13 +180,12 @@ async fn load_test_fifty_qos2() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[test_log::test]
 async fn load_test_five_hundred_qos0() {
-    let topic1 = unique_topic();
-    let topic2 = topic1.clone();
+    let (topic_name, _) = unique_topic();
     let (ready_tx, ready_rx) = channel();
 
     let (r, p) = join!(
-        receive_multiple(topic1, QoS::AtMostOnce, 500, ready_tx),
-        publish_multiple(topic2, QoS::AtMostOnce, 500, ready_rx)
+        receive_multiple(topic_name.clone(), QoS::AtMostOnce, 500, ready_tx),
+        publish_multiple(topic_name, QoS::AtMostOnce, 500, ready_rx)
     );
     assert_ok!(r);
     assert_ok!(p);
@@ -202,13 +194,12 @@ async fn load_test_five_hundred_qos0() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[test_log::test]
 async fn load_test_five_hundred_qos1() {
-    let topic1 = unique_topic();
-    let topic2 = topic1.clone();
+    let (topic_name, _) = unique_topic();
     let (ready_tx, ready_rx) = channel();
 
     let (r, p) = join!(
-        receive_multiple(topic1, QoS::AtLeastOnce, 500, ready_tx),
-        publish_multiple(topic2, QoS::AtLeastOnce, 500, ready_rx)
+        receive_multiple(topic_name.clone(), QoS::AtLeastOnce, 500, ready_tx),
+        publish_multiple(topic_name, QoS::AtLeastOnce, 500, ready_rx)
     );
     assert_ok!(r);
     assert_ok!(p);
@@ -217,13 +208,12 @@ async fn load_test_five_hundred_qos1() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[test_log::test]
 async fn load_test_five_hundred_qos2() {
-    let topic1 = unique_topic();
-    let topic2 = topic1.clone();
+    let (topic_name, _) = unique_topic();
     let (ready_tx, ready_rx) = channel();
 
     let (r, p) = join!(
-        receive_multiple(topic1, QoS::ExactlyOnce, 500, ready_tx),
-        publish_multiple(topic2, QoS::ExactlyOnce, 500, ready_rx)
+        receive_multiple(topic_name.clone(), QoS::ExactlyOnce, 500, ready_tx),
+        publish_multiple(topic_name, QoS::ExactlyOnce, 500, ready_rx)
     );
     assert_ok!(r);
     assert_ok!(p);
@@ -232,13 +222,12 @@ async fn load_test_five_hundred_qos2() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 #[test_log::test]
 async fn load_test_ten_thousand_qos0() {
-    let topic1 = unique_topic();
-    let topic2 = topic1.clone();
+    let (topic_name, _) = unique_topic();
     let (ready_tx, ready_rx) = channel();
 
     let (r, p) = join!(
-        receive_multiple(topic1, QoS::AtMostOnce, 10000, ready_tx),
-        publish_multiple(topic2, QoS::AtMostOnce, 10000, ready_rx)
+        receive_multiple(topic_name.clone(), QoS::AtMostOnce, 10000, ready_tx),
+        publish_multiple(topic_name, QoS::AtMostOnce, 10000, ready_rx)
     );
     assert_ok!(r);
     assert_ok!(p);
