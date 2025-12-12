@@ -36,3 +36,4 @@ pub(crate) mod tests;
 pub mod client;
 pub mod interface;
 pub mod network;
+pub mod version;

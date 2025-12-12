@@ -22,6 +22,8 @@
  * SOFTWARE.
  */
 
+pub mod client;
+pub mod client_trait;
 pub mod raw;
 
 use embedded_io::ReadReady;
@@ -53,12 +55,7 @@ where
         config: ClientConfig<'a, MAX_PROPERTIES, R>,
     ) -> Self {
         Self {
-            raw: RawMqttClient::new(
-                network_driver,
-                buffer,
-                recv_buffer,
-                config,
-            ),
+            raw: RawMqttClient::new(network_driver, buffer, recv_buffer, config),
         }
     }
 

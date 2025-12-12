@@ -24,9 +24,11 @@
 
 mod reader;
 mod writer;
+mod codec;
 
 pub use reader::*;
 pub use writer::*;
+pub use codec::*;
 
 use core::fmt::{Display, Formatter};
 
@@ -43,6 +45,7 @@ pub enum Error {
     WrongPacketToDecode,
     WrongPacketToEncode,
     PropertyNotFound,
+    ShortData,
 }
 
 impl Display for Error {
@@ -57,7 +60,8 @@ impl Display for Error {
             Error::PacketTypeMismatch => write!(f, "Packet type not matched during decoding (Received different packet type than encode type)!"),
             Error::WrongPacketToDecode => write!(f, "Not able to decode packet, this packet is used just for sending to broker, not receiving by client!"),
             Error::WrongPacketToEncode => write!(f, "Not able to encode packet, this packet is used only from server to client not the opposite way!"),
-            Error::PropertyNotFound => write!(f, "Property with ID not found!")
+            Error::PropertyNotFound => write!(f, "Property with ID not found!"),
+            Error::ShortData => write!(f, "The data included to decode the packet is to short"),
         }
     }
 }

@@ -22,12 +22,9 @@
  * SOFTWARE.
  */
 
-mod binary;
-mod string;
-mod variable_byte_integer;
-mod topic;
+pub trait Version {}
+pub struct V3;
+pub struct V5;
 
-pub(crate) use binary::*;
-pub(crate) use string::*;
-pub(crate) use variable_byte_integer::*;
-pub(crate) use topic::*;
+impl Version for V3 {}
+impl Version for V5 {}

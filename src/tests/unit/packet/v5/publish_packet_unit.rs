@@ -44,7 +44,7 @@ fn test_encode() {
     packet.topic_name = topic;
     packet.packet_identifier = 23432;
     let mut props = Vec::<Property, 2>::new();
-    props.push(Property::PayloadFormat(0x01));
+    props.push(Property::PayloadFormatIndicator(0x01));
     props.push(Property::MessageExpiryInterval(45678));
     packet.property_len = packet.add_properties(&props);
     static MESSAGE: [u8; 11] = [
@@ -81,7 +81,7 @@ fn test_decode() {
     let prop = packet.properties.get(0);
     assert!(prop.is_some());
     assert_eq!(<&Property as Into<u8>>::into(prop.unwrap()), 0x01);
-    if let Property::PayloadFormat(u) = (*prop.unwrap()).clone() {
+    if let Property::PayloadFormatIndicator(u) = (*prop.unwrap()).clone() {
         assert_eq!(u, 0x01);
     }
     let prop2 = packet.properties.get(1);

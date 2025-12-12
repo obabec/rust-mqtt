@@ -22,12 +22,18 @@
  * SOFTWARE.
  */
 
-mod binary;
-mod string;
-mod variable_byte_integer;
-mod topic;
+use core::marker::PhantomData;
 
-pub(crate) use binary::*;
-pub(crate) use string::*;
-pub(crate) use variable_byte_integer::*;
-pub(crate) use topic::*;
+use crate::version::{Version, V3, V5};
+
+pub struct Client<V: Version> {
+    version: PhantomData<V>,
+}
+
+impl Client<V3> {
+    pub fn connect_to_broker()
+}
+
+impl Client<V5> {
+    pub fn connect_to_broker()
+}

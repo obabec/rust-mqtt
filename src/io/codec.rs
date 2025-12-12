@@ -22,12 +22,30 @@
  * SOFTWARE.
  */
 
-mod binary;
-mod string;
-mod variable_byte_integer;
-mod topic;
+use crate::io::{self, BuffWriter};
 
-pub(crate) use binary::*;
-pub(crate) use string::*;
-pub(crate) use variable_byte_integer::*;
-pub(crate) use topic::*;
+pub trait Codec: Sized {
+    fn encoded_len(&self) -> usize;
+
+    fn encode(&self, writer: &mut BuffWriter) -> Result<(), io::Error>;
+    fn decode(buffer: &[u8]) -> Result<Self, io::Error>;
+}
+
+impl Codec for () {
+    fn encoded_len(&self) -> usize {
+        0
+    }
+
+    fn encode(&self, writer: &mut BuffWriter) -> Result<(), io::Error> {
+        Ok(())
+    }
+
+    fn decode(buffer: &[u8]) -> Result<Self, io::Error> {
+        if buffer.len() == 0 {
+            Ok(())
+        } else {
+            Err(io::Error::DecodingError)
+        }
+    }
+
+}

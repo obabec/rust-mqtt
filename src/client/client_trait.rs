@@ -22,12 +22,6 @@
  * SOFTWARE.
  */
 
-mod binary;
-mod string;
-mod variable_byte_integer;
-mod topic;
-
-pub(crate) use binary::*;
-pub(crate) use string::*;
-pub(crate) use variable_byte_integer::*;
-pub(crate) use topic::*;
+pub trait MqttClient {
+    
+}

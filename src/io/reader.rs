@@ -22,6 +22,7 @@
  * SOFTWARE.
  */
 
+use core::cmp::min;
 use core::mem;
 use core::str;
 
@@ -41,16 +42,20 @@ pub struct BuffReader<'a> {
 }
 
 impl<'a> BuffReader<'a> {
-    pub fn increment_position(&mut self, increment: usize) {
-        self.position += increment;
-    }
-
     pub fn new(buffer: &'a [u8], buff_len: usize) -> Self {
         Self {
             buffer,
             position: 0,
             len: buff_len,
         }
+    }
+
+    pub fn remaining_bytes(&self) -> usize {
+        self.len - self.position
+    }
+
+    pub fn increment_position(&mut self, increment: usize) {
+        self.position += increment;
     }
 
     /// Variable byte integer can be 1-4 Bytes long. Buffer reader takes all 4 Bytes at first and
@@ -170,12 +175,16 @@ impl<'a> BuffReader<'a> {
             Err(e) => {
                 self.position -= len_name;
                 Err(e)
-            },
+            }
         }
     }
 
     /// Read payload message from buffer
-    pub fn read_message(&mut self, total_len: usize) -> &'a [u8] {
+    /// # Args
+    /// - total_len is the total length of the packet, not the total length of the payload
+    /// 
+    /// Returns a shorter slice when not possible
+    pub fn read_payload(&mut self, total_len: usize) -> &'a [u8] {
         if total_len > self.len {
             return &self.buffer[self.position..self.len];
         }

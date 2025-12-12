@@ -27,7 +27,7 @@ use crate::io::{self, BuffReader, BuffWriter};
 
 #[derive(Debug, Clone)]
 pub enum Property<'a> {
-    PayloadFormat(u8),
+    PayloadFormatIndicator(u8),
     MessageExpiryInterval(u32),
     ContentType(EncodedString<'a>),
     ResponseTopic(EncodedString<'a>),
@@ -103,7 +103,7 @@ impl<'a> Property<'a> {
         // not possible to use with associated values with different types
         #[allow(clippy::match_like_matches_macro)]
         match self {
-            Property::PayloadFormat(_u) => true,
+            Property::PayloadFormatIndicator(_u) => true,
             Property::MessageExpiryInterval(_u) => true,
             Property::TopicAlias(_u) => true,
             Property::ResponseTopic(_u) => true,
@@ -225,7 +225,7 @@ impl<'a> Property<'a> {
 
     pub fn encoded_len(&self) -> u16 {
         match self {
-            Property::PayloadFormat(_u) => 1,
+            Property::PayloadFormatIndicator(_u) => 1,
             Property::MessageExpiryInterval(_u) => 4,
             Property::ContentType(u) => u.encoded_len(),
             Property::ResponseTopic(u) => u.encoded_len(),
@@ -261,7 +261,7 @@ impl<'a> Property<'a> {
 
     pub fn encode(&self, buff_writer: &mut BuffWriter<'a>) -> Result<(), io::Error> {
         match self {
-            Property::PayloadFormat(u) => buff_writer.write_u8(*u),
+            Property::PayloadFormatIndicator(u) => buff_writer.write_u8(*u),
             Property::MessageExpiryInterval(u) => buff_writer.write_u32(*u),
             Property::ContentType(u) => buff_writer.write_string_ref(u),
             Property::ResponseTopic(u) => buff_writer.write_string_ref(u),
@@ -295,7 +295,7 @@ impl<'a> Property<'a> {
     pub fn decode(buff_reader: &mut BuffReader<'a>) -> Result<Property<'a>, io::Error> {
         let property_identifier = buff_reader.read_u8();
         return match property_identifier {
-            Ok(0x01) => Ok(Property::PayloadFormat(buff_reader.read_u8()?)),
+            Ok(0x01) => Ok(Property::PayloadFormatIndicator(buff_reader.read_u8()?)),
             Ok(0x02) => Ok(Property::MessageExpiryInterval(buff_reader.read_u32()?)),
             Ok(0x03) => Ok(Property::ContentType(buff_reader.read_string()?)),
             Ok(0x08) => Ok(Property::ResponseTopic(buff_reader.read_string()?)),
@@ -341,7 +341,7 @@ impl<'a> Property<'a> {
 impl<'a> From<&Property<'a>> for u8 {
     fn from(value: &Property<'a>) -> Self {
         match value {
-            Property::PayloadFormat(_u) => 0x01,
+            Property::PayloadFormatIndicator(_u) => 0x01,
             Property::MessageExpiryInterval(_u) => 0x02,
             Property::ContentType(_u) => 0x03,
             Property::ResponseTopic(_u) => 0x08,

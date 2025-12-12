@@ -22,5 +22,6 @@
  * SOFTWARE.
  */
 
+pub mod new;
 #[allow(unused_must_use)]
 pub mod v5;
