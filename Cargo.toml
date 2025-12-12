@@ -1,12 +1,15 @@
 [package]
 name = "rust-mqtt"
 version = "0.3.1"
-authors = ["Ondrej Babec <ond.babec@gmail.com>"]
+authors = [
+    "Ondrej Babec <ond.babec@gmail.com>",
+    "Julian Graf <julian.jg.graf@gmail.com>",
+]
 edition = "2024"
 resolver = "2"
 description = "MQTT client for embedded and non-embedded environments"
 readme = "README.md"
-license-file = "LICENSE"
+license = "MIT"
 repository = "https://github.com/obabec/rust-mqtt"
 keywords = ["embedded", "async", "mqtt", "no_std"]
 categories = ["embedded", "network-programming", "no-std"]
