@@ -3,7 +3,7 @@ use std::time::Duration;
 use log::info;
 use rust_mqtt::{
     client::{event::Publish, options::PublicationOptions},
-    types::QoS,
+    types::{IdentifiedQoS, QoS},
 };
 use tokio::{
     join,
@@ -46,17 +46,19 @@ async fn publish_recv_qos0() {
     let receiver = async {
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter.clone());
         let Publish {
-            packet_identifier: _,
+            identified_qos,
             dup,
             retain,
-            qos,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_filter);
 
         assert!(!dup);
         assert!(!retain);
-        assert_eq!(qos, QoS::AtMostOnce);
+        assert_eq!(
+            <IdentifiedQoS as Into<QoS>>::into(identified_qos),
+            QoS::AtMostOnce
+        );
         assert_eq!(&*message, msg.as_bytes());
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -93,17 +95,19 @@ async fn publish_recv_qos1() {
 
         assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
-            packet_identifier: _,
+            identified_qos,
             dup,
             retain,
-            qos,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
-        assert_eq!(qos, QoS::AtLeastOnce);
+        assert_eq!(
+            <IdentifiedQoS as Into<QoS>>::into(identified_qos),
+            QoS::AtLeastOnce
+        );
         assert_eq!(&*message, msg.as_bytes());
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -140,17 +144,19 @@ async fn publish_recv_qos2() {
 
         assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
-            packet_identifier: _,
+            identified_qos,
             dup,
             retain,
-            qos,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
-        assert_eq!(qos, QoS::ExactlyOnce);
+        assert_eq!(
+            <IdentifiedQoS as Into<QoS>>::into(identified_qos),
+            QoS::ExactlyOnce
+        );
         assert_eq!(&*message, msg.as_bytes());
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -276,7 +282,10 @@ async fn publish_recv_multiple_qos1() {
         let _ = timeout(Duration::from_secs(5), async {
             while !messages.is_empty() {
                 let p = assert_recv!(rx);
-                assert_eq!(p.qos, QoS::AtLeastOnce);
+                assert_eq!(
+                    <IdentifiedQoS as Into<QoS>>::into(p.identified_qos),
+                    QoS::AtLeastOnce
+                );
 
                 let matching_msg = assert_ok!(
                     messages
@@ -348,7 +357,10 @@ async fn publish_recv_multiple_qos2() {
         let _ = timeout(Duration::from_secs(5), async {
             while !messages.is_empty() {
                 let p = assert_recv!(rx);
-                assert_eq!(p.qos, QoS::ExactlyOnce);
+                assert_eq!(
+                    <IdentifiedQoS as Into<QoS>>::into(p.identified_qos),
+                    QoS::ExactlyOnce
+                );
 
                 let matching_msg = assert_ok!(
                     messages
@@ -473,17 +485,19 @@ async fn recv_min_sub_qos0() {
 
         assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
-            packet_identifier: _,
+            identified_qos,
             dup,
             retain,
-            qos,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
-        assert_eq!(qos, QoS::AtMostOnce);
+        assert_eq!(
+            <IdentifiedQoS as Into<QoS>>::into(identified_qos),
+            QoS::AtMostOnce
+        );
         assert_eq!(&*message, msg.as_bytes());
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -520,17 +534,19 @@ async fn recv_min_sub_qos1() {
 
         assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
-            packet_identifier: _,
+            identified_qos,
             dup,
             retain,
-            qos,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
-        assert_eq!(qos, QoS::AtLeastOnce);
+        assert_eq!(
+            <IdentifiedQoS as Into<QoS>>::into(identified_qos),
+            QoS::AtLeastOnce
+        );
         assert_eq!(&*message, msg.as_bytes());
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -567,17 +583,19 @@ async fn recv_min_pub_qos0() {
 
         assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
-            packet_identifier: _,
+            identified_qos,
             dup,
             retain,
-            qos,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
-        assert_eq!(qos, QoS::AtMostOnce);
+        assert_eq!(
+            <IdentifiedQoS as Into<QoS>>::into(identified_qos),
+            QoS::AtMostOnce
+        );
         assert_eq!(&*message, msg.as_bytes());
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -614,17 +632,19 @@ async fn recv_min_pub_qos1() {
 
         assert_subscribe!(rx, options, topic_filter.clone());
         let Publish {
-            packet_identifier: _,
+            identified_qos,
             dup,
             retain,
-            qos,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_filter);
 
         assert!(!dup);
         assert!(!retain);
-        assert_eq!(qos, QoS::AtLeastOnce);
+        assert_eq!(
+            <IdentifiedQoS as Into<QoS>>::into(identified_qos),
+            QoS::AtLeastOnce
+        );
         assert_eq!(&*message, msg.as_bytes());
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };

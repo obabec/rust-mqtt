@@ -9,7 +9,7 @@ use rust_mqtt::{
         event::{Event, Publish, Suback},
         options::{ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions},
     },
-    types::{MqttString, QoS, ReasonCode, TopicFilter, TopicName},
+    types::{IdentifiedQoS, MqttString, QoS, ReasonCode, TopicFilter, TopicName},
 };
 use tokio::net::TcpStream;
 
@@ -154,17 +154,17 @@ pub async fn receive_and_complete<'c>(
 ) -> Result<Publish<'c>, MqttError<'c>> {
     let publish = receive_publish(client).await?;
 
-    match publish.qos {
-        QoS::AtMostOnce => {}
-        QoS::AtLeastOnce => {}
-        QoS::ExactlyOnce => loop {
+    match publish.identified_qos {
+        IdentifiedQoS::AtMostOnce => {}
+        IdentifiedQoS::AtLeastOnce(_) => {}
+        IdentifiedQoS::ExactlyOnce(pid) => loop {
             match warn_inspect!(client.poll().await, "Client::poll() failed")? {
-                Event::PublishReleased(p) if p.packet_identifier == publish.packet_identifier => {
+                Event::PublishReleased(p) if p.packet_identifier == pid => {
                     break;
                 }
                 Event::PublishReleased(p) => warn!(
                     "Expected PUBREL with packet identifier {}, but received PUBREL with packet identifier {}",
-                    publish.packet_identifier, p.packet_identifier
+                    pid, p.packet_identifier
                 ),
                 e => warn!("Expected PUBLISH, but received {:?}", e),
             }

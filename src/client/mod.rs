@@ -17,7 +17,7 @@ use crate::{
     io::net::Transport,
     packet::Packet,
     session::{CPublishFlightState, SPublishFlightState, Session},
-    types::{MqttString, QoS, ReasonCode, SubscriptionFilter, TopicFilter},
+    types::{IdentifiedQoS, MqttString, QoS, ReasonCode, SubscriptionFilter, TopicFilter},
     v5::{
         packet::{
             ConnackPacket, ConnectPacket, DisconnectPacket, PingreqPacket, PingrespPacket,
@@ -445,42 +445,40 @@ impl<
             }
         }
 
-        let mut packet = PublishPacket::new(
+        let identified_qos = match options.qos {
+            QoS::AtMostOnce => IdentifiedQoS::AtMostOnce,
+            QoS::AtLeastOnce => IdentifiedQoS::AtLeastOnce(self.packet_identifier()),
+            QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(self.packet_identifier()),
+        };
+        let pid = identified_qos.packet_identifier();
+
+        let packet = PublishPacket::new(
             false,
             options.retain,
+            identified_qos,
             options.topic.as_ref().as_borrowed(),
             message,
         )?;
 
-        let packet_identifier = match options.qos {
-            QoS::AtMostOnce => {
-                debug!("sending PUBLISH packet");
-                0
-            }
-            _ => {
-                let pid = self.packet_identifier();
-                debug!("sending PUBLISH packet with packet identifier {}", pid);
-                packet.set_qos(options.qos, pid);
-                pid
-            }
-        };
+        match pid {
+            Some(pid) => debug!("sending PUBLISH packet with packet identifier {}", pid),
+            None => debug!("sending PUBLISH packet"),
+        }
 
-        match options.qos {
-            QoS::AtMostOnce => {}
-            QoS::AtLeastOnce => {
-                // Safety: `remaining_send_quota()` > 0 confirms that there is space.
-                unsafe { self.session.await_puback(packet_identifier) };
-            }
-            QoS::ExactlyOnce => {
-                // Safety: `remaining_send_quota()` > 0 confirms that there is space.
-                unsafe { self.session.await_pubrec(packet_identifier) };
-            }
+        match identified_qos {
+            IdentifiedQoS::AtMostOnce => {}
+            IdentifiedQoS::AtLeastOnce(packet_identifier) =>
+            // Safety: `remaining_send_quota()` > 0 confirms that there is space.
+            unsafe { self.session.await_puback(packet_identifier) },
+            IdentifiedQoS::ExactlyOnce(packet_identifier) =>
+            // Safety: `remaining_send_quota()` > 0 confirms that there is space.
+            unsafe { self.session.await_pubrec(packet_identifier) },
         }
 
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
-        Ok(packet_identifier)
+        Ok(pid.unwrap_or_default())
     }
 
     /// Resends a PUBLISH packet with DUP flag set.
@@ -497,33 +495,40 @@ impl<
         options: &PublicationOptions<'_>,
         message: Bytes<'_>,
     ) -> Result<(), MqttError<'c>> {
-        let s = (options.qos > QoS::AtMostOnce)
-            .then(|| self.session.remove_cpublish(packet_identifier))
-            .flatten();
-
-        match (options.qos, s) {
-            (QoS::AtMostOnce, _) => panic!("QoS 0 packets cannot be republished"),
-            // Safety: A single entry was just removed so there is space.
-            (QoS::AtLeastOnce, Some(_)) => unsafe { self.session.await_puback(packet_identifier) },
-            // Safety: A single entry was just removed so there is space.
-            (QoS::ExactlyOnce, Some(_)) => unsafe { self.session.await_pubrec(packet_identifier) },
-            (_, None) => {
-                warn!(
-                    "packet identifier {} not in flight or not in correct in-flight state",
-                    packet_identifier
-                );
-                return Err(MqttError::PacketIdentifierNotInFlight);
-            }
+        if options.qos == QoS::AtMostOnce {
+            panic!("QoS 0 packets cannot be republished");
         }
 
-        let mut packet = PublishPacket::new(
+        if self.session.remove_cpublish(packet_identifier).is_none() {
+            warn!(
+                "packet identifier {} not in flight or not in correct in-flight state",
+                packet_identifier
+            );
+            return Err(MqttError::PacketIdentifierNotInFlight);
+        };
+
+        let identified_qos = match options.qos {
+            // Safety: method has panniced if QoS == 0
+            QoS::AtMostOnce => unsafe { unreachable_unchecked() },
+            QoS::AtLeastOnce => {
+                // Safety: A single entry was just removed so there is space.
+                unsafe { self.session.await_puback(packet_identifier) };
+                IdentifiedQoS::AtLeastOnce(packet_identifier)
+            }
+            QoS::ExactlyOnce => {
+                // Safety: A single entry was just removed so there is space.
+                unsafe { self.session.await_pubrec(packet_identifier) };
+                IdentifiedQoS::ExactlyOnce(packet_identifier)
+            }
+        };
+
+        let packet = PublishPacket::new(
             true,
             options.retain,
+            identified_qos,
             options.topic.as_ref().as_borrowed(),
             message,
         )?;
-
-        packet.set_qos(options.qos, packet_identifier);
 
         debug!(
             "resending PUBLISH packet with packet identifier {}",
@@ -713,69 +718,63 @@ impl<
             PacketType::Publish => {
                 debug!("receiving PUBLISH packet");
                 let publish = self.raw.recv_body::<PublishPacket>(&header).await?;
-                let pid = publish.packet_identifier;
 
                 let event = Event::Publish(Publish {
-                    packet_identifier: pid.unwrap_or_default(),
+                    identified_qos: publish.identified_qos,
                     dup: publish.dup,
                     retain: publish.retain,
-                    qos: publish.qos,
                     topic: publish.topic,
                     message: publish.message,
                 });
 
-                match pid {
-                    None if publish.qos == QoS::AtMostOnce => {
+                match publish.identified_qos {
+                    IdentifiedQoS::AtMostOnce => {
                         debug!("received QoS 0 publication");
 
                         event
                     }
-                    // Safety: `PublishPacket::receive` always returns a packet identifier if QoS != 0
-                    None => unsafe { unreachable_unchecked() },
-                    Some(pid) if self.session.is_used_spublish_packet_identifier(pid) => {
+                    IdentifiedQoS::AtLeastOnce(pid) | IdentifiedQoS::ExactlyOnce(pid)
+                        if self.session.is_used_spublish_packet_identifier(pid) =>
+                    {
                         warn!("packet identifier {} already in use", pid);
                         Event::Ignored
                     }
-                    Some(pid) => match publish.qos {
-                        // Safety: `PublishPacket::receive` doesn't read packet identifier if QoS > 0
-                        QoS::AtMostOnce => unsafe { unreachable_unchecked() },
-                        QoS::AtLeastOnce => {
-                            debug!("received QoS 1 publication with packet identifier {}", pid);
+                    IdentifiedQoS::AtLeastOnce(pid) => {
+                        debug!("received QoS 1 publication with packet identifier {}", pid);
 
-                            // Could disconnect using ReasonCode::ReceiveMaximumExceeded, but we can handle a QoS 1 publication always.
+                        // Could disconnect using ReasonCode::ReceiveMaximumExceeded, but we can handle a QoS 1 publication always.
 
-                            let puback = PubackPacket::new(pid, ReasonCode::Success);
+                        let puback = PubackPacket::new(pid, ReasonCode::Success);
 
-                            debug!("sending PUBACK packet");
+                        debug!("sending PUBACK packet");
 
-                            self.raw.send(&puback).await?;
-                            self.raw.flush().await?;
+                        self.raw.send(&puback).await?;
+                        self.raw.flush().await?;
 
-                            event
+                        event
+                    }
+                    IdentifiedQoS::ExactlyOnce(pid) => {
+                        debug!("received QoS 2 publication with packet identifier {}", pid);
+
+                        if self.session.spublish_remaining_capacity() == 0 {
+                            error!("server exceeded receive maximum");
+                            self.raw
+                                .close_with(Some(ReasonCode::ReceiveMaximumExceeded));
+                            return Err(MqttError::Server);
                         }
-                        QoS::ExactlyOnce => {
-                            debug!("received QoS 2 publication with packet identifier {}", pid);
 
-                            if self.session.spublish_remaining_capacity() == 0 {
-                                error!("server exceeded receive maximum");
-                                self.raw
-                                    .close_with(Some(ReasonCode::ReceiveMaximumExceeded));
-                                return Err(MqttError::Server);
-                            }
+                        let pubrec = PubrecPacket::new(pid, ReasonCode::Success);
 
-                            let pubrec = PubrecPacket::new(pid, ReasonCode::Success);
+                        // Safety: `spublish_capacity()` > 0 confirms that there is space.
+                        unsafe { self.session.await_pubrel(pid) };
 
-                            // Safety: `spublish_capacity()` > 0 confirms that there is space.
-                            unsafe { self.session.await_pubrel(pid) };
+                        debug!("sending PUBREC packet");
 
-                            debug!("sending PUBREC packet");
+                        self.raw.send(&pubrec).await?;
+                        self.raw.flush().await?;
 
-                            self.raw.send(&pubrec).await?;
-                            self.raw.flush().await?;
-
-                            event
-                        }
-                    },
+                        event
+                    }
                 }
             }
             PacketType::Puback => {

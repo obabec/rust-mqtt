@@ -2,7 +2,7 @@
 
 use crate::{
     bytes::Bytes,
-    types::{MqttString, QoS, ReasonCode},
+    types::{IdentifiedQoS, MqttString, ReasonCode},
 };
 
 /// Events emitted by the client when receiving an MQTT packet.
@@ -91,9 +91,13 @@ pub struct Suback {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Publish<'p> {
-    /// The packet identifier of the PUBLISH packet. If the quality of service of this publish is 0, the packet
-    /// identifier is 0. Otherwise it is never 0.
-    pub packet_identifier: u16,
+    /// The quality of service the server determined to use for this publication. It is the minimum of
+    /// the matching subscription with the highest quality of service level and the quality of service of
+    /// the publishing client's publication.
+    /// 
+    /// If the quality of service is greater than 0, this includes the non-zero packet identifier of the
+    /// PUBLISH packet.
+    pub identified_qos: IdentifiedQoS,
 
     /// The DUP flag in the PUBLISH packet. If set to false, it indicates that this is the first occasion
     /// the server has attempted to send this publication.
@@ -103,11 +107,6 @@ pub struct Publish<'p> {
     /// result of a retained message. If set to false, this publication having been retained depends on
     /// the retain as published flag of the matching subscription.
     pub retain: bool,
-
-    /// The quality of service the server determined to use for this publication. It is the minimum of
-    /// the matching subscription with the highest quality of service level and the quality of service of
-    /// the publishing client's publication.
-    pub qos: QoS,
 
     /// The exact topic of this publication.
     pub topic: MqttString<'p>,

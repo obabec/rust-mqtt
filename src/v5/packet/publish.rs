@@ -9,7 +9,7 @@ use crate::{
         write::{Writable, wlen},
     },
     packet::{Packet, RxError, RxPacket, TxError, TxPacket},
-    types::{MqttString, QoS, TooLargeToEncode, VarByteInt},
+    types::{IdentifiedQoS, MqttString, QoS, TooLargeToEncode, VarByteInt},
     v5::property::{
         AtMostOnceProperty, ContentType, CorrelationData, MessageExpiryInterval,
         PayloadFormatIndicator, Property, PropertyType, ResponseTopic, SubscriptionIdentifier,
@@ -21,11 +21,10 @@ use crate::{
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PublishPacket<'p> {
     pub dup: bool,
-    pub qos: QoS,
+    pub identified_qos: IdentifiedQoS,
     pub retain: bool,
 
     pub topic: MqttString<'p>,
-    pub packet_identifier: Option<u16>,
 
     // TODO clarify whether PayloadFormatIndicator can be included only once
     pub payload_format_indicator: Option<PayloadFormatIndicator>,
@@ -62,11 +61,15 @@ impl<'p> RxPacket<'p> for PublishPacket<'p> {
         trace!("reading topic name");
         let topic_name = MqttString::read(r).await?;
 
-        let packet_identifier = match qos {
-            QoS::AtMostOnce => None,
-            _ => {
+        let identified_qos = match qos {
+            QoS::AtMostOnce => IdentifiedQoS::AtMostOnce,
+            QoS::AtLeastOnce => {
                 trace!("reading packet identifier");
-                Some(u16::read(r).await?)
+                IdentifiedQoS::AtLeastOnce(u16::read(r).await?)
+            }
+            QoS::ExactlyOnce => {
+                trace!("reading packet identifier");
+                IdentifiedQoS::ExactlyOnce(u16::read(r).await?)
             }
         };
 
@@ -166,10 +169,9 @@ impl<'p> RxPacket<'p> for PublishPacket<'p> {
 
         Ok(PublishPacket {
             dup,
-            qos,
+            identified_qos,
             retain,
             topic: topic_name,
-            packet_identifier,
             payload_format_indicator,
             message_expiry_interval,
             topic_alias,
@@ -185,14 +187,15 @@ impl<'p> TxPacket for PublishPacket<'p> {
         // Safety: Publish packets that are too long to encode cannot be created
         let remaining_len = unsafe { self.remaining_length().unwrap_unchecked() };
 
-        let flags = (u8::from(self.dup) << 3) | self.qos.into_bits(1) | u8::from(self.retain);
+        let qos: QoS = self.identified_qos.into();
+        let flags = (u8::from(self.dup) << 3) | qos.into_bits(1) | u8::from(self.retain);
 
         FixedHeader::new(Self::PACKET_TYPE, flags, remaining_len)
             .write(write)
             .await?;
 
         self.topic.write(write).await?;
-        if let Some(p) = self.packet_identifier {
+        if let Some(p) = self.identified_qos.packet_identifier() {
             p.write(write).await?
         }
 
@@ -215,15 +218,15 @@ impl<'p> PublishPacket<'p> {
     pub fn new(
         dup: bool,
         retain: bool,
+        identified_qos: IdentifiedQoS,
         topic: MqttString<'p>,
         message: Bytes<'p>,
     ) -> Result<Self, TooLargeToEncode> {
         let p = Self {
             dup,
-            qos: QoS::AtMostOnce,
+            identified_qos,
             retain,
             topic,
-            packet_identifier: None,
             payload_format_indicator: None,
             message_expiry_interval: None,
             topic_alias: None,
@@ -236,19 +239,11 @@ impl<'p> PublishPacket<'p> {
         p.remaining_length().map(|_| p)
     }
 
-    /// Sets the Quality of Service of the packet to the provided value.
-    ///
-    /// A packet identifier is only allowed when the Quality of Service of the packet
-    /// is greater than 0, therefore only call this method if the qos is not 0
-    pub fn set_qos(&mut self, qos: QoS, packet_identifier: u16) {
-        self.qos = qos;
-        self.packet_identifier = Some(packet_identifier);
-    }
-
     fn remaining_length(&self) -> Result<VarByteInt, TooLargeToEncode> {
         let variable_header_length = self.topic.written_len()
             + self
-                .packet_identifier
+                .identified_qos
+                .packet_identifier()
                 .map(|p| p.written_len())
                 .unwrap_or_default();
 
@@ -286,7 +281,7 @@ mod unit {
     use crate::{
         bytes::Bytes,
         test::{rx::decode, tx::encode},
-        types::{MqttBinary, MqttString, QoS},
+        types::{IdentifiedQoS, MqttBinary, MqttString},
         v5::{
             packet::PublishPacket,
             property::{
@@ -299,14 +294,14 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_simple() {
-        let mut packet = PublishPacket::new(
+        let packet = PublishPacket::new(
             false,
             false,
+            IdentifiedQoS::AtLeastOnce(5897),
             MqttString::try_from("test/topic").unwrap(),
             Bytes::from("hello".as_bytes()),
         )
         .unwrap();
-        packet.set_qos(QoS::AtLeastOnce, 5897);
 
         #[rustfmt::skip]
         encode!(packet, [
@@ -347,11 +342,10 @@ mod unit {
             ]
         );
 
-        assert_eq!(packet.qos, QoS::AtMostOnce);
+        assert_eq!(packet.identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!packet.dup);
         assert!(!packet.retain);
         assert_eq!(packet.topic, MqttString::try_from("test/topic").unwrap());
-        assert_eq!(packet.packet_identifier, None);
 
         assert!(packet.payload_format_indicator.is_none());
         assert!(packet.message_expiry_interval.is_none());
@@ -375,11 +369,10 @@ mod unit {
             ]
         );
 
-        assert_eq!(packet.qos, QoS::ExactlyOnce);
+        assert_eq!(packet.identified_qos, IdentifiedQoS::ExactlyOnce(21539));
         assert!(packet.dup);
         assert!(packet.retain);
         assert_eq!(packet.topic, MqttString::try_from("test").unwrap());
-        assert_eq!(packet.packet_identifier, Some(21539));
         assert!(packet.payload_format_indicator.is_none());
         assert!(packet.message_expiry_interval.is_none());
         assert!(packet.topic_alias.is_none());
@@ -432,11 +425,10 @@ mod unit {
             ]
         );
 
-        assert_eq!(packet.qos, QoS::AtMostOnce);
+        assert_eq!(packet.identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!packet.dup);
         assert!(!packet.retain);
         assert_eq!(packet.topic, MqttString::try_from("test").unwrap());
-        assert_eq!(packet.packet_identifier, None);
         assert_eq!(packet.message, Bytes::from("hello".as_bytes()));
         assert_eq!(
             packet.payload_format_indicator,

@@ -1,7 +1,7 @@
 use log::info;
 use rust_mqtt::{
     client::options::{PublicationOptions, SubscriptionOptions},
-    types::{QoS, TopicName},
+    types::{IdentifiedQoS, QoS, TopicName},
 };
 use tokio::{
     join,
@@ -78,7 +78,10 @@ async fn receive_multiple(
     for i in 0..count {
         let publish = assert_recv!(client);
         assert_eq!(&*publish.message, MSG.as_bytes());
-        assert_eq!(publish.qos, qos);
+        assert_eq!(
+            <IdentifiedQoS as Into<QoS>>::into(publish.identified_qos),
+            qos
+        );
 
         if (i + 1) % 100 == 0 {
             info!("[Receiver] Received {}/{} messages", i + 1, count);
