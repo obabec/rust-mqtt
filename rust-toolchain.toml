@@ -1,6 +1,6 @@
 [toolchain]
-channel = "1.91"
-components = ["rust-src", "rustfmt"]
+channel = "1.92"
+profile = "default"
 targets = [
   "thumbv7em-none-eabi",
   "thumbv7m-none-eabi",
