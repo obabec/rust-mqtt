@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// The main error returned by `Raw`.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error<B> {
     /// A packet was too long to encode its length with the variable byte integer

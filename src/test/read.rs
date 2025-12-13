@@ -2,13 +2,13 @@ use core::{cmp::min, fmt};
 
 use crate::eio::{self, ErrorType, Read};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SliceReader<'a> {
     slice: &'a [u8],
     index: usize,
 }
 
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SliceReaderError;
 impl fmt::Display for SliceReaderError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -50,40 +50,71 @@ impl<'a> SliceReader<'a> {
 
 #[cfg(test)]
 mod unit {
+    use tokio_test::assert_ok;
+
     use crate::{eio::Read, test::read::SliceReader};
 
     #[tokio::test]
     #[test_log::test]
-    async fn reads_in_one() {
-        let mut reader = SliceReader::new(b"hello");
+    async fn read_full() {
+        let mut reader = SliceReader::new(b"hello there");
         let mut buf = [0u8; 5];
 
-        let n = reader.read(&mut buf).await.unwrap();
+        let n = assert_ok!(reader.read(&mut buf).await);
         assert_eq!(n, 5);
-        assert_eq!(&buf, b"hello");
-
-        let n = reader.read(&mut buf).await.unwrap();
-        assert_eq!(n, 0);
         assert_eq!(&buf, b"hello");
     }
 
     #[tokio::test]
     #[test_log::test]
-    async fn reads_in_chunks() {
+    async fn read_partial() {
+        let mut reader = SliceReader::new(b"hello");
+        let mut buf = [0u8; 10];
+
+        let n = assert_ok!(reader.read(&mut buf).await);
+        assert_eq!(n, 5);
+        assert_eq!(&buf[..n], b"hello");
+        assert_eq!(&buf[n..], [0, 0, 0, 0, 0]);
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn read_chunks() {
         let mut reader = SliceReader::new(b"ab");
         let mut buf = [0u8; 1];
 
-        let n1 = reader.read(&mut buf).await.unwrap();
-        assert_eq!(n1, 1);
+        let n = assert_ok!(reader.read(&mut buf).await);
+        assert_eq!(n, 1);
         assert_eq!(&buf, b"a");
 
-        let n2 = reader.read(&mut buf).await.unwrap();
-        assert_eq!(n2, 1);
+        let n = assert_ok!(reader.read(&mut buf).await);
+        assert_eq!(n, 1);
         assert_eq!(&buf, b"b");
+    }
 
-        // No more data: should return 0 bytes read (EOF)
-        let n3 = reader.read(&mut buf).await.unwrap();
-        assert_eq!(n3, 0);
-        assert_eq!(&buf, b"b");
+    #[tokio::test]
+    #[test_log::test]
+    async fn read_empty_eof() {
+        let mut reader = SliceReader::new(b"");
+        let mut buf = [0u8; 1];
+
+        let n = assert_ok!(reader.read(&mut buf).await);
+        assert_eq!(n, 0);
+        assert_eq!(&buf[..], [0]);
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn read_some_eof() {
+        let mut reader = SliceReader::new(b"hi");
+        let mut buf = [0u8; 2];
+
+        let n = assert_ok!(reader.read(&mut buf).await);
+        assert_eq!(n, 2);
+        assert_eq!(&buf[..], b"hi");
+
+        let n = assert_ok!(reader.read(&mut buf).await);
+        assert_eq!(n, 0);
+        assert_eq!(&buf[..], b"hi");
     }
 }

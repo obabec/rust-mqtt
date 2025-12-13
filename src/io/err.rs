@@ -5,7 +5,7 @@ use core::{
 
 use crate::eio::{self, ErrorKind, ReadExactError};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ReadError<E> {
     Read(E),
@@ -14,7 +14,20 @@ pub enum ReadError<E> {
     ProtocolError,
 }
 
-#[derive(Debug)]
+impl<E, B: fmt::Debug> From<BodyReadError<E, B>> for ReadError<BodyReadError<E, B>> {
+    fn from(e: BodyReadError<E, B>) -> Self {
+        match e {
+            e @ BodyReadError::InsufficientRemainingLen => ReadError::Read(e),
+            e @ BodyReadError::Read(_) => ReadError::Read(e),
+            e @ BodyReadError::Buffer(_) => ReadError::Read(e),
+            BodyReadError::UnexpectedEOF => ReadError::UnexpectedEOF,
+            BodyReadError::MalformedPacket => ReadError::MalformedPacket,
+            BodyReadError::ProtocolError => ReadError::ProtocolError,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum BodyReadError<E, B: fmt::Debug> {
     Read(E),
@@ -64,11 +77,6 @@ impl<E: eio::Error, B: fmt::Debug> eio::Error for BodyReadError<E, B> {
     }
 }
 
-impl<E> From<E> for ReadError<E> {
-    fn from(e: E) -> Self {
-        Self::Read(e)
-    }
-}
 impl<E, B: fmt::Debug> From<E> for BodyReadError<E, B> {
     fn from(e: E) -> Self {
         Self::Read(e)
@@ -93,7 +101,7 @@ impl<E, B: fmt::Debug> From<ReadError<E>> for BodyReadError<E, B> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum WriteError<E> {
     WriteZero,

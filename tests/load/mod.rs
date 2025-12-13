@@ -26,7 +26,7 @@ async fn publish_multiple(
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     info!("[Publisher] Waiting for receiver to be ready");
-    let _ = ready_rx.await;
+    assert_ok!(ready_rx.await);
     info!("[Publisher] Receiver is ready, starting to publish");
 
     let pub_options = PublicationOptions {
@@ -72,7 +72,7 @@ async fn receive_multiple(
     assert_subscribe!(client, options, topic_name.into());
 
     info!("[Receiver] Subscription confirmed, signaling ready");
-    let _ = ready_tx.send(());
+    assert_ok!(ready_tx.send(()));
 
     info!("[Receiver] Waiting for {} messages", count);
     for i in 0..count {

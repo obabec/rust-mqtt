@@ -179,3 +179,253 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
         })
     }
 }
+
+#[cfg(test)]
+mod unit {
+    use core::time::Duration;
+
+    use embedded_io_adapters::tokio_1::FromTokio;
+    use tokio::{
+        io::{AsyncWriteExt, duplex},
+        join,
+        sync::oneshot::channel,
+        time::{sleep, timeout},
+    };
+    use tokio_test::{assert_err, assert_ok};
+
+    #[cfg(feature = "alloc")]
+    use crate::buffer::AllocBuffer;
+    #[cfg(feature = "bump")]
+    use crate::buffer::BumpBuffer;
+
+    use crate::{
+        client::raw::Raw,
+        header::{FixedHeader, PacketType},
+        types::VarByteInt,
+    };
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn recv_header_simple() {
+        #[cfg(feature = "alloc")]
+        let mut b = AllocBuffer;
+        #[cfg(feature = "bump")]
+        let mut b = [0; 64];
+        #[cfg(feature = "bump")]
+        let mut b = BumpBuffer::new(&mut b);
+        let (c, mut s) = duplex(64);
+        let r = FromTokio::new(c);
+
+        let mut c = Raw::new_disconnected(&mut b);
+        c.set_net(r);
+
+        let tx = async {
+            assert_ok!(s.write_all(&[0x10, 0x00, 0x24]).await);
+        };
+        let rx = async {
+            let h = assert_ok!(c.recv_header().await);
+            assert_eq!(
+                h,
+                FixedHeader::new(PacketType::Connect, 0x00, VarByteInt::from(0u8))
+            );
+        };
+
+        join!(rx, tx);
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn recv_header_with_pause() {
+        #[cfg(feature = "alloc")]
+        let mut b = AllocBuffer;
+        #[cfg(feature = "bump")]
+        let mut b = [0; 64];
+        #[cfg(feature = "bump")]
+        let mut b = BumpBuffer::new(&mut b);
+        let (c, mut s) = duplex(64);
+        let r = FromTokio::new(c);
+
+        let mut c = Raw::new_disconnected(&mut b);
+        c.set_net(r);
+
+        let tx = async {
+            assert_ok!(s.write_u8(0xE0).await);
+            sleep(Duration::from_millis(100)).await;
+            assert_ok!(s.write_u8(0x80).await);
+            sleep(Duration::from_millis(100)).await;
+            assert_ok!(s.write_u8(0x80).await);
+            sleep(Duration::from_millis(100)).await;
+            assert_ok!(s.write_u8(0x01).await);
+        };
+        let rx = async {
+            let h = assert_ok!(c.recv_header().await);
+            assert_eq!(
+                h,
+                FixedHeader::new(PacketType::Disconnect, 0x00, VarByteInt::from(16_384u16))
+            );
+        };
+
+        join!(rx, tx);
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn recv_header_cancel_no_progres() {
+        #[cfg(feature = "alloc")]
+        let mut b = AllocBuffer;
+        #[cfg(feature = "bump")]
+        let mut b = [0; 64];
+        #[cfg(feature = "bump")]
+        let mut b = BumpBuffer::new(&mut b);
+        let (c, mut s) = duplex(64);
+        let r = FromTokio::new(c);
+        let (rx_ready, tx_ready) = channel();
+
+        let mut c = Raw::new_disconnected(&mut b);
+        c.set_net(r);
+
+        let tx = async {
+            assert_ok!(tx_ready.await);
+            assert_ok!(s.write_all(&[0xE0, 0x00]).await);
+        };
+        let rx = async {
+            assert_err!(timeout(Duration::from_millis(100), c.recv_header()).await);
+            assert_ok!(rx_ready.send(()));
+
+            let h = assert_ok!(c.recv_header().await);
+            assert_eq!(
+                h,
+                FixedHeader::new(PacketType::Disconnect, 0x00, VarByteInt::from(0u8))
+            );
+        };
+
+        join!(rx, tx);
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn recv_header_cancel_type_and_flags_byte() {
+        #[cfg(feature = "alloc")]
+        let mut b = AllocBuffer;
+        #[cfg(feature = "bump")]
+        let mut b = [0; 64];
+        #[cfg(feature = "bump")]
+        let mut b = BumpBuffer::new(&mut b);
+        let (c, mut s) = duplex(64);
+        let r = FromTokio::new(c);
+        let (rx_ready, tx_ready) = channel();
+
+        let mut c = Raw::new_disconnected(&mut b);
+        c.set_net(r);
+
+        let tx = async {
+            assert_ok!(s.write_u8(0xA0).await);
+            assert_ok!(tx_ready.await);
+            assert_ok!(s.write_all(&[0x80, 0x80, 0x80, 0x01]).await);
+        };
+        let rx = async {
+            assert_err!(timeout(Duration::from_millis(100), c.recv_header()).await);
+            assert_ok!(rx_ready.send(()));
+
+            let h = assert_ok!(c.recv_header().await);
+            assert_eq!(
+                h,
+                FixedHeader::new(
+                    PacketType::Unsubscribe,
+                    0x00,
+                    VarByteInt::try_from(2_097_152u32).unwrap()
+                )
+            );
+        };
+
+        join!(rx, tx);
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn recv_header_cancel_single_length_byte() {
+        #[cfg(feature = "alloc")]
+        let mut b = AllocBuffer;
+        #[cfg(feature = "bump")]
+        let mut b = [0; 64];
+        #[cfg(feature = "bump")]
+        let mut b = BumpBuffer::new(&mut b);
+        let (c, mut s) = duplex(64);
+        let r = FromTokio::new(c);
+        let (rx_ready, tx_ready) = channel();
+
+        let mut c = Raw::new_disconnected(&mut b);
+        c.set_net(r);
+
+        let tx = async {
+            assert_ok!(s.write_all(&[0xD7, 0xFF]).await);
+            assert_ok!(tx_ready.await);
+            assert_ok!(s.write_all(&[0xFF, 0xFF, 0x7F]).await);
+        };
+        let rx = async {
+            assert_err!(timeout(Duration::from_millis(100), c.recv_header()).await);
+            assert_ok!(rx_ready.send(()));
+
+            let h = assert_ok!(c.recv_header().await);
+            assert_eq!(
+                h,
+                FixedHeader::new(
+                    PacketType::Pingresp,
+                    0x07,
+                    VarByteInt::try_from(VarByteInt::MAX_ENCODABLE).unwrap()
+                )
+            );
+        };
+
+        join!(rx, tx);
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn recv_header_cancel_multi() {
+        #[cfg(feature = "alloc")]
+        let mut b = AllocBuffer;
+        #[cfg(feature = "bump")]
+        let mut b = [0; 64];
+        #[cfg(feature = "bump")]
+        let mut b = BumpBuffer::new(&mut b);
+        let (c, mut s) = duplex(64);
+        let r = FromTokio::new(c);
+        let (rx_ready1, tx_ready1) = channel();
+        let (rx_ready2, tx_ready2) = channel();
+        let (rx_ready3, tx_ready3) = channel();
+
+        let mut c = Raw::new_disconnected(&mut b);
+        c.set_net(r);
+
+        let tx = async {
+            assert_ok!(s.write_u8(0x68).await);
+            assert_ok!(tx_ready1.await);
+            assert_ok!(s.write_u8(0xFF).await);
+            assert_ok!(tx_ready2.await);
+            assert_ok!(s.write_u8(0xFF).await);
+            assert_ok!(tx_ready3.await);
+            assert_ok!(s.write_u8(0x7F).await);
+        };
+        let rx = async {
+            assert_err!(timeout(Duration::from_millis(50), c.recv_header()).await);
+            assert_ok!(rx_ready1.send(()));
+            assert_err!(timeout(Duration::from_millis(50), c.recv_header()).await);
+            assert_ok!(rx_ready2.send(()));
+            assert_err!(timeout(Duration::from_millis(50), c.recv_header()).await);
+            assert_ok!(rx_ready3.send(()));
+
+            let h = assert_ok!(c.recv_header().await);
+            assert_eq!(
+                h,
+                FixedHeader::new(
+                    PacketType::Pubrel,
+                    0x08,
+                    VarByteInt::try_from(2_097_151u32).unwrap()
+                )
+            );
+        };
+
+        join!(rx, tx);
+    }
+}

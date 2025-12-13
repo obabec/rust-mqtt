@@ -15,7 +15,7 @@ use crate::{
 /// - For unrecoverable errors, `Client::abort` can be called to send an optional DISCONNECT packet if allowed by specification.
 ///   You can recover the session by calling `Client::recover`
 /// - For recoverable errors, follow the error-specific behaviour.
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error<'e> {
     /// An underlying Read/Write method returned an error.

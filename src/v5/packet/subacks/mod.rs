@@ -1,10 +1,10 @@
 use core::marker::PhantomData;
 
-use embedded_io_async::Read;
 use heapless::Vec;
 
 use crate::{
     buffer::BufferProvider,
+    eio::Read,
     fmt::{error, trace},
     header::{FixedHeader, PacketType},
     io::{

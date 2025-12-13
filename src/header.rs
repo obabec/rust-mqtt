@@ -1,30 +1,18 @@
 use crate::{
-    eio::{Read, Write},
+    eio::Write,
     fmt::unreachable,
     io::{
-        err::{ReadError, WriteError},
-        read::Readable,
+        err::WriteError,
         write::{Writable, wlen},
     },
     types::VarByteInt,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FixedHeader {
     pub(crate) type_and_flags: u8,
     pub(crate) remaining_len: VarByteInt,
-}
-
-impl<R: Read> Readable<R> for FixedHeader {
-    async fn read(net: &mut R) -> Result<Self, ReadError<R::Error>> {
-        let type_and_flags = u8::read(net).await?;
-        let remaining_len = VarByteInt::read(net).await?;
-        Ok(Self {
-            type_and_flags,
-            remaining_len,
-        })
-    }
 }
 
 impl Writable for FixedHeader {

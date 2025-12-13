@@ -1,3 +1,4 @@
+use crate::{eio::Read, io::err::ReadError, types::VarByteInt};
 use tokio_test::assert_ok;
 
 #[cfg(feature = "alloc")]
@@ -22,6 +23,17 @@ macro_rules! decode {
 
         crate::test::rx::decode_packet::<$t, _, REMAINING_LEN>(($bytes), buffer).await
     }};
+}
+
+impl<R: Read> Readable<R> for FixedHeader {
+    async fn read(net: &mut R) -> Result<Self, ReadError<R::Error>> {
+        let type_and_flags = u8::read(net).await?;
+        let remaining_len = VarByteInt::read(net).await?;
+        Ok(Self {
+            type_and_flags,
+            remaining_len,
+        })
+    }
 }
 
 pub async fn decode_packet<'a, T: RxPacket<'a>, const N: usize, const REMAINING_LEN: usize>(
