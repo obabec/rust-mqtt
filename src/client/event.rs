@@ -94,7 +94,7 @@ pub struct Publish<'p> {
     /// The quality of service the server determined to use for this publication. It is the minimum of
     /// the matching subscription with the highest quality of service level and the quality of service of
     /// the publishing client's publication.
-    /// 
+    ///
     /// If the quality of service is greater than 0, this includes the non-zero packet identifier of the
     /// PUBLISH packet.
     pub identified_qos: IdentifiedQoS,

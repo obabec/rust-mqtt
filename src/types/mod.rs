@@ -13,7 +13,7 @@ pub(crate) use will::Will;
 
 pub use binary::MqttBinary;
 pub use int::VarByteInt;
-pub use qos::{QoS, IdentifiedQoS};
+pub use qos::{IdentifiedQoS, QoS};
 pub use reason_code::ReasonCode;
 pub use string::MqttString;
 pub use topic::{TopicFilter, TopicName};

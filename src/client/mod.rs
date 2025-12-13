@@ -187,6 +187,9 @@ impl<
     /// Configuration that was negotiated with the server is stored in the `client_config`, `server_config`,
     /// `shared_config` and `session` fields which have getters.
     ///
+    /// If the server does not have a session present, the client's session is cleared. In case you would want
+    /// to keep the session state, you can call `Client::session()` and clone the session before.
+    ///
     /// # Returns:
     /// Information not being used currently by the client and therefore stored in its fields.
     pub async fn connect<'d>(
@@ -289,17 +292,19 @@ impl<
         if reason_code.is_success() {
             debug!("CONNACK packet indicates success");
 
-            let client_identifier = match assigned_client_identifier {
-                Some(c) => c.into_inner(),
-                None => match client_identifier {
-                    Some(c) => c,
-                    None => {
-                        error!("server did not assign a client identifier when it was required.");
-                        self.raw.close_with(Some(ReasonCode::ProtocolError));
-                        return Err(MqttError::Server);
-                    }
-                },
-            };
+            if !session_present && !options.clean_start {
+                warn!("server does not have the requested session present.");
+                self.session.clear();
+            }
+
+            let client_identifier = assigned_client_identifier
+                .map(Property::into_inner)
+                .or(client_identifier)
+                .ok_or_else(|| {
+                    error!("server did not assign a client identifier when it was required.");
+                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    MqttError::Server
+                })?;
 
             self.shared_config.session_expiry_interval =
                 session_expiry_interval.unwrap_or(options.session_expiry_interval);
