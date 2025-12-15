@@ -1,0 +1,15 @@
+on: [pull_request, workflow_dispatch]
+name: Format
+
+jobs:
+  rustfmt_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install toolchain
+        run: rustup show
+
+      - name: Check formatting
+        run: cargo fmt --all --check
