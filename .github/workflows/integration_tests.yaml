@@ -8,8 +8,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@1.92
+      - name: Install toolchain
+        run: rustup show
 
       - name: Install Mosquitto
         run: |
@@ -33,8 +33,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@1.92
+      - name: Install toolchain
+        run: rustup show
 
       - name: Start HiveMQ
         run: |
