@@ -37,7 +37,7 @@ impl HeaderState {
             unsafe { unreachable_unchecked() }
         }
 
-        // Since i is in the 0..4 range, we can safely index into `self.buffer`
+        // Since i is in the 0..=4 range, we can safely index into `self.buffer`
 
         trace!("receiving byte {} of header", i);
 
