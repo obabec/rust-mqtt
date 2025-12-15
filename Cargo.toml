@@ -6,6 +6,7 @@ authors = [
     "Julian Graf <julian.jg.graf@gmail.com>",
 ]
 edition = "2024"
+rust-version = "1.87"
 resolver = "2"
 description = "MQTT client for embedded and non-embedded environments"
 readme = "README.md"

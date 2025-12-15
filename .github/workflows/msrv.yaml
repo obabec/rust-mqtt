@@ -1,0 +1,20 @@
+on: [pull_request, workflow_dispatch]
+name: MSRV
+
+jobs:
+  msrv_check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install toolchain
+        run: rustup show
+
+      - name: Install cargo-msrv
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-msrv
+
+      - name: Run MSRV check
+        run: cargo msrv verify
