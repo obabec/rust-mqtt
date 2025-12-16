@@ -1,18 +1,18 @@
-on: [pull_request]
-
-name: UnitTests
+on: [pull_request, workflow_dispatch]
+name: Unit Tests
 
 jobs:
   unit_tests:
-    name: Unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+      - name: Install toolchain
+        run: rustup show
 
-      - name: Run Unit tests
-        run: RUST_LOG=trace cargo test unit
+      - name: Run unit tests with alloc feature
+        run: RUST_LOG=trace cargo test unit --features "log" -- --show-output
+
+      - name: Run unit tests with bump feature
+        run: RUST_LOG=trace cargo test unit --no-default-features --features "v5 bump log" -- --show-output

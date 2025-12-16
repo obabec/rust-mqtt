@@ -1,58 +1,51 @@
-on: [pull_request]
-
-name: IntegrationTests
+on: [pull_request, workflow_dispatch]
+name: Integration Tests
 
 jobs:
   integration_tests_mosquitto:
-    name: Integration tests with mosquitto
     runs-on: ubuntu-latest
     steps:
-      - name: Git checkout
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
+      - name: Install toolchain
+        run: rustup show
 
-      - name: Build embedded
-        run: cargo build --target thumbv7em-none-eabihf --features "no_std" --no-default-features
-
-      - name: Start Mosquitto
+      - name: Install Mosquitto
         run: |
+          sudo apt-get update
           sudo apt-get install mosquitto
           sudo service mosquitto stop
-          mosquitto_passwd -U .ci/mqtt_pass.txt
+
+      - name: Configure & Start Mosquitto
+        run: |
+          cp .ci/mqtt_pass_plain.txt .ci/mqtt_pass_hashed.txt
+          chmod 700 .ci/mqtt_pass_hashed.txt
+          mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
           mosquitto -c .ci/mosquitto.conf -d
 
-      - name: Run integration-tests tests
-        run: RUST_LOG=trace cargo test integration
+      - name: Run integration tests
+        run: RUST_LOG=trace cargo test integration --features "log" -- --show-output
 
   integration_tests_hive:
-    name: Integration tests with HiveMQ
     runs-on: ubuntu-latest
     steps:
-      - name: Git checkout
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-
-      - name: Build embedded
-        run: cargo build --target thumbv7em-none-eabihf --features "no_std" --no-default-features
+      - name: Install toolchain
+        run: rustup show
 
       - name: Start HiveMQ
         run: |
-          curl -LO https://github.com/hivemq/hivemq-community-edition/releases/download/2021.3/hivemq-ce-2021.3.zip
-          unzip hivemq-ce-2021.3.zip
-          curl -LO https://www.hivemq.com/releases/extensions/hivemq-file-rbac-extension-4.4.0.zip
-          unzip hivemq-file-rbac-extension-4.4.0.zip
-          mv hivemq-file-rbac-extension hivemq-ce-2021.3/extensions
-          cp .ci/hive_cred.xml hivemq-ce-2021.3/extensions/hivemq-file-rbac-extension/credentials.xml
-          cp .ci/hive_extension_config.xml hivemq-ce-2021.3/extensions/hivemq-file-rbac-extension/extension-config.xml
-          hivemq-ce-2021.3/bin/run.sh &
+          curl -LO https://github.com/hivemq/hivemq-community-edition/releases/download/2025.5/hivemq-ce-2025.5.zip
+          unzip hivemq-ce-2025.5.zip
+          curl -LO https://github.com/hivemq/hivemq-file-rbac-extension/releases/download/4.6.8/hivemq-file-rbac-extension-4.6.8.zip
+          unzip hivemq-file-rbac-extension-4.6.8.zip
+          mv hivemq-file-rbac-extension hivemq-ce-2025.5/extensions
+          cp .ci/hive_cred.xml hivemq-ce-2025.5/extensions/hivemq-file-rbac-extension/credentials.xml
+          cp .ci/hive_extension_config.xml hivemq-ce-2025.5/extensions/hivemq-file-rbac-extension/conf/config.xml
+          hivemq-ce-2025.5/bin/run.sh &
 
-      - name: Run integration-tests tests
-        run: RUST_LOG=trace cargo test integration
+      - name: Run integration tests
+        run: RUST_LOG=trace cargo test integration --features "log" -- --show-output

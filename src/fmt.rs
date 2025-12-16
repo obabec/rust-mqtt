@@ -1,43 +1,7 @@
-#![macro_use]
-#![allow(unused_macros)]
+#![allow(unused)]
 
-#[cfg(all(feature = "defmt", feature = "log"))]
-compile_error!("You may not enable both `defmt` and `log` features.");
-
-macro_rules! assert {
-    ($($x:tt)*) => {
-        {
-            #[cfg(not(feature = "defmt"))]
-            ::core::assert!($($x)*);
-            #[cfg(feature = "defmt")]
-            ::defmt::assert!($($x)*);
-        }
-    };
-}
-
-macro_rules! assert_eq {
-    ($($x:tt)*) => {
-        {
-            #[cfg(not(feature = "defmt"))]
-            ::core::assert_eq!($($x)*);
-            #[cfg(feature = "defmt")]
-            ::defmt::assert_eq!($($x)*);
-        }
-    };
-}
-
-macro_rules! assert_ne {
-    ($($x:tt)*) => {
-        {
-            #[cfg(not(feature = "defmt"))]
-            ::core::assert_ne!($($x)*);
-            #[cfg(feature = "defmt")]
-            ::defmt::assert_ne!($($x)*);
-        }
-    };
-}
-
-macro_rules! debug_assert {
+#[clippy::format_args]
+macro_rules! debug_assert_ {
     ($($x:tt)*) => {
         {
             #[cfg(not(feature = "defmt"))]
@@ -48,7 +12,8 @@ macro_rules! debug_assert {
     };
 }
 
-macro_rules! debug_assert_eq {
+#[clippy::format_args]
+macro_rules! debug_assert_eq_ {
     ($($x:tt)*) => {
         {
             #[cfg(not(feature = "defmt"))]
@@ -59,7 +24,8 @@ macro_rules! debug_assert_eq {
     };
 }
 
-macro_rules! debug_assert_ne {
+#[clippy::format_args]
+macro_rules! debug_assert_ne_ {
     ($($x:tt)*) => {
         {
             #[cfg(not(feature = "defmt"))]
@@ -70,18 +36,8 @@ macro_rules! debug_assert_ne {
     };
 }
 
-macro_rules! todo {
-    ($($x:tt)*) => {
-        {
-            #[cfg(not(feature = "defmt"))]
-            ::core::todo!($($x)*);
-            #[cfg(feature = "defmt")]
-            ::defmt::todo!($($x)*);
-        }
-    };
-}
-
-macro_rules! unreachable {
+#[clippy::format_args]
+macro_rules! unreachable_ {
     ($($x:tt)*) => {
         {
             #[cfg(not(feature = "defmt"))]
@@ -92,7 +48,8 @@ macro_rules! unreachable {
     };
 }
 
-macro_rules! panic {
+#[clippy::format_args]
+macro_rules! panic_ {
     ($($x:tt)*) => {
         {
             #[cfg(not(feature = "defmt"))]
@@ -103,6 +60,7 @@ macro_rules! panic {
     };
 }
 
+#[clippy::format_args]
 macro_rules! trace {
     ($s:literal $(, $x:expr)* $(,)?) => {
         {
@@ -116,6 +74,7 @@ macro_rules! trace {
     };
 }
 
+#[clippy::format_args]
 macro_rules! debug {
     ($s:literal $(, $x:expr)* $(,)?) => {
         {
@@ -129,20 +88,22 @@ macro_rules! debug {
     };
 }
 
+#[clippy::format_args]
 macro_rules! info {
     ($s:literal $(, $x:expr)* $(,)?) => {
         {
-            #[cfg(feature = "log")]
-            ::log::info!($s $(, $x)*);
             #[cfg(feature = "defmt")]
             ::defmt::info!($s $(, $x)*);
+            #[cfg(feature = "log")]
+            ::log::info!($s $(, $x)*);
             #[cfg(not(any(feature = "log", feature="defmt")))]
             let _ = ($( & $x ),*);
         }
     };
 }
 
-macro_rules! warn {
+#[clippy::format_args]
+macro_rules! warn_ {
     ($s:literal $(, $x:expr)* $(,)?) => {
         {
             #[cfg(feature = "log")]
@@ -155,6 +116,7 @@ macro_rules! warn {
     };
 }
 
+#[clippy::format_args]
 macro_rules! error {
     ($s:literal $(, $x:expr)* $(,)?) => {
         {
@@ -168,61 +130,15 @@ macro_rules! error {
     };
 }
 
-#[cfg(feature = "defmt")]
-macro_rules! unwrap {
-    ($($x:tt)*) => {
-        ::defmt::unwrap!($($x)*)
-    };
-}
+pub(crate) use debug;
+pub(crate) use error;
+pub(crate) use info;
+pub(crate) use trace;
+pub(crate) use warn_ as warn;
 
-#[cfg(not(feature = "defmt"))]
-macro_rules! unwrap {
-    ($arg:expr) => {
-        match $crate::fmt::Try::into_result($arg) {
-            ::core::result::Result::Ok(t) => t,
-            ::core::result::Result::Err(e) => {
-                ::core::panic!("unwrap of `{}` failed: {:?}", ::core::stringify!($arg), e);
-            }
-        }
-    };
-    ($arg:expr, $($msg:expr),+ $(,)? ) => {
-        match $crate::fmt::Try::into_result($arg) {
-            ::core::result::Result::Ok(t) => t,
-            ::core::result::Result::Err(e) => {
-                ::core::panic!("unwrap of `{}` failed: {}: {:?}", ::core::stringify!($arg), ::core::format_args!($($msg,)*), e);
-            }
-        }
-    }
-}
+pub(crate) use debug_assert_ as debug_assert;
+pub(crate) use debug_assert_eq_ as debug_assert_eq;
+pub(crate) use debug_assert_ne_ as debug_assert_ne;
 
-#[cfg(feature = "defmt-timestamp-uptime")]
-defmt::timestamp! {"{=u64:us}", crate::time::Instant::now().as_micros() }
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct NoneError;
-
-pub trait Try {
-    type Ok;
-    type Error;
-    fn into_result(self) -> Result<Self::Ok, Self::Error>;
-}
-
-impl<T> Try for Option<T> {
-    type Ok = T;
-    type Error = NoneError;
-
-    #[inline]
-    fn into_result(self) -> Result<T, NoneError> {
-        self.ok_or(NoneError)
-    }
-}
-
-impl<T, E> Try for Result<T, E> {
-    type Ok = T;
-    type Error = E;
-
-    #[inline]
-    fn into_result(self) -> Self {
-        self
-    }
-}
+pub(crate) use panic_ as panic;
+pub(crate) use unreachable_ as unreachable;
