@@ -37,6 +37,15 @@ tokio-test = "0.4.4"
 test-log = "0.2.19"
 log = "0.4.28"
 env_logger = "0.11.8"
+embedded-tls = { git = "https://github.com/drogue-iot/embedded-tls.git", rev = "0348d4e15e31fd2666560c25bcf9601df625380a", default-features = false, features = [
+    "webpki",
+    "std",
+    "log",
+] }
+rand = "0.8"
+pem-parser = "0.1.1"
+signature = "2.2.0"
+p256 = "0.13.2"
 
 
 [features]
@@ -54,3 +63,6 @@ v5 = []
 
 [[example]]
 name = "demo"
+
+[[example]]
+name = "tls"
