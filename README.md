@@ -1,6 +1,6 @@
 # rust-mqtt
 
-rust-mqtt is an MQTT client primarily for no_std environments. The library provides an async API depending on `embedded_io_async`'s traits. As of now, only MQTT version 5.0 is supported.
+rust-mqtt is an MQTT client primarily for no_std environments. The library provides an async API depending on [embedded_io_async](https://docs.rs/embedded-io-async/latest/embedded_io_async/)'s traits. As of now, only [MQTT version 5.0](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html) is supported.
 
 ## Library state
 
@@ -43,8 +43,10 @@ rust-mqtt is an MQTT client primarily for no_std environments. The library provi
 
 ### Examples
 
-The example 'demo' contains most of rust-mqtt's features. Note that the example is very specific and showcases the client API and is not a good way to use the client.
-Out of the box, it connects to a broker on localhost:1883 with basic authentication. The easiest way to set this up is by installing, configuring and running Mosquitto using the CI configuration:
+- 'demo' is a showcase of rust-mqtt's features over TCP. Note that the example usage is very strict and not really a good way of using the client.
+- 'tls' connects the client to a broker over TLS with client certificate authentication and server certificate verification using [embedded-tls](https://github.com/drogue-iot/embedded-tls).
+
+Set up the broker for 'demo' by installing, configuring and running Mosquitto using the CI configuration:
 
 ```bash
 cp .ci/mqtt_pass_plain.txt .ci/mqtt_pass_hashed.txt
@@ -53,10 +55,18 @@ mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
 mosquitto -c .ci/mosquitto.conf -v
 ```
 
-Then you can run the example with different logging configs and the bump/alloc features:
+Set up the broker for 'tls' by generating the PKI files with openssl using the provided script and running mosquitto with the tls config file:
+
+```bash
+(cd ./.ci/pki/ && ./generate.sh)
+mosquitto -c .ci/mosquitto-tls.conf -v
+```
+
+Then you can run the examples with different logging configs and the bump/alloc features:
 
 ```bash
 RUST_LOG=debug cargo run --example demo
+RUST_LOG=info cargo run --example tls
 RUST_LOG=trace cargo run --example demo --no-default-features --features "v5 log bump"
 ```
 
