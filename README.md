@@ -55,10 +55,9 @@ mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
 mosquitto -c .ci/mosquitto.conf -v
 ```
 
-Set up the broker for 'tls' by generating the PKI files with openssl using the provided script and running mosquitto with the tls config file:
+Set up the broker for 'tls' by running Mosquitto with the tls config file. The required PKI files have been generated using the `.ci/pki/generate.sh` script.
 
 ```bash
-(cd ./.ci/pki/ && ./generate.sh)
 mosquitto -c .ci/mosquitto-tls.conf -v
 ```
 

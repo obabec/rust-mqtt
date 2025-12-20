@@ -74,12 +74,12 @@ async fn main() {
     let connection = TcpStream::connect(addr).await.unwrap();
     let connection = FromTokio::new(connection);
 
-    let ca = pem_to_der(include_str!("../.ci/pki/ca-cert.pem"));
-    let client_cert = pem_to_der(include_str!("../.ci/pki/client-cert.pem"));
-    let client_key = pem_to_der(include_str!("../.ci/pki/client-key.pem"));
+    let ca_cert = pem_to_der(include_str!("./pki/ca-cert.pem"));
+    let client_cert = pem_to_der(include_str!("./pki/client-cert.pem"));
+    let client_key = pem_to_der(include_str!("./pki/client-key.pem"));
 
     let config = TlsConfig::new()
-        .with_ca(Certificate::X509(&ca))
+        .with_ca(Certificate::X509(&ca_cert))
         .with_cert(Certificate::X509(&client_cert))
         .with_priv_key(&client_key)
         .with_server_name("localhost");
