@@ -6,3 +6,7 @@ Cargo.lock
 /target
 
 .ci/mqtt_pass_hashed.txt
+.ci/pki/*
+
+!.ci/pki/generate.sh
+!.ci/pki/cfg

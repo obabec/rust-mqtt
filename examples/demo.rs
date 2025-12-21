@@ -6,12 +6,9 @@ use std::{
 use embedded_io_adapters::tokio_1::FromTokio;
 use log::{error, info};
 
-#[cfg(feature = "alloc")]
-use rust_mqtt::buffer::AllocBuffer;
-#[cfg(feature = "bump")]
-use rust_mqtt::buffer::BumpBuffer;
 use rust_mqtt::{
     Bytes,
+    buffer::*,
     client::{
         Client,
         event::{Event, Suback},
@@ -69,7 +66,7 @@ async fn main() {
         .await
     {
         Ok(c) => {
-            info!("Connected to server {:?}", c);
+            info!("Connected to server: {:?}", c);
             info!("{:?}", client.client_config());
             info!("{:?}", client.server_config());
             info!("{:?}", client.shared_config());
