@@ -51,9 +51,9 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS
             topic_filters,
         };
 
-        const GUARANTEED_ENCODABLE_MAX_TOPIC_FILTERS: usize = 4095;
+        const GUARANTEED_ENCODABLE_TOPIC_FILTERS: usize = 4095;
 
-        if MAX_TOPIC_FILTERS > GUARANTEED_ENCODABLE_MAX_TOPIC_FILTERS {
+        if MAX_TOPIC_FILTERS > GUARANTEED_ENCODABLE_TOPIC_FILTERS {
             p.remaining_len_raw().map(|_| p)
         } else {
             Ok(p)
