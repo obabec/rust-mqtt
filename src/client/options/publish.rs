@@ -10,6 +10,12 @@ pub struct Options<'p> {
     /// at any time by the server.
     pub retain: bool,
 
+    /// The message expiry interval in seconds of this application message. After this
+    /// interval has passed, the server cannot publish this message onward to subscribers.
+    /// If set to `None`, the message does not expire and the message expiry interval
+    /// property is omitted on the network.
+    pub message_expiry_interval: Option<u32>,
+
     /// The topic that the message is published on.
     pub topic: TopicName<'p>,
 
