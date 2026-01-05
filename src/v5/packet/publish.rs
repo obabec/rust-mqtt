@@ -183,14 +183,16 @@ impl<'p> RxPacket<'p> for PublishPacket<'p> {
     }
 }
 impl<'p> TxPacket for PublishPacket<'p> {
-    async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
-        // Safety: Publish packets that are too long to encode cannot be created
-        let remaining_len = unsafe { self.remaining_length().unwrap_unchecked() };
+    fn remaining_len(&self) -> VarByteInt {
+        // Safety: PUBLISH packets that are too long to encode cannot be created
+        unsafe { self.remaining_len_raw().unwrap_unchecked() }
+    }
 
+    async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
         let qos: QoS = self.identified_qos.into();
         let flags = (u8::from(self.dup) << 3) | qos.into_bits(1) | u8::from(self.retain);
 
-        FixedHeader::new(Self::PACKET_TYPE, flags, remaining_len)
+        FixedHeader::new(Self::PACKET_TYPE, flags, self.remaining_len())
             .write(write)
             .await?;
 
@@ -236,10 +238,10 @@ impl<'p> PublishPacket<'p> {
             message,
         };
 
-        p.remaining_length().map(|_| p)
+        p.remaining_len_raw().map(|_| p)
     }
 
-    fn remaining_length(&self) -> Result<VarByteInt, TooLargeToEncode> {
+    fn remaining_len_raw(&self) -> Result<VarByteInt, TooLargeToEncode> {
         let variable_header_length = self.topic.written_len()
             + self
                 .identified_qos

@@ -43,11 +43,13 @@ impl<'p, T: PingPacketType> RxPacket<'p> for GenericPingPacket<T> {
     }
 }
 impl<T: PingPacketType> TxPacket for GenericPingPacket<T> {
-    async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
+    fn remaining_len(&self) -> VarByteInt {
         // Safety: 0 < VarByteInt::MAX_ENCODABLE
-        let remaining_len = unsafe { VarByteInt::new_unchecked(0) };
+        unsafe { VarByteInt::new_unchecked(0) }
+    }
 
-        FixedHeader::new(Self::PACKET_TYPE, T::FLAGS, remaining_len)
+    async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
+        FixedHeader::new(Self::PACKET_TYPE, T::FLAGS, self.remaining_len())
             .write(write)
             .await?;
 

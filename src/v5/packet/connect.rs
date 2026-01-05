@@ -48,8 +48,31 @@ impl<'p> Packet for ConnectPacket<'p> {
     const PACKET_TYPE: PacketType = PacketType::Connect;
 }
 impl<'p> TxPacket for ConnectPacket<'p> {
+    fn remaining_len(&self) -> VarByteInt {
+        let variable_header_length = wlen!([u8; 7]) + wlen!(u8) + wlen!(u16);
+
+        let properties_length = self.properties_length();
+        let total_properties_length = properties_length.size() + properties_length.written_len();
+
+        let body_length = self.client_identifier.written_len()
+            + self.will.written_len()
+            + self.user_name.written_len()
+            + self.password.written_len();
+
+        let total_length = variable_header_length + total_properties_length + body_length;
+
+        // Safety: Max length = 393253 < VarByteInt::MAX_ENCODABLE
+        // variable header: 8
+        // properties length: 4
+        // properties: 131093
+        // will: 2 * 65537 (will topic & will payload)
+        // username: 65537
+        // password: 65537
+        unsafe { VarByteInt::new_unchecked(total_length as u32) }
+    }
+
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
-        FixedHeader::new(Self::PACKET_TYPE, 0x00, self.remaining_length())
+        FixedHeader::new(Self::PACKET_TYPE, 0x00, self.remaining_len())
             .write(write)
             .await?;
 
@@ -112,29 +135,6 @@ impl<'p> ConnectPacket<'p> {
             user_name: None,
             password: None,
         }
-    }
-
-    pub fn remaining_length(&self) -> VarByteInt {
-        let variable_header_length = wlen!([u8; 7]) + wlen!(u8) + wlen!(u16);
-
-        let properties_length = self.properties_length();
-        let total_properties_length = properties_length.size() + properties_length.written_len();
-
-        let body_length = self.client_identifier.written_len()
-            + self.will.written_len()
-            + self.user_name.written_len()
-            + self.password.written_len();
-
-        let total_length = variable_header_length + total_properties_length + body_length;
-
-        // Safety: Max length = 393253 < VarByteInt::MAX_ENCODABLE
-        // variable header: 8
-        // properties length: 4
-        // properties: 131093
-        // will: 2 * 65537 (will topic & will payload)
-        // username: 65537
-        // password: 65537
-        unsafe { VarByteInt::new_unchecked(total_length as u32) }
     }
 
     pub fn properties_length(&self) -> VarByteInt {

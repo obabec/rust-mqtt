@@ -22,9 +22,14 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> Packet for SubscribePacket<'p, MAX_TOPI
     const PACKET_TYPE: PacketType = PacketType::Subscribe;
 }
 impl<'p, const MAX_TOPIC_FILTERS: usize> TxPacket for SubscribePacket<'p, MAX_TOPIC_FILTERS> {
+    fn remaining_len(&self) -> VarByteInt {
+        // Safety: SUBSCRIBE packets that are too long to encode cannot be created
+        unsafe { self.remaining_len_raw().unwrap_unchecked() }
+    }
+
     /// If MAX_TOPIC_FILTERS is to less than or equal to 4095, it is guaranteed that TxError::RemainingLenExceeded is never returned.
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
-        FixedHeader::new(Self::PACKET_TYPE, 0x02, self.remaining_length()?)
+        FixedHeader::new(Self::PACKET_TYPE, 0x02, self.remaining_len())
             .write(write)
             .await?;
 
@@ -45,20 +50,23 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> 
     pub fn new(
         packet_identifier: u16,
         subscribe_filters: Vec<SubscriptionFilter<'p>, MAX_TOPIC_FILTERS>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, TooLargeToEncode> {
+        let p = Self {
             packet_identifier,
             subscription_identifier: None,
             subscribe_filters,
+        };
+
+        const GUARANTEED_ENCODABLE_MAX_TOPIC_FILTERS: usize = 4095;
+
+        if MAX_TOPIC_FILTERS > GUARANTEED_ENCODABLE_MAX_TOPIC_FILTERS {
+            p.remaining_len_raw().map(|_| p)
+        } else {
+            Ok(p)
         }
     }
 
-    #[cfg(test)]
-    pub fn add_subscription_identifier(&mut self, subscription_identifier: VarByteInt) {
-        self.subscription_identifier = Some(subscription_identifier.into());
-    }
-
-    fn remaining_length(&self) -> Result<VarByteInt, TooLargeToEncode> {
+    fn remaining_len_raw(&self) -> Result<VarByteInt, TooLargeToEncode> {
         let variable_header_length = self.packet_identifier.written_len();
 
         let properties_length = self.properties_length();
@@ -75,6 +83,24 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> 
         // properties: 5
         // topic filters: MAX_TOPIC_FILTERS * 65538
         VarByteInt::try_from(total_length as u32)
+    }
+
+    #[cfg(test)]
+    pub fn add_subscription_identifier(
+        &mut self,
+        subscription_identifier: VarByteInt,
+    ) -> Result<(), TooLargeToEncode> {
+        let previous = self
+            .subscription_identifier
+            .replace(subscription_identifier.into());
+
+        match self.remaining_len_raw() {
+            Ok(_) => Ok(()),
+            Err(t) => {
+                self.subscription_identifier = previous;
+                Err(t)
+            }
+        }
     }
 
     pub fn properties_length(&self) -> VarByteInt {
@@ -125,7 +151,7 @@ mod unit {
                 },
             ))
             .unwrap();
-        let packet: SubscribePacket<'_, 2> = SubscribePacket::new(23197, topics);
+        let packet: SubscribePacket<'_, 2> = SubscribePacket::new(23197, topics).unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [
@@ -180,8 +206,10 @@ mod unit {
             ))
             .unwrap();
 
-        let mut packet: SubscribePacket<'_, 10> = SubscribePacket::new(23197, topics);
-        packet.add_subscription_identifier(VarByteInt::try_from(87986078u32).unwrap());
+        let mut packet: SubscribePacket<'_, 10> = SubscribePacket::new(23197, topics).unwrap();
+        packet
+            .add_subscription_identifier(VarByteInt::try_from(87986078u32).unwrap())
+            .unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [
