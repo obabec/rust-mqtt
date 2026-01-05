@@ -34,6 +34,7 @@ async fn publish_recv_qos0() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name.clone(),
             qos: QoS::AtMostOnce,
         };
@@ -49,6 +50,7 @@ async fn publish_recv_qos0() {
             identified_qos,
             dup,
             retain,
+            message_expiry_interval,
             subscription_identifiers: _,
             topic: _,
             message,
@@ -56,6 +58,7 @@ async fn publish_recv_qos0() {
 
         assert!(!dup);
         assert!(!retain);
+        assert!(message_expiry_interval.is_none());
         assert_eq!(
             <IdentifiedQoS as Into<QoS>>::into(identified_qos),
             QoS::AtMostOnce
@@ -81,6 +84,7 @@ async fn publish_recv_qos1() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name.clone(),
             qos: QoS::AtLeastOnce,
         };
@@ -99,6 +103,7 @@ async fn publish_recv_qos1() {
             identified_qos,
             dup,
             retain,
+            message_expiry_interval,
             subscription_identifiers: _,
             topic: _,
             message,
@@ -106,6 +111,7 @@ async fn publish_recv_qos1() {
 
         assert!(!dup);
         assert!(!retain);
+        assert!(message_expiry_interval.is_none());
         assert_eq!(
             <IdentifiedQoS as Into<QoS>>::into(identified_qos),
             QoS::AtLeastOnce
@@ -131,6 +137,7 @@ async fn publish_recv_qos2() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name.clone(),
             qos: QoS::ExactlyOnce,
         };
@@ -149,6 +156,7 @@ async fn publish_recv_qos2() {
             identified_qos,
             dup,
             retain,
+            message_expiry_interval,
             subscription_identifiers: _,
             topic: _,
             message,
@@ -156,6 +164,7 @@ async fn publish_recv_qos2() {
 
         assert!(!dup);
         assert!(!retain);
+        assert!(message_expiry_interval.is_none());
         assert_eq!(
             <IdentifiedQoS as Into<QoS>>::into(identified_qos),
             QoS::ExactlyOnce
@@ -184,6 +193,7 @@ async fn publish_recv_multiple_qos0() {
     let publisher1 = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name1.clone(),
             qos: QoS::AtMostOnce,
         };
@@ -195,6 +205,7 @@ async fn publish_recv_multiple_qos0() {
     let publisher2 = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name2.clone(),
             qos: QoS::AtMostOnce,
         };
@@ -253,6 +264,7 @@ async fn publish_recv_multiple_qos1() {
     let publisher1 = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name1.clone(),
             qos: QoS::AtLeastOnce,
         };
@@ -264,6 +276,7 @@ async fn publish_recv_multiple_qos1() {
     let publisher2 = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name2.clone(),
             qos: QoS::AtLeastOnce,
         };
@@ -328,6 +341,7 @@ async fn publish_recv_multiple_qos2() {
     let publisher1 = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name1.clone(),
             qos: QoS::ExactlyOnce,
         };
@@ -339,6 +353,7 @@ async fn publish_recv_multiple_qos2() {
     let publisher2 = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name2.clone(),
             qos: QoS::ExactlyOnce,
         };
@@ -404,6 +419,7 @@ async fn unsub_no_recv() {
     let publisher1 = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name1.clone(),
             qos: QoS::AtLeastOnce,
         };
@@ -418,6 +434,7 @@ async fn unsub_no_recv() {
     let publisher2 = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name2.clone(),
             qos: QoS::AtLeastOnce,
         };
@@ -462,6 +479,147 @@ async fn unsub_no_recv() {
 
 #[tokio::test]
 #[test_log::test]
+async fn message_expiry_interval_basic() {
+    let (topic_name, topic_filter) = unique_topic();
+    let msg = "It's not a bug, it's a forthcoming feature";
+
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        let pub_options = PublicationOptions {
+            retain: false,
+            message_expiry_interval: Some(10),
+            topic: topic_name.clone(),
+            qos: QoS::AtLeastOnce,
+        };
+
+        sleep(Duration::from_secs(5)).await;
+        assert_published!(tx, pub_options.clone(), msg.into());
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
+        options.qos = QoS::AtLeastOnce;
+        assert_subscribe!(rx, options, topic_filter.clone());
+
+        let Publish {
+            identified_qos: _,
+            dup: _,
+            retain: _,
+            message_expiry_interval,
+            subscription_identifiers: _,
+            topic: _,
+            message,
+        } = assert_recv_excl!(rx, topic_name);
+
+        assert_eq!(&*message, msg.as_bytes());
+        assert!(message_expiry_interval.is_some());
+        assert!(matches!(message_expiry_interval.unwrap(), 9..=10));
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn message_expiry_interval_partially_expired() {
+    let (topic_name, topic_filter) = unique_topic();
+    let msg = "It's not a bug, it's an undocumented feature!";
+
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        let pub_options = PublicationOptions {
+            retain: true,
+            message_expiry_interval: Some(10),
+            topic: topic_name.clone(),
+            qos: QoS::AtLeastOnce,
+        };
+
+        assert_published!(tx, pub_options.clone(), msg.into());
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        sleep(Duration::from_secs(5)).await;
+
+        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
+        options.qos = QoS::AtLeastOnce;
+        assert_subscribe!(rx, options, topic_filter.clone());
+
+        let Publish {
+            identified_qos: _,
+            dup: _,
+            retain: _,
+            message_expiry_interval,
+            subscription_identifiers: _,
+            topic: _,
+            message,
+        } = assert_recv_excl!(rx, topic_name);
+        
+        assert_eq!(&*message, msg.as_bytes());
+        assert!(message_expiry_interval.is_some());
+        assert!(matches!(message_expiry_interval.unwrap(), 4..=6));
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn message_expiry_interval_completely_expired() {
+    let (topic_name, topic_filter) = unique_topic();
+    let msg = "It works on my system!";
+
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        let pub_options = PublicationOptions {
+            retain: true,
+            message_expiry_interval: Some(5),
+            topic: topic_name.clone(),
+            qos: QoS::AtLeastOnce,
+        };
+
+        assert_published!(tx, pub_options.clone(), msg.into());
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        sleep(Duration::from_secs(6)).await;
+
+        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
+        options.qos = QoS::AtLeastOnce;
+        assert_subscribe!(rx, options, topic_filter.clone());
+
+        assert_err!(
+            timeout(Duration::from_secs(4), async {
+                assert_recv!(rx);
+            })
+            .await,
+            "Expected to receive nothing"
+        );
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+
+#[tokio::test]
+#[test_log::test]
 async fn recv_min_sub_qos0() {
     let (topic_name, topic_filter) = unique_topic();
     let msg = "(╯°□°）╯︵ ┻━┻";
@@ -474,6 +632,7 @@ async fn recv_min_sub_qos0() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name.clone(),
             qos: QoS::ExactlyOnce,
         };
@@ -491,6 +650,7 @@ async fn recv_min_sub_qos0() {
             identified_qos,
             dup,
             retain,
+            message_expiry_interval,
             subscription_identifiers: _,
             topic: _,
             message,
@@ -498,6 +658,7 @@ async fn recv_min_sub_qos0() {
 
         assert!(!dup);
         assert!(!retain);
+        assert!(message_expiry_interval.is_none());
         assert_eq!(
             <IdentifiedQoS as Into<QoS>>::into(identified_qos),
             QoS::AtMostOnce
@@ -523,6 +684,7 @@ async fn recv_min_sub_qos1() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name.clone(),
             qos: QoS::ExactlyOnce,
         };
@@ -541,6 +703,7 @@ async fn recv_min_sub_qos1() {
             identified_qos,
             dup,
             retain,
+            message_expiry_interval,
             subscription_identifiers: _,
             topic: _,
             message,
@@ -548,6 +711,7 @@ async fn recv_min_sub_qos1() {
 
         assert!(!dup);
         assert!(!retain);
+        assert!(message_expiry_interval.is_none());
         assert_eq!(
             <IdentifiedQoS as Into<QoS>>::into(identified_qos),
             QoS::AtLeastOnce
@@ -573,6 +737,7 @@ async fn recv_min_pub_qos0() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name.clone(),
             qos: QoS::AtMostOnce,
         };
@@ -591,6 +756,7 @@ async fn recv_min_pub_qos0() {
             identified_qos,
             dup,
             retain,
+            message_expiry_interval,
             subscription_identifiers: _,
             topic: _,
             message,
@@ -598,6 +764,7 @@ async fn recv_min_pub_qos0() {
 
         assert!(!dup);
         assert!(!retain);
+        assert!(message_expiry_interval.is_none());
         assert_eq!(
             <IdentifiedQoS as Into<QoS>>::into(identified_qos),
             QoS::AtMostOnce
@@ -623,6 +790,7 @@ async fn recv_min_pub_qos1() {
     let publisher = async {
         let pub_options = PublicationOptions {
             retain: false,
+            message_expiry_interval: None,
             topic: topic_name.clone(),
             qos: QoS::AtLeastOnce,
         };
@@ -641,6 +809,7 @@ async fn recv_min_pub_qos1() {
             identified_qos,
             dup,
             retain,
+            message_expiry_interval,
             subscription_identifiers: _,
             topic: _,
             message,
@@ -648,6 +817,7 @@ async fn recv_min_pub_qos1() {
 
         assert!(!dup);
         assert!(!retain);
+        assert!(message_expiry_interval.is_none());
         assert_eq!(
             <IdentifiedQoS as Into<QoS>>::into(identified_qos),
             QoS::AtLeastOnce

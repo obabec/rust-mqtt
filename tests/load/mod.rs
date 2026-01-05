@@ -31,6 +31,7 @@ async fn publish_multiple(
 
     let pub_options = PublicationOptions {
         retain: false,
+        message_expiry_interval: None,
         topic: topic.clone(),
         qos,
     };
