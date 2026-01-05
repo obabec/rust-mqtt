@@ -123,8 +123,23 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
     }
 }
 impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
+    fn remaining_len(&self) -> VarByteInt {
+        let variable_header_length = wlen!(u16) + wlen!(ReasonCode);
+
+        let properties_length = self.properties_length();
+        let total_properties_length = properties_length.size() + properties_length.written_len();
+
+        let total_length = variable_header_length + total_properties_length;
+
+        // Safety: Max length = 65545 < VarByteInt::MAX_ENCODABLE
+        // properties length: 4
+        // properties: 65538
+        // variable header: 3
+        unsafe { VarByteInt::new_unchecked(total_length as u32) }
+    }
+
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
-        FixedHeader::new(Self::PACKET_TYPE, T::FLAGS, self.remaining_length())
+        FixedHeader::new(Self::PACKET_TYPE, T::FLAGS, self.remaining_len())
             .write(write)
             .await?;
 
@@ -156,21 +171,6 @@ impl<'p, T: PubackPacketType> GenericPubackPacket<'p, T> {
             reason_string: None,
             _phantom_data: PhantomData,
         }
-    }
-
-    fn remaining_length(&self) -> VarByteInt {
-        let variable_header_length = wlen!(u16) + wlen!(ReasonCode);
-
-        let properties_length = self.properties_length();
-        let total_properties_length = properties_length.size() + properties_length.written_len();
-
-        let total_length = variable_header_length + total_properties_length;
-
-        // Safety: Max length = 65545 < VarByteInt::MAX_ENCODABLE
-        // properties length: 4
-        // properties: 65538
-        // variable header: 3
-        unsafe { VarByteInt::new_unchecked(total_length as u32) }
     }
 
     fn properties_length(&self) -> VarByteInt {

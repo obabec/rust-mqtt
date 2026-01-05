@@ -69,6 +69,11 @@ pub enum Error<'e> {
     /// Recoverable error. No action has been taken by the client.
     PacketMaxLengthExceeded,
 
+    /// A packet is too long and would exceed the servers maximum packet size.
+    ///
+    /// Recoverable error. No action has been taken by the client.
+    ServerMaximumPacketSizeExceeded,
+
     /// An action was rejected because an internal buffer used for tracking session state is full.
     ///
     /// Recoverable error. Try again after an `Event` has been emitted that indicates that buffer might be free again.

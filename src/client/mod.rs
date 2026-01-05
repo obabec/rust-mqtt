@@ -11,11 +11,11 @@ use crate::{
         options::{ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions},
         raw::Raw,
     },
-    config::{ClientConfig, ServerConfig, SessionExpiryInterval, SharedConfig},
+    config::{ClientConfig, MaximumPacketSize, ServerConfig, SessionExpiryInterval, SharedConfig},
     fmt::{debug, error, panic, warn},
     header::{FixedHeader, PacketType},
     io::net::Transport,
-    packet::Packet,
+    packet::{Packet, TxPacket},
     session::{CPublishFlightState, SPublishFlightState, Session},
     types::{IdentifiedQoS, MqttString, QoS, ReasonCode, SubscriptionFilter, TopicFilter},
     v5::{
@@ -357,6 +357,8 @@ impl<
     pub async fn ping(&mut self) -> Result<(), MqttError<'c>> {
         debug!("sending PINGREQ packet");
 
+        // PINGREQ has length 2 which really shouldn't exceed server's max packet size.
+        // If it does the server should reconsider its incarnation as an MQTT server.
         self.raw.send(&PingreqPacket::new()).await?;
         self.raw.flush().await?;
 
@@ -386,7 +388,14 @@ impl<
         let pid = self.packet_identifier();
         let mut subscribe_filters = Vec::<_, 1>::new();
         let _ = subscribe_filters.push(subscribe_filter);
-        let packet = SubscribePacket::new(pid, subscribe_filters);
+        let packet = SubscribePacket::new(pid, subscribe_filters)?;
+
+        match self.server_config.maximum_packet_size {
+            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
+                return Err(MqttError::ServerMaximumPacketSizeExceeded);
+            }
+            _ => {}
+        }
 
         debug!("sending SUBSCRIBE packet");
 
@@ -417,7 +426,14 @@ impl<
         let pid = self.packet_identifier();
         let mut topic_filters = Vec::<_, 1>::new();
         let _ = topic_filters.push(topic_filter);
-        let packet = UnsubscribePacket::new(pid, topic_filters);
+        let packet = UnsubscribePacket::new(pid, topic_filters)?;
+
+        match self.server_config.maximum_packet_size {
+            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
+                return Err(MqttError::ServerMaximumPacketSizeExceeded);
+            }
+            _ => {}
+        }
 
         debug!("sending UNSUBSCRIBE packet");
 
@@ -455,7 +471,6 @@ impl<
             QoS::AtLeastOnce => IdentifiedQoS::AtLeastOnce(self.packet_identifier()),
             QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(self.packet_identifier()),
         };
-        let pid = identified_qos.packet_identifier();
 
         let packet = PublishPacket::new(
             false,
@@ -465,25 +480,36 @@ impl<
             message,
         )?;
 
-        match pid {
-            Some(pid) => debug!("sending PUBLISH packet with packet identifier {}", pid),
-            None => debug!("sending PUBLISH packet"),
+        match self.server_config.maximum_packet_size {
+            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
+                return Err(MqttError::ServerMaximumPacketSizeExceeded);
+            }
+            _ => {}
         }
 
-        match identified_qos {
-            IdentifiedQoS::AtMostOnce => {}
-            IdentifiedQoS::AtLeastOnce(packet_identifier) =>
-            // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
-            unsafe { self.session.await_puback(packet_identifier) },
-            IdentifiedQoS::ExactlyOnce(packet_identifier) =>
-            // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
-            unsafe { self.session.await_pubrec(packet_identifier) },
+        match identified_qos.packet_identifier() {
+            Some(pid) => debug!("sending PUBLISH packet with packet identifier {}", pid),
+            None => debug!("sending PUBLISH packet"),
         }
 
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
-        Ok(pid.unwrap_or_default())
+        let pid = match identified_qos {
+            IdentifiedQoS::AtMostOnce => 0,
+            IdentifiedQoS::AtLeastOnce(packet_identifier) => {
+                // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
+                unsafe { self.session.await_puback(packet_identifier) };
+                packet_identifier
+            }
+            IdentifiedQoS::ExactlyOnce(packet_identifier) => {
+                // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
+                unsafe { self.session.await_pubrec(packet_identifier) };
+                packet_identifier
+            }
+        };
+
+        Ok(pid)
     }
 
     /// Resends a PUBLISH packet with DUP flag set.
@@ -515,16 +541,8 @@ impl<
         let identified_qos = match options.qos {
             // Safety: method has panniced if QoS == 0
             QoS::AtMostOnce => unsafe { unreachable_unchecked() },
-            QoS::AtLeastOnce => {
-                // Safety: A single entry was just removed so there is space.
-                unsafe { self.session.await_puback(packet_identifier) };
-                IdentifiedQoS::AtLeastOnce(packet_identifier)
-            }
-            QoS::ExactlyOnce => {
-                // Safety: A single entry was just removed so there is space.
-                unsafe { self.session.await_pubrec(packet_identifier) };
-                IdentifiedQoS::ExactlyOnce(packet_identifier)
-            }
+            QoS::AtLeastOnce => IdentifiedQoS::AtLeastOnce(packet_identifier),
+            QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(packet_identifier),
         };
 
         let packet = PublishPacket::new(
@@ -535,6 +553,13 @@ impl<
             message,
         )?;
 
+        match self.server_config.maximum_packet_size {
+            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
+                return Err(MqttError::ServerMaximumPacketSizeExceeded);
+            }
+            _ => {}
+        }
+
         debug!(
             "resending PUBLISH packet with packet identifier {}",
             packet_identifier
@@ -542,6 +567,18 @@ impl<
 
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
+
+        match options.qos {
+            // Safety: method has panniced if QoS == 0
+            QoS::AtMostOnce => unsafe { unreachable_unchecked() },
+            QoS::AtLeastOnce =>
+            // Safety: A single entry was just removed so there is space.
+            unsafe { self.session.await_puback(packet_identifier) },
+
+            QoS::ExactlyOnce =>
+            // Safety: A single entry was just removed so there is space.
+            unsafe { self.session.await_pubrec(packet_identifier) },
+        };
 
         Ok(())
     }
@@ -559,6 +596,9 @@ impl<
         {
             let pubrel = PubrelPacket::new(packet_identifier, ReasonCode::Success);
 
+            // Don't check whether length exceeds servers maximum packet size because we don't
+            // add properties to PUBREL packets -> length is always minimal at 6 bytes.
+            // The server really shouldn't reject this.
             self.raw.send(&pubrel).await?;
         }
 
@@ -573,7 +613,7 @@ impl<
     ///
     /// After an MQTT communication fails, usually either the client or the server closes the connection.
     ///
-    /// This is not cancel-safe but you can set a timeout if the network connection is replaced with `Client::` down the line or you don't reuse the client.
+    /// This is not cancel-safe but you can set a timeout if reconnecting later anyway or you don't reuse the client.
     #[inline]
     pub async fn abort(&mut self) {
         #[allow(unused_must_use)]
@@ -610,6 +650,9 @@ impl<
 
         debug!("sending DISCONNECT packet");
 
+        // Don't check whether length exceeds servers maximum packet size because we don't
+        // add a reason string to the DISCONNECT packet -> length is always in the 4..=9 range in bytes.
+        // The server really shouldn't reject this.
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
@@ -753,6 +796,9 @@ impl<
 
                         debug!("sending PUBACK packet");
 
+                        // Don't check whether length exceeds servers maximum packet size because we don't
+                        // add properties to PUBACK packets -> length is always minimal at 6 bytes.
+                        // The server really shouldn't reject this.
                         self.raw.send(&puback).await?;
                         self.raw.flush().await?;
 
@@ -770,13 +816,16 @@ impl<
 
                         let pubrec = PubrecPacket::new(pid, ReasonCode::Success);
 
-                        // Safety: `spublish_remaining_capacity()` > 0 confirms that there is space.
-                        unsafe { self.session.await_pubrel(pid) };
-
                         debug!("sending PUBREC packet");
 
+                        // Don't check whether length exceeds servers maximum packet size because we don't
+                        // add properties to PUBREC packets -> length is always minimal at 6 bytes.
+                        // The server really shouldn't reject this.
                         self.raw.send(&pubrec).await?;
                         self.raw.flush().await?;
+
+                        // Safety: `spublish_remaining_capacity()` > 0 confirms that there is space.
+                        unsafe { self.session.await_pubrel(pid) };
 
                         event
                     }
@@ -831,6 +880,9 @@ impl<
 
                         debug!("sending PUBREL packet");
 
+                        // Don't check whether length exceeds servers maximum packet size because we don't
+                        // add properties to PUBREL packets -> length is always minimal at 6 bytes.
+                        // The server really shouldn't reject this.
                         self.raw.send(&pubrel).await?;
                         self.raw.flush().await?;
 
@@ -879,6 +931,9 @@ impl<
 
                         debug!("sending PUBCOMP packet");
 
+                        // Don't check whether length exceeds servers maximum packet size because we don't
+                        // add properties to PUBCOMP packets -> length is always minimal at 6 bytes.
+                        // The server really shouldn't reject this.
                         self.raw.send(&pubcomp).await?;
                         self.raw.flush().await?;
 

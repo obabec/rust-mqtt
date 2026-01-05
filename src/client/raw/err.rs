@@ -33,7 +33,6 @@ impl<E: eio::Error, B> From<TxError<E>> for Error<B> {
         match e {
             TxError::WriteZero => Self::Network(ErrorKind::WriteZero),
             TxError::Write(e) => Self::Network(e.kind()),
-            TxError::RemainingLenExceeded => Self::PacketTooLong,
         }
     }
 }

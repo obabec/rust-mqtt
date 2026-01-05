@@ -19,9 +19,13 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> Packet for UnsubscribePacket<'p, MAX_TO
     const PACKET_TYPE: PacketType = PacketType::Unsubscribe;
 }
 impl<'p, const MAX_TOPIC_FILTERS: usize> TxPacket for UnsubscribePacket<'p, MAX_TOPIC_FILTERS> {
-    /// If MAX_TOPIC_FILTERS is to less than or equal to 4095, it is guaranteed that TxError::RemainingLenExceeded is never returned.
+    fn remaining_len(&self) -> VarByteInt {
+        // Safety: UNSUBSCRIBE packets that are too long to encode cannot be created
+        unsafe { self.remaining_len_raw().unwrap_unchecked() }
+    }
+
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
-        FixedHeader::new(Self::PACKET_TYPE, 0x02, self.remaining_length()?)
+        FixedHeader::new(Self::PACKET_TYPE, 0x02, self.remaining_len())
             .write(write)
             .await?;
 
@@ -37,7 +41,26 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> TxPacket for UnsubscribePacket<'p, MAX_
 }
 
 impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS> {
-    fn remaining_length(&self) -> Result<VarByteInt, TooLargeToEncode> {
+    /// If MAX_TOPIC_FILTERS is to less than or equal to 4095, it is guaranteed that TooLargeToEncode is never returned.
+    pub fn new(
+        packet_identifier: u16,
+        topic_filters: Vec<TopicFilter<'p>, MAX_TOPIC_FILTERS>,
+    ) -> Result<Self, TooLargeToEncode> {
+        let p = Self {
+            packet_identifier,
+            topic_filters,
+        };
+
+        const GUARANTEED_ENCODABLE_TOPIC_FILTERS: usize = 4095;
+
+        if MAX_TOPIC_FILTERS > GUARANTEED_ENCODABLE_TOPIC_FILTERS {
+            p.remaining_len_raw().map(|_| p)
+        } else {
+            Ok(p)
+        }
+    }
+
+    fn remaining_len_raw(&self) -> Result<VarByteInt, TooLargeToEncode> {
         let variable_header_length = self.packet_identifier.written_len();
 
         let properties_length = self.properties_length();
@@ -67,18 +90,6 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS
     }
 }
 
-impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS> {
-    pub fn new(
-        packet_identifier: u16,
-        topic_filters: Vec<TopicFilter<'p>, MAX_TOPIC_FILTERS>,
-    ) -> Self {
-        Self {
-            packet_identifier,
-            topic_filters,
-        }
-    }
-}
-
 #[cfg(test)]
 mod unit {
     use heapless::Vec;
@@ -103,7 +114,7 @@ mod unit {
             .push(unsafe { TopicFilter::new_unchecked(MqttString::try_from("test/#").unwrap()) })
             .unwrap();
 
-        let packet: UnsubscribePacket<'_, 2> = UnsubscribePacket::new(9874, topics);
+        let packet: UnsubscribePacket<'_, 2> = UnsubscribePacket::new(9874, topics).unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [

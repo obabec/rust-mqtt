@@ -147,7 +147,7 @@ impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
 }
 impl<'p> TxPacket for DisconnectPacket<'p> {
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
-        FixedHeader::new(Self::PACKET_TYPE, 0x00, self.remaining_length())
+        FixedHeader::new(Self::PACKET_TYPE, 0x00, self.remaining_len())
             .write(write)
             .await?;
 
@@ -161,6 +161,21 @@ impl<'p> TxPacket for DisconnectPacket<'p> {
         self.server_reference.write(write).await?;
 
         Ok(())
+    }
+
+    fn remaining_len(&self) -> VarByteInt {
+        let variable_header_length = wlen!(ReasonCode);
+
+        let properties_length = self.properties_length();
+        let total_properties_length = properties_length.size() + properties_length.written_len();
+
+        let total_length = variable_header_length + total_properties_length;
+
+        // Safety: Max length: 131086 < VarByteInt::MAX_ENCODABLE
+        // variable header (reason_code): 1
+        // properties length: 4
+        // properties: 131081
+        unsafe { VarByteInt::new_unchecked(total_length as u32) }
     }
 }
 
@@ -181,21 +196,6 @@ impl<'p> DisconnectPacket<'p> {
     #[cfg(test)]
     pub fn add_reason_string(&mut self, reason_string: MqttString<'p>) {
         self.reason_string = Some(reason_string.into());
-    }
-
-    fn remaining_length(&self) -> VarByteInt {
-        let variable_header_length = wlen!(ReasonCode);
-
-        let properties_length = self.properties_length();
-        let total_properties_length = properties_length.size() + properties_length.written_len();
-
-        let total_length = variable_header_length + total_properties_length;
-
-        // Safety: Max length: 131086 < VarByteInt::MAX_ENCODABLE
-        // variable header (reason_code): 1
-        // properties length: 4
-        // properties: 131081
-        unsafe { VarByteInt::new_unchecked(total_length as u32) }
     }
 
     fn properties_length(&self) -> VarByteInt {
