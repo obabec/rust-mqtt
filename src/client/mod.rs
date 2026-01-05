@@ -471,7 +471,6 @@ impl<
             QoS::AtLeastOnce => IdentifiedQoS::AtLeastOnce(self.packet_identifier()),
             QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(self.packet_identifier()),
         };
-        let pid = identified_qos.packet_identifier();
 
         let packet = PublishPacket::new(
             false,
@@ -488,7 +487,7 @@ impl<
             _ => {}
         }
 
-        match pid {
+        match identified_qos.packet_identifier() {
             Some(pid) => debug!("sending PUBLISH packet with packet identifier {}", pid),
             None => debug!("sending PUBLISH packet"),
         }
@@ -496,17 +495,21 @@ impl<
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
-        match identified_qos {
-            IdentifiedQoS::AtMostOnce => {}
-            IdentifiedQoS::AtLeastOnce(packet_identifier) =>
-            // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
-            unsafe { self.session.await_puback(packet_identifier) },
-            IdentifiedQoS::ExactlyOnce(packet_identifier) =>
-            // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
-            unsafe { self.session.await_pubrec(packet_identifier) },
-        }
+        let pid = match identified_qos {
+            IdentifiedQoS::AtMostOnce => 0,
+            IdentifiedQoS::AtLeastOnce(packet_identifier) => {
+                // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
+                unsafe { self.session.await_puback(packet_identifier) };
+                packet_identifier
+            }
+            IdentifiedQoS::ExactlyOnce(packet_identifier) => {
+                // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
+                unsafe { self.session.await_pubrec(packet_identifier) };
+                packet_identifier
+            }
+        };
 
-        Ok(pid.unwrap_or_default())
+        Ok(pid)
     }
 
     /// Resends a PUBLISH packet with DUP flag set.
