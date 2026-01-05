@@ -564,7 +564,7 @@ async fn message_expiry_interval_partially_expired() {
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_name);
-        
+
         assert_eq!(&*message, msg.as_bytes());
         assert!(message_expiry_interval.is_some());
         assert!(matches!(message_expiry_interval.unwrap(), 4..=6));
@@ -616,7 +616,6 @@ async fn message_expiry_interval_completely_expired() {
 
     join!(receiver, publisher);
 }
-
 
 #[tokio::test]
 #[test_log::test]
