@@ -813,9 +813,6 @@ impl<
 
                         let pubrec = PubrecPacket::new(pid, ReasonCode::Success);
 
-                        // Safety: `spublish_remaining_capacity()` > 0 confirms that there is space.
-                        unsafe { self.session.await_pubrel(pid) };
-
                         debug!("sending PUBREC packet");
 
                         // Don't check whether length exceeds servers maximum packet size because we don't
@@ -823,6 +820,9 @@ impl<
                         // The server really shouldn't reject this.
                         self.raw.send(&pubrec).await?;
                         self.raw.flush().await?;
+
+                        // Safety: `spublish_remaining_capacity()` > 0 confirms that there is space.
+                        unsafe { self.session.await_pubrel(pid) };
 
                         event
                     }
