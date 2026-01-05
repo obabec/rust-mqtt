@@ -13,7 +13,7 @@ pub trait TxPacket: Packet {
     /// This is the value which will ultimately be encoded as the remaining length
     /// in the fixed header.
     fn remaining_len(&self) -> VarByteInt;
-    
+
     /// Returns the full length of the packet from the first byte of the fixed header
     /// to the last byte of the payload.
     fn encoded_len(&self) -> usize {
@@ -21,7 +21,7 @@ pub trait TxPacket: Packet {
         // (type + flags) + remaining length encoded + remaining length
         wlen!(u8) + l.written_len() + l.size()
     }
-    
+
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>>;
 }
 
