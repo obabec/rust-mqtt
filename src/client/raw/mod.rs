@@ -13,7 +13,7 @@ use crate::{
     buffer::BufferProvider,
     client::raw::{header::HeaderState, net::NetState},
     eio::{Error, ErrorKind},
-    fmt::{debug_assert, panic, unreachable},
+    fmt::{debug_assert, unreachable},
     header::FixedHeader,
     io::{err::WriteError, net::Transport, read::BodyReader},
     packet::{RxError, RxPacket, TxError, TxPacket},
@@ -77,10 +77,12 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
             (Some(n), Some(r)) => {
                 let packet = DisconnectPacket::new(r);
 
+                // Don't check whether length exceeds servers maximum packet size because we don't
+                // add a reason string to the DISCONNECT packet -> length is always in the 4..=6 range in bytes.
+                // The server really shouldn't reject this.
                 packet.send(n).await.map_err(|e| match e {
                     TxError::Write(e) => RawError::Network(Error::kind(&e)),
                     TxError::WriteZero => RawError::Network(ErrorKind::WriteZero),
-                    TxError::RemainingLenExceeded => panic!("DISCONNECT never exceeds max length"),
                 })
             }
             (None, Some(_)) => unreachable!(
