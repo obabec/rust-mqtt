@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Comply with server's maximum packet size
+
+## 0.4.0 - 2025-12-16
+
 - Extensive rewrite
 - Trait based buffer provision in deserialization
 - More robust packet deserialization regarding protocol errors and malformed packets
