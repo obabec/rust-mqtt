@@ -9,4 +9,8 @@ Cargo.lock
 .ci/pki/*
 
 !.ci/pki/generate.sh
+!.ci/pki/ca-key.pem
+!.ci/pki/ca-cert.pem
+!.ci/pki/server-key.pem
+!.ci/pki/server-cert.pem
 !.ci/pki/cfg

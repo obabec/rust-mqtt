@@ -11,12 +11,12 @@ rust-mqtt is an MQTT client primarily for no_std environments. The library provi
 - Flow control
 - Configuration & session tracking
 - Session recovery
+- Serverside maximum packet size
 
 ### Currently unsupported MQTT features & limitations
 
 - AUTH packet
 - User properties
-- Serverside maximum packet size
 - Request/Response
 - Subscription identifiers
 - Topic alias
@@ -26,7 +26,6 @@ rust-mqtt is an MQTT client primarily for no_std environments. The library provi
 ### Extension plans (more or less by priority)
 
 - Receive the 'remaining length' (variable header & payload) of an mqtt packet using a buffer instead of calling `Read::read` very frequently.
-- Refrain from sending packets exceeding server's maximum packet size.
 - MQTT version 3
 - Sync implementation.
 
