@@ -1,14 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
-# CA
-openssl ecparam -name prime256v1 -genkey -noout -out ca-key.pem
+FULL=false
+if [[ "${1:-}" == "--ca" ]]; then
+  FULL=true
+fi
 
-openssl req -new -x509 \
-  -key ca-key.pem \
-  -days 3650 \
-  -config cfg/ca.cnf \
-  -out ca-cert.pem
+# CA
+if [[ "$FULL" == "true" ]]; then
+  openssl ecparam -name prime256v1 -genkey -noout -out ca-key.pem
+
+  openssl req -new -x509 \
+    -key ca-key.pem \
+    -days 3650 \
+    -config cfg/ca.cnf \
+    -out ca-cert.pem
+fi
 
 # Server
 openssl ecparam -name prime256v1 -genkey -noout -out server-key.pem
