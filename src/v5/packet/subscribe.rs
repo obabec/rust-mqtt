@@ -49,11 +49,12 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> 
     /// so that the packets complete length doesn't exceed `VarByteInt::MAX_ENCODABLE`.
     pub fn new(
         packet_identifier: u16,
+        subscription_identifier: Option<VarByteInt>,
         subscribe_filters: Vec<SubscriptionFilter<'p>, MAX_TOPIC_FILTERS>,
     ) -> Result<Self, TooLargeToEncode> {
         let p = Self {
             packet_identifier,
-            subscription_identifier: None,
+            subscription_identifier: subscription_identifier.map(Into::into),
             subscribe_filters,
         };
 
@@ -83,24 +84,6 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> 
         // properties: 5
         // topic filters: MAX_TOPIC_FILTERS * 65538
         VarByteInt::try_from(total_length as u32)
-    }
-
-    #[cfg(test)]
-    pub fn add_subscription_identifier(
-        &mut self,
-        subscription_identifier: VarByteInt,
-    ) -> Result<(), TooLargeToEncode> {
-        let previous = self
-            .subscription_identifier
-            .replace(subscription_identifier.into());
-
-        match self.remaining_len_raw() {
-            Ok(_) => Ok(()),
-            Err(t) => {
-                self.subscription_identifier = previous;
-                Err(t)
-            }
-        }
     }
 
     pub fn properties_length(&self) -> VarByteInt {
@@ -136,6 +119,7 @@ mod unit {
                     retain_as_published: false,
                     no_local: true,
                     qos: QoS::AtMostOnce,
+                    subscription_identifier: None,
                 },
             ))
             .unwrap();
@@ -148,10 +132,11 @@ mod unit {
                     retain_as_published: true,
                     no_local: false,
                     qos: QoS::ExactlyOnce,
+                    subscription_identifier: None,
                 },
             ))
             .unwrap();
-        let packet: SubscribePacket<'_, 2> = SubscribePacket::new(23197, topics).unwrap();
+        let packet: SubscribePacket<'_, 2> = SubscribePacket::new(23197, None, topics).unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [
@@ -202,14 +187,17 @@ mod unit {
                     retain_as_published: true,
                     no_local: false,
                     qos: QoS::AtMostOnce,
+                    subscription_identifier: Some(VarByteInt::from(23459u16)),
                 },
             ))
             .unwrap();
 
-        let mut packet: SubscribePacket<'_, 10> = SubscribePacket::new(23197, topics).unwrap();
-        packet
-            .add_subscription_identifier(VarByteInt::try_from(87986078u32).unwrap())
-            .unwrap();
+        let packet: SubscribePacket<'_, 10> = SubscribePacket::new(
+            23197,
+            Some(VarByteInt::try_from(87986078u32).unwrap()),
+            topics,
+        )
+        .unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [

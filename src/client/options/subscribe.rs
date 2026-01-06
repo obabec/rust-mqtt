@@ -1,4 +1,4 @@
-use crate::types::QoS;
+use crate::types::{QoS, VarByteInt};
 
 /// Options for subscription included for every topic.
 #[derive(Debug, Clone, Copy)]
@@ -24,6 +24,11 @@ pub struct Options {
     /// matching this subscription with to the client. A quality of service level
     /// lower than this can be granted by the server.
     pub qos: QoS,
+
+    /// The subscription identifier of the subscription. The server will set
+    /// subscription identifier properties in its PUBLISH packets to the values of
+    /// all matching subscriptions with a subscription identifier.
+    pub subscription_identifier: Option<VarByteInt>,
 }
 
 /// Serverside retain handling configuration for a subscription.

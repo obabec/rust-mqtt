@@ -17,7 +17,7 @@ pub mod fmt;
 pub mod utils;
 
 pub type Tcp = FromTokio<TcpStream>;
-pub type TestClient<'a> = Client<'a, Tcp, AllocBuffer, 1, 1, 1>;
+pub type TestClient<'a> = Client<'a, Tcp, AllocBuffer, 1, 1, 1, 1>;
 
 pub const BROKER_ADDRESS: SocketAddr =
     SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1883));
@@ -40,6 +40,7 @@ pub const DEFAULT_QOS0_SUB_OPTIONS: SubscriptionOptions = SubscriptionOptions {
     retain_as_published: false,
     no_local: false,
     qos: QoS::AtMostOnce,
+    subscription_identifier: None,
 };
 
 pub const DEFAULT_DC_OPTIONS: &DisconnectOptions = &DisconnectOptions {

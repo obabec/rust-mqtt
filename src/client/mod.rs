@@ -47,6 +47,7 @@ pub struct Client<
     const MAX_SUBSCRIBES: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
 > {
     client_config: ClientConfig,
     shared_config: SharedConfig,
@@ -70,7 +71,8 @@ impl<
     const MAX_SUBSCRIBES: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
-> Client<'c, N, B, MAX_SUBSCRIBES, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+    const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
+> Client<'c, N, B, MAX_SUBSCRIBES, RECEIVE_MAXIMUM, SEND_MAXIMUM, MAX_SUBSCRIPTION_IDENTIFIERS>
 {
     /// Creates a new, disconnected MQTT client using a buffer provider to store
     /// dynamically sized fields of received packets.
@@ -371,6 +373,11 @@ impl<
     /// If no `Event::Suback` is received within a custom time,
     /// this method can be used to send the SUBSCRIBE packet again.
     ///
+    /// A subscription identifier should only be set if the server supports
+    /// subscription identifiers (Can be checked with `Client::server_config()`).
+    /// The client does not double-check whether this feature is supported and will
+    /// always include the subscription identifier argument if present.
+    ///
     /// # Returns:
     /// - The packet identifier of the sent SUBSCRIBE packet.
     pub async fn subscribe(
@@ -388,7 +395,7 @@ impl<
         let pid = self.packet_identifier();
         let mut subscribe_filters = Vec::<_, 1>::new();
         let _ = subscribe_filters.push(subscribe_filter);
-        let packet = SubscribePacket::new(pid, subscribe_filters)?;
+        let packet = SubscribePacket::new(pid, options.subscription_identifier, subscribe_filters)?;
 
         match self.server_config.maximum_packet_size {
             MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
@@ -472,7 +479,7 @@ impl<
             QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(self.packet_identifier()),
         };
 
-        let packet = PublishPacket::new(
+        let packet: PublishPacket<'_, 0> = PublishPacket::new(
             false,
             options.retain,
             identified_qos,
@@ -545,7 +552,7 @@ impl<
             QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(packet_identifier),
         };
 
-        let packet = PublishPacket::new(
+        let packet: PublishPacket<'_, 0> = PublishPacket::new(
             true,
             options.retain,
             identified_qos,
@@ -674,7 +681,7 @@ impl<
     ///
     /// # Returns:
     /// - MQTT Events. Their further meaning is documented in `Event`
-    pub async fn poll(&mut self) -> Result<Event<'c>, MqttError<'c>> {
+    pub async fn poll(&mut self) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c>> {
         let header = self.poll_header().await?;
         self.poll_body(header).await
     }
@@ -713,7 +720,10 @@ impl<
     /// # Returns:
     /// - MQTT Events for regular communication. Their further meaning is documented in `Event`.
     /// - `MqttError::Disconnect` when receiving a DISCONNECT packet.
-    pub async fn poll_body(&mut self, header: FixedHeader) -> Result<Event<'c>, MqttError<'c>> {
+    pub async fn poll_body(
+        &mut self,
+        header: FixedHeader,
+    ) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c>> {
         let event = match header.packet_type()? {
             PacketType::Pingresp => {
                 debug!("receiving PINGRESP packet");
@@ -765,12 +775,20 @@ impl<
             }
             PacketType::Publish => {
                 debug!("receiving PUBLISH packet");
-                let publish = self.raw.recv_body::<PublishPacket>(&header).await?;
+                let publish = self
+                    .raw
+                    .recv_body::<PublishPacket<'_, MAX_SUBSCRIPTION_IDENTIFIERS>>(&header)
+                    .await?;
 
                 let event = Event::Publish(Publish {
                     identified_qos: publish.identified_qos,
                     dup: publish.dup,
                     retain: publish.retain,
+                    subscription_identifiers: publish
+                        .subscription_identifiers
+                        .into_iter()
+                        .map(Property::into_inner)
+                        .collect(),
                     topic: publish.topic,
                     message: publish.message,
                 });

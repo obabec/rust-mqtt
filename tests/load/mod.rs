@@ -66,6 +66,7 @@ async fn receive_multiple(
         retain_as_published: false,
         no_local: false,
         qos,
+        subscription_identifier: None,
     };
 
     info!("[Receiver] Subscribing to topic {:?}", topic_name.as_ref());
