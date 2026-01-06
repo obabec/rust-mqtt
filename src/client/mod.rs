@@ -390,7 +390,7 @@ impl<
         let pid = self.packet_identifier();
         let mut subscribe_filters = Vec::<_, 1>::new();
         let _ = subscribe_filters.push(subscribe_filter);
-        let packet = SubscribePacket::new(pid, subscribe_filters)?;
+        let packet = SubscribePacket::new(pid, options.subscription_identifier, subscribe_filters)?;
 
         match self.server_config.maximum_packet_size {
             MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {

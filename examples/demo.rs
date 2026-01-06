@@ -18,7 +18,7 @@ use rust_mqtt::{
         },
     },
     config::{KeepAlive, SessionExpiryInterval},
-    types::{MqttBinary, MqttString, QoS, TopicName},
+    types::{MqttBinary, MqttString, QoS, TopicName, VarByteInt},
 };
 use tokio::{net::TcpStream, select, time::sleep};
 
@@ -33,7 +33,7 @@ async fn main() {
     #[cfg(feature = "bump")]
     let mut buffer = BumpBuffer::new(&mut buffer);
 
-    let mut client = Client::<'_, _, _, 1, 1, 1, 0>::new(&mut buffer);
+    let mut client = Client::<'_, _, _, 1, 1, 1, 1>::new(&mut buffer);
 
     let addr = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 1883);
     let connection = TcpStream::connect(addr).await.unwrap();
@@ -83,11 +83,18 @@ async fn main() {
         client.buffer().reset()
     };
 
+    let subscription_identifier = if client.server_config().subscription_identifiers_supported {
+        Some(VarByteInt::from(42u16))
+    } else {
+        None
+    };
+
     let sub_options = SubscriptionOptions {
         retain_handling: RetainHandling::SendIfNotSubscribedBefore,
         retain_as_published: true,
         no_local: false,
         qos: QoS::ExactlyOnce,
+        subscription_identifier,
     };
 
     let topic =

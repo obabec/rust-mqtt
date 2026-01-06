@@ -40,6 +40,7 @@ pub const DEFAULT_QOS0_SUB_OPTIONS: SubscriptionOptions = SubscriptionOptions {
     retain_as_published: false,
     no_local: false,
     qos: QoS::AtMostOnce,
+    subscription_identifier: None,
 };
 
 pub const DEFAULT_DC_OPTIONS: &DisconnectOptions = &DisconnectOptions {
