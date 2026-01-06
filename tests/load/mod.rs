@@ -1,6 +1,6 @@
 use log::info;
 use rust_mqtt::{
-    client::options::{PublicationOptions, SubscriptionOptions},
+    client::options::{PublicationOptions, SubscriptionOptions, TopicReference},
     types::{IdentifiedQoS, QoS, TopicName},
 };
 use tokio::{
@@ -32,7 +32,7 @@ async fn publish_multiple(
     let pub_options = PublicationOptions {
         retain: false,
         message_expiry_interval: None,
-        topic: topic.clone(),
+        topic: TopicReference::Name(topic.clone()),
         qos,
     };
 
