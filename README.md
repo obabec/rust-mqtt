@@ -14,13 +14,13 @@ rust-mqtt is an MQTT client primarily for no_std environments. The library provi
 - Serverside maximum packet size
 - Subscription identifiers
 - Message expiry interval
+- Topic alias
 
 ### Currently unsupported MQTT features & limitations
 
 - AUTH packet
 - User properties
 - Request/Response
-- Topic alias
 - Subscribing to multiple topics in a single packet
 
 ### Extension plans (more or less by priority)
