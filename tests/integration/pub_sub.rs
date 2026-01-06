@@ -525,6 +525,7 @@ async fn message_expiry_interval_basic() {
     join!(receiver, publisher);
 }
 
+#[ignore = "enable this test once https://github.com/hivemq/hivemq-community-edition/issues/616 is fixed"]
 #[tokio::test]
 #[test_log::test]
 async fn message_expiry_interval_partially_expired() {
