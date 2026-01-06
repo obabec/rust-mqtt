@@ -344,6 +344,7 @@ async fn subscription_identifier() {
 
     let pub_options = PublicationOptions {
         retain: true,
+        message_expiry_interval: None,
         topic: topic_name.clone(),
         qos: QoS::AtLeastOnce,
     };
