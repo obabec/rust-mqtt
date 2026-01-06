@@ -17,7 +17,7 @@ pub mod fmt;
 pub mod utils;
 
 pub type Tcp = FromTokio<TcpStream>;
-pub type TestClient<'a> = Client<'a, Tcp, AllocBuffer, 1, 1, 1, 0>;
+pub type TestClient<'a> = Client<'a, Tcp, AllocBuffer, 1, 1, 1, 1>;
 
 pub const BROKER_ADDRESS: SocketAddr =
     SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1883));

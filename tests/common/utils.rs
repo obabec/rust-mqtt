@@ -16,7 +16,7 @@ use tokio::net::TcpStream;
 use crate::common::{Tcp, TestClient, fmt::warn_inspect};
 
 static UNIQUE_TOPIC_COUNTER: Mutex<u64> = Mutex::new(0);
-static ALLOC: StaticAlloc = StaticAlloc(AllocBuffer);
+pub static ALLOC: StaticAlloc = StaticAlloc(AllocBuffer);
 
 fn unique_number() -> u64 {
     let mut counter = UNIQUE_TOPIC_COUNTER.lock().unwrap();
@@ -36,9 +36,9 @@ pub fn unique_topic() -> (TopicName<'static>, TopicFilter<'static>) {
     (n, f)
 }
 
-struct StaticAlloc(AllocBuffer);
+pub struct StaticAlloc(AllocBuffer);
 impl StaticAlloc {
-    fn get(&self) -> &'static mut AllocBuffer {
+    pub fn get(&self) -> &'static mut AllocBuffer {
         let inner = &raw const self.0 as *mut AllocBuffer;
         unsafe { &mut *inner }
     }
@@ -140,7 +140,7 @@ pub async fn unsubscribe<'c>(
 
 pub async fn receive_publish<'c>(
     client: &mut TestClient<'c>,
-) -> Result<Publish<'c, 0>, MqttError<'c>> {
+) -> Result<Publish<'c, 1>, MqttError<'c>> {
     loop {
         match warn_inspect!(client.poll().await, "Client::poll() failed")? {
             Event::Publish(p) => break Ok(p),
@@ -151,7 +151,7 @@ pub async fn receive_publish<'c>(
 
 pub async fn receive_and_complete<'c>(
     client: &mut TestClient<'c>,
-) -> Result<Publish<'c, 0>, MqttError<'c>> {
+) -> Result<Publish<'c, 1>, MqttError<'c>> {
     let publish = receive_publish(client).await?;
 
     match publish.identified_qos {

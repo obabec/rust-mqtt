@@ -1,8 +1,11 @@
 use std::time::Duration;
 
 use rust_mqtt::{
-    client::options::{PublicationOptions, RetainHandling},
-    types::{MqttString, QoS},
+    client::{
+        Client, MqttError,
+        options::{PublicationOptions, RetainHandling},
+    },
+    types::{MqttString, QoS, VarByteInt},
 };
 use tokio::{
     net::TcpStream,
@@ -13,7 +16,8 @@ use tokio_test::assert_err;
 use crate::common::{
     BROKER_ADDRESS, DEFAULT_DC_OPTIONS, DEFAULT_QOS0_SUB_OPTIONS, NO_SESSION_CONNECT_OPTIONS, Tcp,
     assert::{assert_ok, assert_published, assert_recv, assert_subscribe},
-    utils::{connected_client, disconnect, unique_topic},
+    fmt::warn_inspect,
+    utils::{ALLOC, connected_client, disconnect, unique_topic},
 };
 
 #[tokio::test]
@@ -292,6 +296,60 @@ async fn subscribe_retain_as_published_true() {
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());
     assert!(publish.retain, "Retain flag should be set to true");
+
+    disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn subscription_identifier() {
+    let (topic_name, topic_filter) = unique_topic();
+    let msg = "Retained message for SendIfNotSubscribedBefore.";
+
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let mut rx: Client<'_, _, _, 1, 1, 1, 1> = {
+        let mut client = Client::new(ALLOC.get());
+
+        let tcp = assert_ok!(
+            warn_inspect!(
+                TcpStream::connect(BROKER_ADDRESS).await,
+                "Error while connecting TCP session"
+            )
+            .map(Tcp::new)
+            .map_err(|_| MqttError::RecoveryRequired)
+        );
+
+        assert_ok!(
+            warn_inspect!(
+                client.connect(tcp, NO_SESSION_CONNECT_OPTIONS, None).await,
+                "Client::connect() failed"
+            )
+            .map(|_| client)
+        )
+    };
+
+    let mut options = DEFAULT_QOS0_SUB_OPTIONS;
+    options.qos = QoS::AtLeastOnce;
+    options.subscription_identifier = Some(VarByteInt::from(83u16));
+    assert_subscribe!(rx, options, topic_filter.clone());
+
+    let pub_options = PublicationOptions {
+        retain: true,
+        topic: topic_name.clone(),
+        qos: QoS::AtLeastOnce,
+    };
+    assert_published!(tx, pub_options.clone(), msg.into());
+
+    let publish = assert_recv!(rx);
+    assert_eq!(&*publish.message, msg.as_bytes());
+    assert_eq!(publish.subscription_identifiers.len(), 1);
+    assert_eq!(
+        publish.subscription_identifiers.first().unwrap(),
+        &VarByteInt::from(83u16)
+    );
 
     disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
     disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
