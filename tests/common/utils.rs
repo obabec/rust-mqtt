@@ -140,7 +140,7 @@ pub async fn unsubscribe<'c>(
 
 pub async fn receive_publish<'c>(
     client: &mut TestClient<'c>,
-) -> Result<Publish<'c>, MqttError<'c>> {
+) -> Result<Publish<'c, 0>, MqttError<'c>> {
     loop {
         match warn_inspect!(client.poll().await, "Client::poll() failed")? {
             Event::Publish(p) => break Ok(p),
@@ -151,7 +151,7 @@ pub async fn receive_publish<'c>(
 
 pub async fn receive_and_complete<'c>(
     client: &mut TestClient<'c>,
-) -> Result<Publish<'c>, MqttError<'c>> {
+) -> Result<Publish<'c, 0>, MqttError<'c>> {
     let publish = receive_publish(client).await?;
 
     match publish.identified_qos {

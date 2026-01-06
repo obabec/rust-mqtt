@@ -49,6 +49,7 @@ async fn publish_recv_qos0() {
             identified_qos,
             dup,
             retain,
+            subscription_identifiers: _,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_filter);
@@ -98,6 +99,7 @@ async fn publish_recv_qos1() {
             identified_qos,
             dup,
             retain,
+            subscription_identifiers: _,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_name);
@@ -147,6 +149,7 @@ async fn publish_recv_qos2() {
             identified_qos,
             dup,
             retain,
+            subscription_identifiers: _,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_name);
@@ -488,6 +491,7 @@ async fn recv_min_sub_qos0() {
             identified_qos,
             dup,
             retain,
+            subscription_identifiers: _,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_name);
@@ -537,6 +541,7 @@ async fn recv_min_sub_qos1() {
             identified_qos,
             dup,
             retain,
+            subscription_identifiers: _,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_name);
@@ -586,6 +591,7 @@ async fn recv_min_pub_qos0() {
             identified_qos,
             dup,
             retain,
+            subscription_identifiers: _,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_name);
@@ -635,6 +641,7 @@ async fn recv_min_pub_qos1() {
             identified_qos,
             dup,
             retain,
+            subscription_identifiers: _,
             topic: _,
             message,
         } = assert_recv_excl!(rx, topic_filter);

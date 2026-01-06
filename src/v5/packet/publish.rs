@@ -1,3 +1,5 @@
+use heapless::Vec;
+
 use crate::{
     buffer::BufferProvider,
     bytes::Bytes,
@@ -19,7 +21,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct PublishPacket<'p> {
+pub struct PublishPacket<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     pub dup: bool,
     pub identified_qos: IdentifiedQoS,
     pub retain: bool,
@@ -34,15 +36,19 @@ pub struct PublishPacket<'p> {
     pub topic_alias: Option<TopicAlias>,
     pub response_topic: Option<ResponseTopic<'p>>,
     pub correlation_data: Option<CorrelationData<'p>>,
-    // TODO subscription identifiers
+    pub subscription_identifiers: Vec<SubscriptionIdentifier, MAX_SUBSCRIPTION_IDENTIFIERS>,
     pub content_type: Option<ContentType<'p>>,
     pub message: Bytes<'p>,
 }
 
-impl<'p> Packet for PublishPacket<'p> {
+impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> Packet
+    for PublishPacket<'p, MAX_SUBSCRIPTION_IDENTIFIERS>
+{
     const PACKET_TYPE: PacketType = PacketType::Publish;
 }
-impl<'p> RxPacket<'p> for PublishPacket<'p> {
+impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
+    for PublishPacket<'p, MAX_SUBSCRIPTION_IDENTIFIERS>
+{
     async fn receive<R: Read, B: BufferProvider<'p>>(
         header: &FixedHeader,
         mut reader: BodyReader<'_, 'p, R, B>,
@@ -82,6 +88,7 @@ impl<'p> RxPacket<'p> for PublishPacket<'p> {
         let mut topic_alias: Option<TopicAlias> = None;
         let mut response_topic: Option<ResponseTopic<'_>> = None;
         let mut correlation_data: Option<CorrelationData<'_>> = None;
+        let mut subscription_identifiers = Vec::new();
         let mut content_type: Option<ContentType<'_>> = None;
 
         while properties_length > 0 {
@@ -140,11 +147,13 @@ impl<'p> RxPacket<'p> for PublishPacket<'p> {
                     properties_length = properties_length.checked_sub(wlen!(u16) + len).ok_or(RxError::MalformedPacket)?;
                 }
                 PropertyType::SubscriptionIdentifier => {
-                    // Since multiple subscription identifiers can appear, we just parse it into the void for now
-                    let mut subscription_identifier: Option<SubscriptionIdentifier> = None;
-                    subscription_identifier.try_set(r).await?;
+                    let subscription_identifier = SubscriptionIdentifier::read(r).await?;
+
+                    // The subscription identifiers in the packet are not guaranteed to be exhaustive
+                    #[allow(unused_must_use)]
+                    subscription_identifiers.push(subscription_identifier);
                     properties_length = properties_length
-                        .checked_sub(subscription_identifier.unwrap().into_inner().written_len())
+                        .checked_sub(subscription_identifier.into_inner().written_len())
                         .ok_or(RxError::MalformedPacket)?;
                 }
                 PropertyType::ContentType => {
@@ -177,12 +186,15 @@ impl<'p> RxPacket<'p> for PublishPacket<'p> {
             topic_alias,
             response_topic,
             correlation_data,
+            subscription_identifiers,
             content_type,
             message: payload,
         })
     }
 }
-impl<'p> TxPacket for PublishPacket<'p> {
+impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
+    for PublishPacket<'p, MAX_SUBSCRIPTION_IDENTIFIERS>
+{
     fn remaining_len(&self) -> VarByteInt {
         // Safety: PUBLISH packets that are too long to encode cannot be created
         unsafe { self.remaining_len_raw().unwrap_unchecked() }
@@ -207,6 +219,7 @@ impl<'p> TxPacket for PublishPacket<'p> {
         self.topic_alias.write(write).await?;
         self.response_topic.write(write).await?;
         self.correlation_data.write(write).await?;
+        // Don't write subscription identifiers as they are irration when publishing from client to server
         self.content_type.write(write).await?;
 
         self.message.write(write).await?;
@@ -215,7 +228,9 @@ impl<'p> TxPacket for PublishPacket<'p> {
     }
 }
 
-impl<'p> PublishPacket<'p> {
+impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
+    PublishPacket<'p, MAX_SUBSCRIPTION_IDENTIFIERS>
+{
     /// Creates a new packet with Quality of Service 0
     pub fn new(
         dup: bool,
@@ -234,6 +249,7 @@ impl<'p> PublishPacket<'p> {
             topic_alias: None,
             response_topic: None,
             correlation_data: None,
+            subscription_identifiers: Vec::new(),
             content_type: None,
             message,
         };
@@ -288,7 +304,7 @@ mod unit {
             packet::PublishPacket,
             property::{
                 ContentType, CorrelationData, MessageExpiryInterval, PayloadFormatIndicator,
-                ResponseTopic, TopicAlias,
+                Property, ResponseTopic, TopicAlias,
             },
         },
     };
@@ -296,7 +312,7 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_simple() {
-        let packet = PublishPacket::new(
+        let packet: PublishPacket<'_, 0> = PublishPacket::new(
             false,
             false,
             IdentifiedQoS::AtLeastOnce(5897),
@@ -336,7 +352,7 @@ mod unit {
     #[test_log::test]
     async fn decode_simple() {
         let packet = decode!(
-            PublishPacket,
+            PublishPacket<'_, 0>,
             13,
             [
                 0x30, 0x0D, 0x00, 0x0A, b't', b'e', b's', b't', b'/', b't', b'o', b'p', b'i', b'c',
@@ -363,7 +379,7 @@ mod unit {
     #[test_log::test]
     async fn decode_payload() {
         let packet = decode!(
-            PublishPacket,
+            PublishPacket<'_, 0>,
             21,
             [
                 0x3D, 0x15, 0x00, 0x04, b't', b'e', b's', b't', 0x54, 0x23, 0x00, b'h', b'e', b'l',
@@ -390,7 +406,7 @@ mod unit {
     async fn decode_properties() {
         #[rustfmt::skip]
         let packet = decode!(
-            PublishPacket,
+            PublishPacket<'_, 1>,
             79,
             [
                 0x30, 0x4F,
@@ -455,7 +471,16 @@ mod unit {
             ))
         );
 
-        // TODO subscription identifier = 42u32
+        assert_eq!(packet.subscription_identifiers.len(), 1);
+        assert_eq!(
+            packet
+                .subscription_identifiers
+                .first()
+                .unwrap()
+                .into_inner()
+                .value(),
+            42
+        );
 
         assert_eq!(
             packet.content_type,

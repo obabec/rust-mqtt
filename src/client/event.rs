@@ -1,14 +1,16 @@
 //! Contains the main `Event` and content types the client can emit.
 
+use heapless::Vec;
+
 use crate::{
     bytes::Bytes,
-    types::{IdentifiedQoS, MqttString, ReasonCode},
+    types::{IdentifiedQoS, MqttString, ReasonCode, VarByteInt},
 };
 
 /// Events emitted by the client when receiving an MQTT packet.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Event<'e> {
+pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// The server sent a PINGRESP packet.
     Pingresp,
 
@@ -18,7 +20,7 @@ pub enum Event<'e> {
     /// - QoS 0: No action
     /// - QoS 1: A PUBACK packet has been sent to the server.
     /// - QoS 2: A PUBREC packet has been sent to the server and the packet identifier is tracked as in flight
-    Publish(Publish<'e>),
+    Publish(Publish<'e, MAX_SUBSCRIPTION_IDENTIFIERS>),
 
     /// The server sent a SUBACK packet matching a SUBSCRIBE packet.
     ///
@@ -90,7 +92,7 @@ pub struct Suback {
 /// Content of `Event::Publish`.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Publish<'p> {
+pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// The quality of service the server determined to use for this publication. It is the minimum of
     /// the matching subscription with the highest quality of service level and the quality of service of
     /// the publishing client's publication.
@@ -107,6 +109,10 @@ pub struct Publish<'p> {
     /// result of a retained message. If set to false, this publication having been retained depends on
     /// the retain as published flag of the matching subscription.
     pub retain: bool,
+
+    /// The subscription identifiers in the PUBLISH packet. If the vector is full, this list might not
+    /// be exhaustive.
+    pub subscription_identifiers: Vec<VarByteInt, MAX_SUBSCRIPTION_IDENTIFIERS>,
 
     /// The exact topic of this publication.
     pub topic: MqttString<'p>,
