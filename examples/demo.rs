@@ -14,7 +14,7 @@ use rust_mqtt::{
         event::{Event, Suback},
         options::{
             ConnectOptions, DisconnectOptions, PublicationOptions, RetainHandling,
-            SubscriptionOptions, WillOptions,
+            SubscriptionOptions, TopicReference, WillOptions,
         },
     },
     config::{KeepAlive, SessionExpiryInterval},
@@ -125,8 +125,8 @@ async fn main() {
 
     let pub_options = PublicationOptions {
         retain: false,
-        message_expiry_interval: Some(42),
-        topic: topic.clone(),
+        message_expiry_interval: None,
+        topic: TopicReference::Mapping(topic.clone(), 1),
         qos: QoS::ExactlyOnce,
     };
 
@@ -147,7 +147,7 @@ async fn main() {
     let pub_options = PublicationOptions {
         retain: false,
         message_expiry_interval: None,
-        topic: topic.clone(),
+        topic: TopicReference::Mapping(topic.clone(), 1),
         qos: QoS::ExactlyOnce,
     };
     client
@@ -209,14 +209,6 @@ async fn main() {
         };
     }
 
-    match client.unsubscribe(topic.into()).await {
-        Ok(_) => info!("Sent Unsubscribe"),
-        Err(e) => {
-            error!("Failed to unsubscribe: {:?}", e);
-            return;
-        }
-    };
-
     match client.poll().await {
         Ok(e) => info!("Received Event {:?}", e),
         Err(e) => {
@@ -224,6 +216,14 @@ async fn main() {
             return;
         }
     }
+
+    match client.unsubscribe(topic.into()).await {
+        Ok(_) => info!("Sent Unsubscribe"),
+        Err(e) => {
+            error!("Failed to unsubscribe: {:?}", e);
+            return;
+        }
+    };
 
     match client.poll().await {
         Ok(Event::Unsuback(Suback {
@@ -239,6 +239,23 @@ async fn main() {
             return;
         }
     }
+
+    let pub_options = PublicationOptions {
+        retain: false,
+        message_expiry_interval: None,
+        topic: TopicReference::Alias(1),
+        qos: QoS::AtMostOnce,
+    };
+    match client
+        .publish(&pub_options, Bytes::from("something".as_bytes()))
+        .await
+    {
+        Ok(_) => info!("Published to topic alias 1 aka \"rust-mqtt/is/great\""),
+        Err(e) => {
+            error!("Failed to publish to topic alias {:?}", e);
+            return;
+        }
+    };
 
     match client
         .disconnect(&DisconnectOptions {
