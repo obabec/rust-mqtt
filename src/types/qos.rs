@@ -20,7 +20,7 @@ impl From<IdentifiedQoS> for QoS {
 }
 
 impl QoS {
-    pub(crate) fn into_bits(self, left_shift: u8) -> u8 {
+    pub(crate) const fn into_bits(self, left_shift: u8) -> u8 {
         let bits = match self {
             Self::AtMostOnce => 0x00,
             Self::AtLeastOnce => 0x01,

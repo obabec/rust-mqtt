@@ -17,14 +17,16 @@ use crate::{
     io::net::Transport,
     packet::{Packet, TxPacket},
     session::{CPublishFlightState, SPublishFlightState, Session},
-    types::{IdentifiedQoS, MqttString, QoS, ReasonCode, SubscriptionFilter, TopicFilter},
+    types::{
+        IdentifiedQoS, MqttString, QoS, ReasonCode, SubscriptionFilter, TopicFilter, TopicName,
+    },
     v5::{
         packet::{
             ConnackPacket, ConnectPacket, DisconnectPacket, PingreqPacket, PingrespPacket,
             PubackPacket, PubcompPacket, PublishPacket, PubrecPacket, PubrelPacket, SubackPacket,
             SubscribePacket, UnsubackPacket, UnsubscribePacket,
         },
-        property::Property,
+        property::{Property, TopicAlias},
     },
 };
 use heapless::Vec;
@@ -479,12 +481,33 @@ impl<
             QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(self.packet_identifier()),
         };
 
+        let topic_name = match options.topic.topic_name() {
+            Some(t) => t,
+            None => {
+                // Safety: Empty string does not exceed MqttString::MAX_LENGTH
+                //         An empty string is a valid topic when a topic alias is present.
+                const EMPTY_TOPIC: TopicName =
+                    unsafe { TopicName::new_unchecked(MqttString::from_slice_unchecked("")) };
+
+                &EMPTY_TOPIC
+            }
+        };
+        let topic_alias = match options.topic.alias() {
+            Some(0) => return Err(MqttError::InvalidTopicAlias),
+            Some(a) if a > self.server_config.topic_alias_maximum => {
+                return Err(MqttError::InvalidTopicAlias);
+            }
+            Some(a) => Some(a),
+            None => None,
+        };
+
         let packet: PublishPacket<'_, 0> = PublishPacket::new(
             false,
             options.retain,
             identified_qos,
             options.message_expiry_interval.map(Into::into),
-            options.topic.as_ref().as_borrowed(),
+            topic_alias.map(TopicAlias),
+            topic_name.as_ref().as_borrowed(),
             message,
         )?;
 
@@ -553,12 +576,33 @@ impl<
             QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(packet_identifier),
         };
 
+        let topic_name = match options.topic.topic_name() {
+            Some(t) => t,
+            None => {
+                // Safety: Empty string does not exceed MqttString::MAX_LENGTH
+                //         An empty string is a valid topic when a topic alias is present.
+                const EMPTY_TOPIC: TopicName =
+                    unsafe { TopicName::new_unchecked(MqttString::from_slice_unchecked("")) };
+
+                &EMPTY_TOPIC
+            }
+        };
+        let topic_alias = match options.topic.alias() {
+            Some(0) => return Err(MqttError::InvalidTopicAlias),
+            Some(a) if a > self.server_config.topic_alias_maximum => {
+                return Err(MqttError::InvalidTopicAlias);
+            }
+            Some(a) => Some(a),
+            None => None,
+        };
+
         let packet: PublishPacket<'_, 0> = PublishPacket::new(
-            true,
+            false,
             options.retain,
             identified_qos,
             options.message_expiry_interval.map(Into::into),
-            options.topic.as_ref().as_borrowed(),
+            topic_alias.map(TopicAlias),
+            topic_name.as_ref().as_borrowed(),
             message,
         )?;
 

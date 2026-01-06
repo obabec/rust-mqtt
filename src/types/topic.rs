@@ -26,7 +26,7 @@ impl<'t> TopicName<'t> {
     ///
     /// # Safety
     /// The syntax of the topic name is valid.
-    pub unsafe fn new_unchecked(topic: MqttString<'t>) -> Self {
+    pub const unsafe fn new_unchecked(topic: MqttString<'t>) -> Self {
         Self(topic)
     }
 
@@ -63,7 +63,7 @@ impl<'t> TopicFilter<'t> {
     ///
     /// # Safety
     /// The syntax of the topic filter is valid.
-    pub unsafe fn new_unchecked(topic: MqttString<'t>) -> Self {
+    pub const unsafe fn new_unchecked(topic: MqttString<'t>) -> Self {
         Self(topic)
     }
 
@@ -118,7 +118,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> Writable
 }
 
 impl<'t> SubscriptionFilter<'t> {
-    pub fn new(topic: TopicFilter<'t>, options: &SubscriptionOptions) -> Self {
+    pub const fn new(topic: TopicFilter<'t>, options: &SubscriptionOptions) -> Self {
         let retain_handling_bits = match options.retain_handling {
             RetainHandling::AlwaysSend => 0x00,
             RetainHandling::SendIfNotSubscribedBefore => 0x10,

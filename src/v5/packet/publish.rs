@@ -237,6 +237,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
         retain: bool,
         identified_qos: IdentifiedQoS,
         message_expiry_interval: Option<MessageExpiryInterval>,
+        topic_alias: Option<TopicAlias>,
         topic: MqttString<'p>,
         message: Bytes<'p>,
     ) -> Result<Self, TooLargeToEncode> {
@@ -247,7 +248,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
             topic,
             payload_format_indicator: None,
             message_expiry_interval,
-            topic_alias: None,
+            topic_alias,
             response_topic: None,
             correlation_data: None,
             subscription_identifiers: Vec::new(),
@@ -318,6 +319,7 @@ mod unit {
             false,
             IdentifiedQoS::AtLeastOnce(5897),
             None,
+            None,
             MqttString::try_from("test/topic").unwrap(),
             Bytes::from("hello".as_bytes()),
         )
@@ -342,6 +344,45 @@ mod unit {
             0x17, // Packet identifier
             0x09, // Packet identifier
             0x00, // Property length
+            b'h', // Payload
+            b'e', //
+            b'l', //
+            b'l', //
+            b'o', // Payload
+        ]);
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn encode_properties() {
+        let packet: PublishPacket<'_, 0> = PublishPacket::new(
+            true,
+            true,
+            IdentifiedQoS::ExactlyOnce(9624),
+            Some(481123u32.into()),
+            Some(TopicAlias(23408)),
+            MqttString::try_from("").unwrap(),
+            Bytes::from("hello".as_bytes()),
+        )
+        .unwrap();
+
+        #[rustfmt::skip]
+        encode!(packet, [
+            0x3D,
+            0x12,
+            0x00, // Topic Name
+            0x00, // Topic Name
+            0x25, // Packet identifier
+            0x98, // Packet identifier
+            0x08, // Property length
+            0x02, // Message expiry interval
+            0x00, //
+            0x07, //
+            0x57, //
+            0x63, // Message expiry interval
+            0x23, // Topic alias
+            0x5B, //
+            0x70, // Topic alias
             b'h', // Payload
             b'e', //
             b'l', //

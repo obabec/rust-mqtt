@@ -74,6 +74,11 @@ pub enum Error<'e> {
     /// Recoverable error. No action has been taken by the client.
     ServerMaximumPacketSizeExceeded,
 
+    /// A topic alias value was 0 or greater than the server's maximum allowed value.
+    ///
+    /// Recoverable error. No action has been taken by the client.
+    InvalidTopicAlias,
+
     /// An action was rejected because an internal buffer used for tracking session state is full.
     ///
     /// Recoverable error. Try again after an `Event` has been emitted that indicates that buffer might be free again.

@@ -17,11 +17,45 @@ pub struct Options<'p> {
     pub message_expiry_interval: Option<u32>,
 
     /// The topic that the message is published on.
-    pub topic: TopicName<'p>,
+    pub topic: TopicReference<'p>,
 
     /// The quality of service that the message is published with to the server.
     /// The quality of service level used by the server to send this publication
     /// to subscribed clients is the minimum of this value and the quality of service
     /// value of the receiving client's subscription.
     pub qos: QoS,
+}
+
+/// The options for specifiying which topic to publish to. Topic aliases only last for the
+/// duration of a single network connection and not necessarily until the session end.
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum TopicReference<'t> {
+    /// Publish to the inner topic name without creating an alias.
+    Name(TopicName<'t>),
+
+    /// Publish to an already mapped topic alias. The alias must have been defined earlier
+    /// in the network connection.
+    Alias(u16),
+
+    /// Create a new topic alias or replace an existing topic alias.
+    /// The alias lasts until the end of the network connection.
+    Mapping(TopicName<'t>, u16),
+}
+
+impl<'t> TopicReference<'t> {
+    pub(crate) fn alias(&self) -> Option<u16> {
+        match self {
+            TopicReference::Name(_) => None,
+            TopicReference::Alias(alias) => Some(*alias),
+            TopicReference::Mapping(_, alias) => Some(*alias),
+        }
+    }
+    pub(crate) fn topic_name(&self) -> Option<&TopicName<'t>> {
+        match self {
+            TopicReference::Name(topic_name) => Some(topic_name),
+            TopicReference::Alias(_) => None,
+            TopicReference::Mapping(topic_name, _) => Some(topic_name),
+        }
+    }
 }
