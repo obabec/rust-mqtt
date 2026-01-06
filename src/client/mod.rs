@@ -373,6 +373,11 @@ impl<
     /// If no `Event::Suback` is received within a custom time,
     /// this method can be used to send the SUBSCRIBE packet again.
     ///
+    /// A subscription identifier should only be set if the server supports
+    /// subscription identifiers (Can be checked with `Client::server_config()`).
+    /// The client does not double-check whether this feature is supported and will
+    /// always include the subscription identifier argument if present.
+    ///
     /// # Returns:
     /// - The packet identifier of the sent SUBSCRIBE packet.
     pub async fn subscribe(
