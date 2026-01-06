@@ -110,6 +110,11 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// the retain as published flag of the matching subscription.
     pub retain: bool,
 
+    /// The message expiry interval in seconds.
+    /// This is calculated by subtracting the elapsed time since the publish from the message expiry
+    /// interval in original publication
+    pub message_expiry_interval: Option<u32>,
+
     /// The subscription identifiers in the PUBLISH packet. If the vector is full, this list might not
     /// be exhaustive.
     pub subscription_identifiers: Vec<VarByteInt, MAX_SUBSCRIPTION_IDENTIFIERS>,

@@ -483,6 +483,7 @@ impl<
             false,
             options.retain,
             identified_qos,
+            options.message_expiry_interval.map(Into::into),
             options.topic.as_ref().as_borrowed(),
             message,
         )?;
@@ -556,6 +557,7 @@ impl<
             true,
             options.retain,
             identified_qos,
+            options.message_expiry_interval.map(Into::into),
             options.topic.as_ref().as_borrowed(),
             message,
         )?;
@@ -784,6 +786,9 @@ impl<
                     identified_qos: publish.identified_qos,
                     dup: publish.dup,
                     retain: publish.retain,
+                    message_expiry_interval: publish
+                        .message_expiry_interval
+                        .map(Property::into_inner),
                     subscription_identifiers: publish
                         .subscription_identifiers
                         .into_iter()

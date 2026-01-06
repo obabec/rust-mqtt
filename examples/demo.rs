@@ -125,6 +125,7 @@ async fn main() {
 
     let pub_options = PublicationOptions {
         retain: false,
+        message_expiry_interval: Some(42),
         topic: topic.clone(),
         qos: QoS::ExactlyOnce,
     };
@@ -145,6 +146,7 @@ async fn main() {
 
     let pub_options = PublicationOptions {
         retain: false,
+        message_expiry_interval: None,
         topic: topic.clone(),
         qos: QoS::ExactlyOnce,
     };

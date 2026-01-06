@@ -236,6 +236,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
         dup: bool,
         retain: bool,
         identified_qos: IdentifiedQoS,
+        message_expiry_interval: Option<MessageExpiryInterval>,
         topic: MqttString<'p>,
         message: Bytes<'p>,
     ) -> Result<Self, TooLargeToEncode> {
@@ -245,7 +246,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
             retain,
             topic,
             payload_format_indicator: None,
-            message_expiry_interval: None,
+            message_expiry_interval,
             topic_alias: None,
             response_topic: None,
             correlation_data: None,
@@ -316,6 +317,7 @@ mod unit {
             false,
             false,
             IdentifiedQoS::AtLeastOnce(5897),
+            None,
             MqttString::try_from("test/topic").unwrap(),
             Bytes::from("hello".as_bytes()),
         )

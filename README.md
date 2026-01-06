@@ -13,6 +13,7 @@ rust-mqtt is an MQTT client primarily for no_std environments. The library provi
 - Session recovery
 - Serverside maximum packet size
 - Subscription identifiers
+- Message expiry interval
 
 ### Currently unsupported MQTT features & limitations
 
@@ -21,7 +22,6 @@ rust-mqtt is an MQTT client primarily for no_std environments. The library provi
 - Request/Response
 - Topic alias
 - Subscribing to multiple topics in a single packet
-- Message expiry interval
 
 ### Extension plans (more or less by priority)
 
