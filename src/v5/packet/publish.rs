@@ -170,6 +170,10 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
             };
         }
 
+        if topic_name.is_empty() && topic_alias.is_none() {
+            return Err(RxError::ProtocolError);
+        }
+
         let message_len = r.remaining_len();
 
         trace!("reading message ({} bytes)", message_len);
