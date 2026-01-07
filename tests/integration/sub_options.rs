@@ -3,7 +3,7 @@ use std::time::Duration;
 use rust_mqtt::{
     client::{
         Client, MqttError,
-        options::{PublicationOptions, RetainHandling},
+        options::{PublicationOptions, RetainHandling, TopicReference},
     },
     types::{MqttString, QoS, VarByteInt},
 };
@@ -37,7 +37,7 @@ async fn publish_no_local() {
     let pub_options = PublicationOptions {
         retain: false,
         message_expiry_interval: None,
-        topic: topic_name.clone(),
+        topic: TopicReference::Name(topic_name.clone()),
         qos: QoS::ExactlyOnce,
     };
 
@@ -77,7 +77,7 @@ async fn subscribe_retain_handling_default() {
     let pub_options = PublicationOptions {
         retain: true,
         message_expiry_interval: None,
-        topic: topic_name.clone(),
+        topic: TopicReference::Name(topic_name.clone()),
         qos: QoS::AtLeastOnce,
     };
     assert_published!(tx, pub_options, msg.into());
@@ -138,7 +138,7 @@ async fn subscribe_retain_handling_never() {
     let pub_options = PublicationOptions {
         retain: true,
         message_expiry_interval: None,
-        topic: topic_name.clone(),
+        topic: TopicReference::Name(topic_name.clone()),
         qos: QoS::AtLeastOnce,
     };
     assert_published!(tx, pub_options, msg.into());
@@ -190,7 +190,7 @@ async fn subscribe_retain_handling_clean_only() {
     let pub_options = PublicationOptions {
         retain: true,
         message_expiry_interval: None,
-        topic: topic_name.clone(),
+        topic: TopicReference::Name(topic_name.clone()),
         qos: QoS::AtLeastOnce,
     };
     assert_published!(tx, pub_options, msg.into());
@@ -237,7 +237,7 @@ async fn subscribe_retain_as_published_false() {
     let pub_options = PublicationOptions {
         retain: true,
         message_expiry_interval: None,
-        topic: topic_name.clone(),
+        topic: TopicReference::Name(topic_name.clone()),
         qos: QoS::AtLeastOnce,
     };
     assert_published!(tx, pub_options.clone(), msg.into());
@@ -279,7 +279,7 @@ async fn subscribe_retain_as_published_true() {
     let pub_options = PublicationOptions {
         retain: true,
         message_expiry_interval: None,
-        topic: topic_name.clone(),
+        topic: TopicReference::Name(topic_name.clone()),
         qos: QoS::AtLeastOnce,
     };
     assert_published!(tx, pub_options.clone(), msg.into());
@@ -345,7 +345,7 @@ async fn subscription_identifier() {
     let pub_options = PublicationOptions {
         retain: true,
         message_expiry_interval: None,
-        topic: topic_name.clone(),
+        topic: TopicReference::Name(topic_name.clone()),
         qos: QoS::AtLeastOnce,
     };
     assert_published!(tx, pub_options.clone(), msg.into());
