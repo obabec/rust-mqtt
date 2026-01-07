@@ -74,7 +74,8 @@ pub enum Error<'e> {
     /// Recoverable error. No action has been taken by the client.
     ServerMaximumPacketSizeExceeded,
 
-    /// A topic alias value was 0 or greater than the server's maximum allowed value.
+    /// The value of a topic alias in an outgoing PUBLISH packet was 0 or greater than the server's maximum allowed
+    /// value. Sending this PUBLISH packet would raise a protocol error.
     ///
     /// Recoverable error. No action has been taken by the client.
     InvalidTopicAlias,
