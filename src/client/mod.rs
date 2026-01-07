@@ -597,7 +597,7 @@ impl<
         };
 
         let packet: PublishPacket<'_, 0> = PublishPacket::new(
-            false,
+            true,
             options.retain,
             identified_qos,
             options.message_expiry_interval.map(Into::into),
