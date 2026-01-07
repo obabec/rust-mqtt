@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for topic aliases to outgoing publications
 - Treat an incoming PUBLISH packet with an empty topic and no topic alias as a protocol error
 - Fix the session expiry interval property with a value of 0 being elided in DISCONNECT packets on the network
+- Add clearer errors for invalid republishes
+- Fix in flight packet identifiers being lost if transmission of PUBLISH, PUBACK or PUBREL packets fail
+- Add `Event::Duplicate` for duplicate incoming QoS 2 publications
 
 ## 0.4.1 - 2026-01-06
 
