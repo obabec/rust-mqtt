@@ -257,6 +257,13 @@ async fn main() {
     // Wait at least 1 second so that server publishes our will.
     sleep(Duration::from_secs(2)).await;
 
+    // The reason why a new bump buffer has to be created is because BufferProvider<'b> is also borrowed for 'b.
+    // This is an inconvenience here but in reality it should be fine if the existing client is reused by reconnecting.
+    #[cfg(feature = "bump")]
+    let mut buffer = [0; 1024];
+    #[cfg(feature = "bump")]
+    let mut buffer = BumpBuffer::new(&mut buffer);
+
     // Continue the previous session
     let mut client = Client::<'_, _, _, 1, 1, 1, 1>::with_session(session, &mut buffer);
 
