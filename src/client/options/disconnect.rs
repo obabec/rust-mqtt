@@ -1,6 +1,8 @@
 use crate::config::SessionExpiryInterval;
 
 /// Options for a disconnection to the server with a DISCONNECT packet.
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Options {
     /// If set to true, the server publishes the will message.
     pub publish_will: bool,
