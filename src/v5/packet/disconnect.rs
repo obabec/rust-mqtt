@@ -226,8 +226,7 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_simple() {
-        let mut packet = DisconnectPacket::new(ReasonCode::MaximumConnectTime);
-        packet.add_session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
+        let packet = DisconnectPacket::new(ReasonCode::MaximumConnectTime);
 
         #[rustfmt::skip]
         encode!(packet, [
@@ -255,6 +254,24 @@ mod unit {
                 0x11, 0x01, 0x60, 0x51, 0x43, // Reason String
                 0x1F, 0x00, 0x12, b'A', b'c', b'c', b'r', b'o', b'i', b't', b'r', b'e', b' ', b'M',
                 b'o', b'm', b'e', b'n', b't', b'u', b'm',
+            ]
+        );
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn encode_zero_session_expiry_interval() {
+        let mut packet = DisconnectPacket::new(ReasonCode::MaximumConnectTime);
+        packet.add_session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
+
+        #[rustfmt::skip]
+        encode!(packet, [
+                0xE0, //
+                0x07, // remaining length
+                0xA0, // reason code
+                0x05, // property length
+
+                0x11, 0x00, 0x00, 0x00, 0x00, // Session Expiry Interval
             ]
         );
     }
