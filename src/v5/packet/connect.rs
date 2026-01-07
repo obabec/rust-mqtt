@@ -91,7 +91,11 @@ impl<'p> TxPacket for ConnectPacket<'p> {
         let properties_length = self.properties_length();
         properties_length.write(write).await?;
 
-        self.session_expiry_interval.write(write).await?;
+        // If the session expiry interval is 0, it can be omitted on the network.
+        // This is only the case for the CONNECT packet.
+        if self.session_expiry_interval != SessionExpiryInterval::EndOnDisconnect {
+            self.session_expiry_interval.write(write).await?;
+        }
         self.receive_maximum.write(write).await?;
         self.maximum_packet_size.write(write).await?;
         self.topic_alias_maximum.write(write).await?;
@@ -138,7 +142,14 @@ impl<'p> ConnectPacket<'p> {
     }
 
     pub fn properties_length(&self) -> VarByteInt {
-        let len = self.session_expiry_interval.written_len()
+        let session_expiry_interval_len =
+            if self.session_expiry_interval == SessionExpiryInterval::EndOnDisconnect {
+                0
+            } else {
+                self.session_expiry_interval.written_len()
+            };
+
+        let len = session_expiry_interval_len
             + self.receive_maximum.written_len()
             + self.maximum_packet_size.written_len()
             + self.topic_alias_maximum.written_len()
