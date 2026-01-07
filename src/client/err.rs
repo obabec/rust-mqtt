@@ -57,17 +57,35 @@ pub enum Error<'e> {
         reason_string: Option<MqttString<'e>>,
     },
 
-    /// A method tried to send a packet with a packet identifier that is not tracked as in flight.
+    /// Another unrecoverable error has been returned earlier. The underlying connection is in a state,
+    /// in which it refuses/is not able to perform regular communication.
+    ///
+    /// Unrecoverable error. `Client::abort` should be called.
+    RecoveryRequired,
+
+    /// A republish of a packet without an in flight entry was attempted.
     ///
     /// Recoverable error. No action has been taken by the client.
     PacketIdentifierNotInFlight,
+
+    /// A republish of a packet with a quality of service that does not match the quality of
+    /// service of the original publication was attempted.
+    ///
+    /// Recoverable error. No action has been taken by the client.
+    RepublishQoSNotMatching,
+
+    /// A republish of a packet whose corresponding PUBREL packet has already been sent was attempted.
+    /// Sending the PUBLISH packet in this case would result in a protocol violation.
+    ///
+    /// Recoverable error. No action has been taken by the client.
+    PacketIdentifierAwaitingPubcomp,
 
     /// A packet was too long to encode its length with the variable byte integer.
     ///
     /// This can currently only be returned from `Client::publish` or `Client::republish`
     ///
     /// Recoverable error. No action has been taken by the client.
-    PacketMaxLengthExceeded,
+    PacketMaximumLengthExceeded,
 
     /// A packet is too long and would exceed the servers maximum packet size.
     ///
@@ -104,18 +122,23 @@ pub enum Error<'e> {
     /// Recoverable error. Try disconnecting again without an session expiry interval or with a session expiry interval
     /// of zero (`SessionExpiryInterval::EndOnDisconnect`).
     IllegalDisconnectSessionExpiryInterval,
-
-    /// Another unrecoverable error has been returned earlier. The underlying connection is in a state,
-    /// in which it refuses/is not able to perform regular communication.
-    ///
-    /// Unrecoverable error. `Client::abort` should be called.
-    RecoveryRequired,
 }
 
 impl<'e> Error<'e> {
     /// Returns whether the client can recover from this error without closing the network connection.
     pub fn is_recoverable(&self) -> bool {
-        matches!(self, Self::PacketIdentifierNotInFlight)
+        matches!(
+            self,
+            Self::PacketIdentifierNotInFlight
+                | Self::RepublishQoSNotMatching
+                | Self::PacketIdentifierAwaitingPubcomp
+                | Self::PacketMaximumLengthExceeded
+                | Self::ServerMaximumPacketSizeExceeded
+                | Self::InvalidTopicAlias
+                | Self::SessionBuffer
+                | Self::SendQuotaExceeded
+                | Self::IllegalDisconnectSessionExpiryInterval
+        )
     }
 }
 
@@ -128,7 +151,7 @@ impl<'e> From<Reserved> for Error<'e> {
 impl<'e, B> From<RawError<B>> for Error<'e> {
     fn from(e: RawError<B>) -> Self {
         match e {
-            RawError::PacketTooLong => Self::PacketMaxLengthExceeded,
+            RawError::PacketTooLong => Self::PacketMaximumLengthExceeded,
             RawError::Disconnected => Self::RecoveryRequired,
             RawError::Network(e) => Self::Network(e),
             RawError::Alloc(_) => Self::Alloc,
@@ -140,6 +163,6 @@ impl<'e, B> From<RawError<B>> for Error<'e> {
 
 impl<'e> From<TooLargeToEncode> for Error<'e> {
     fn from(_: TooLargeToEncode) -> Self {
-        Self::PacketMaxLengthExceeded
+        Self::PacketMaximumLengthExceeded
     }
 }
