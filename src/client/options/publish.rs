@@ -16,7 +16,9 @@ pub struct Options<'p> {
     /// property is omitted on the network.
     pub message_expiry_interval: Option<u32>,
 
-    /// The topic that the message is published on.
+    /// The topic that the message is published on. The topic can be referenced over
+    /// an existing topic alias mapping or by specifying the topic name and optionally
+    /// mapping a topic alias to it.
     pub topic: TopicReference<'p>,
 
     /// The quality of service that the message is published with to the server.
