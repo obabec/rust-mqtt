@@ -9,7 +9,7 @@ pub use flight::{CPublishFlightState, InFlightPublish, SPublishFlightState};
 /// Session-associated information
 ///
 /// Client identifier is not stored here as it would lead to inconsistencies with the underyling allocation system.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Session<const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize> {
     /// The currently in-flight outgoing publications.

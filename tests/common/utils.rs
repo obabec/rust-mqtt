@@ -44,6 +44,15 @@ impl StaticAlloc {
     }
 }
 
+pub async fn tcp_connection(broker: SocketAddr) -> Result<Tcp, MqttError<'static>> {
+    warn_inspect!(
+        TcpStream::connect(broker).await,
+        "Error while connecting TCP session"
+    )
+    .map(Tcp::new)
+    .map_err(|_| MqttError::RecoveryRequired)
+}
+
 pub async fn connected_client(
     broker: SocketAddr,
     options: &ConnectOptions<'static>,
@@ -51,12 +60,7 @@ pub async fn connected_client(
 ) -> Result<TestClient<'static>, MqttError<'static>> {
     let mut client = Client::new(ALLOC.get());
 
-    let tcp = warn_inspect!(
-        TcpStream::connect(broker).await,
-        "Error while connecting TCP session"
-    )
-    .map(Tcp::new)
-    .map_err(|_| MqttError::RecoveryRequired)?;
+    let tcp = tcp_connection(broker).await?;
 
     warn_inspect!(
         client.connect(tcp, options, client_identifier).await,

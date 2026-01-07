@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add subscription identifiers in subscriptions & incoming publishes
 - Add message expiry interval to outgoing and incoming publications
 - Add support for topic aliases to outgoing publications
-- Treat an incoming PUBLISH packet with an empty topic and no topic alias as a protocol error.
+- Treat an incoming PUBLISH packet with an empty topic and no topic alias as a protocol error
+- Fix the session expiry interval property with a value of 0 being elided in DISCONNECT packets on the network
 
 ## 0.4.1 - 2026-01-06
 

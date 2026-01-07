@@ -191,11 +191,7 @@ impl<R: Read> Readable<R> for SessionExpiryInterval {
 
 impl Writable for SessionExpiryInterval {
     fn written_len(&self) -> usize {
-        if matches!(self, Self::EndOnDisconnect) {
-            0
-        } else {
-            Self::TYPE.written_len() + wlen!(u32)
-        }
+        Self::TYPE.written_len() + wlen!(u32)
     }
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
         let value = match self {
@@ -204,10 +200,9 @@ impl Writable for SessionExpiryInterval {
             Self::Seconds(s) => *s,
         };
 
-        if value != 0 {
-            Self::TYPE.write(write).await?;
-            value.write(write).await?;
-        }
+        Self::TYPE.write(write).await?;
+        value.write(write).await?;
+
         Ok(())
     }
 }
