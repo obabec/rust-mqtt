@@ -79,7 +79,7 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     Ignored,
 
     /// The server sent a QoS 2 PUBLISH packet which would cause a duplicate.
-    /// 
+    ///
     /// The client has responded with a PUBREC packet.
     Duplicate,
 }
