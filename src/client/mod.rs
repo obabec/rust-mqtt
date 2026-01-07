@@ -890,7 +890,7 @@ impl<
                         debug!("received QoS 2 publication with packet identifier {}", pid);
 
                         let event = match self.session.spublish_flight_state(pid) {
-                            Some(SPublishFlightState::AwaitingPubrel) => Event::Ignored,
+                            Some(SPublishFlightState::AwaitingPubrel) => Event::Duplicate,
                             None if self.session.spublish_remaining_capacity() > 0 => {
                                 // Safety: `spublish_remaining_capacity()` > 0 confirms that there is space.
                                 unsafe { self.session.await_pubrel(pid) };
