@@ -4,8 +4,6 @@ mod err;
 mod header;
 mod net;
 
-use core::marker::PhantomData;
-
 pub use err::Error as RawError;
 pub use net::Error as NetStateError;
 
@@ -27,7 +25,6 @@ pub(crate) struct Raw<'b, N: Transport, B: BufferProvider<'b>> {
     n: NetState<N>,
     buf: &'b mut B,
     header: HeaderState,
-    _b: PhantomData<&'b ()>,
 }
 
 impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
@@ -36,7 +33,6 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
             n: NetState::Terminated,
             buf,
             header: HeaderState::new(),
-            _b: PhantomData,
         }
     }
 
