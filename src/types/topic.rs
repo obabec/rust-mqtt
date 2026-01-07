@@ -32,8 +32,8 @@ impl<'t> TopicName<'t> {
 
     /// Delegates to `Bytes::as_borrowed()`.
     #[inline]
-    pub fn as_borrowed(&'t self) -> Self {
-        Self(self.as_ref().as_borrowed())
+    pub const fn as_borrowed(&'t self) -> Self {
+        Self(self.0.as_borrowed())
     }
 }
 
@@ -69,8 +69,8 @@ impl<'t> TopicFilter<'t> {
 
     /// Delegates to `Bytes::as_borrowed()`.
     #[inline]
-    pub fn as_borrowed(&'t self) -> Self {
-        Self(self.as_ref().as_borrowed())
+    pub const fn as_borrowed(&'t self) -> Self {
+        Self(self.0.as_borrowed())
     }
 }
 

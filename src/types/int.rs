@@ -82,12 +82,12 @@ impl VarByteInt {
     }
 
     /// Returns the inner value.
-    pub fn value(&self) -> u32 {
+    pub const fn value(&self) -> u32 {
         self.0
     }
 
     /// Returns `Self::value() as usize`
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         self.0 as usize
     }
 

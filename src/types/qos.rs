@@ -30,7 +30,7 @@ impl QoS {
         bits << left_shift
     }
 
-    pub(crate) fn try_from_bits(bits: u8) -> Result<Self, ()> {
+    pub(crate) const fn try_from_bits(bits: u8) -> Result<Self, ()> {
         match bits {
             0x00 => Ok(Self::AtMostOnce),
             0x01 => Ok(Self::AtLeastOnce),
@@ -57,7 +57,7 @@ impl IdentifiedQoS {
     /// Returns `Some(packet_identifer)` if IdentifiedQoS > 0 and therefore has to be
     /// identified and `None` otherwise.
     #[inline]
-    pub fn packet_identifier(&self) -> Option<u16> {
+    pub const fn packet_identifier(&self) -> Option<u16> {
         match self {
             Self::AtMostOnce => None,
             Self::AtLeastOnce(pid) => Some(*pid),

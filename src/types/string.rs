@@ -58,8 +58,23 @@ impl<'s> MqttString<'s> {
     ///
     /// # Important
     /// Does not check that the data is valid UTF-8!
+    #[cfg(not(feature = "alloc"))]
+    pub const fn new(bytes: Bytes<'s>) -> Result<Self, TooLargeToEncode> {
+        match MqttBinary::new(bytes) {
+            Ok(b) => Ok(Self(b)),
+            Err(e) => Err(e),
+        }
+    }
+    /// Creates an MQTT string and checks for the max length in bytes of `Self::MAX_LENGTH`.
+    ///
+    /// # Important
+    /// Does not check that the data is valid UTF-8!
+    #[cfg(feature = "alloc")]
     pub fn new(bytes: Bytes<'s>) -> Result<Self, TooLargeToEncode> {
-        Ok(Self(MqttBinary::new(bytes)?))
+        match MqttBinary::new(bytes) {
+            Ok(b) => Ok(Self(b)),
+            Err(e) => Err(e),
+        }
     }
 
     /// Creates an MQTT string and checks for the max length in bytes of `Self::MAX_LENGTH`.
@@ -77,7 +92,7 @@ impl<'s> MqttString<'s> {
     ///
     /// # Safety
     /// The length of the slice parameter in bytes is less than or equal to `Self::MAX_LENGTH`.
-    pub unsafe fn new_unchecked(bytes: Bytes<'s>) -> Self {
+    pub const unsafe fn new_unchecked(bytes: Bytes<'s>) -> Self {
         // Safety: The length of the slice parameter in bytes is less than or equal to `Self::MAX_LENGTH`.
         Self(unsafe { MqttBinary::new_unchecked(bytes) })
     }
@@ -93,7 +108,7 @@ impl<'s> MqttString<'s> {
 
     /// Returns the length of the underlying data in bytes.
     #[inline]
-    pub fn len(&self) -> u16 {
+    pub const fn len(&self) -> u16 {
         self.0.len()
     }
 
@@ -105,7 +120,7 @@ impl<'s> MqttString<'s> {
 
     /// Delegates to `Bytes::as_borrowed()`.
     #[inline]
-    pub fn as_borrowed(&'s self) -> Self {
+    pub const fn as_borrowed(&'s self) -> Self {
         Self(self.0.as_borrowed())
     }
 }
