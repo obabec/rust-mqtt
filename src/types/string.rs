@@ -118,6 +118,13 @@ impl<'s> MqttString<'s> {
         self.0.is_empty()
     }
 
+    /// Returns the underlying string as `&str`
+    #[inline]
+    pub const fn as_str(&self) -> &str {
+        // Safety: MqttString contains valid UTF-8
+        unsafe { from_utf8_unchecked(self.0.as_bytes()) }
+    }
+    
     /// Delegates to `Bytes::as_borrowed()`.
     #[inline]
     pub const fn as_borrowed(&'s self) -> Self {

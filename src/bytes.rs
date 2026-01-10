@@ -21,6 +21,16 @@ pub enum Bytes<'a> {
 }
 
 impl<'a> Bytes<'a> {
+    /// Returns the underlying data as `&[u8]`
+    #[inline]
+    pub const fn as_bytes(&self) -> &[u8] {
+        match self {
+            #[cfg(feature = "alloc")]
+            Self::Owned(b) => b,
+            Self::Borrowed(s) => s,
+        }
+    }
+
     /// Borrows `self` with its full lifetime to create another owned `Self` instance.
     #[inline]
     pub const fn as_borrowed(&'a self) -> Self {
@@ -137,11 +147,7 @@ impl<'a> Deref for Bytes<'a> {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        match self {
-            Self::Borrowed(value) => value,
-            #[cfg(feature = "alloc")]
-            Self::Owned(value) => value,
-        }
+        self.as_bytes()
     }
 }
 

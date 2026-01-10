@@ -44,7 +44,7 @@ impl<'b> From<MqttString<'b>> for MqttBinary<'b> {
 
 impl<'b> AsRef<[u8]> for MqttBinary<'b> {
     fn as_ref(&self) -> &[u8] {
-        &self.0
+        self.as_bytes()
     }
 }
 
@@ -103,6 +103,12 @@ impl<'b> MqttBinary<'b> {
     #[inline]
     pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    /// Returns the underlying bytes as `&[u8]`
+    #[inline]
+    pub const fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
     }
 
     /// Delegates to `Bytes::as_borrowed()`.

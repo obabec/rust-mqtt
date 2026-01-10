@@ -1,3 +1,4 @@
+use const_fn::const_fn;
 use heapless::Vec;
 
 use crate::{
@@ -22,35 +23,38 @@ use crate::{
 pub struct TopicName<'t>(MqttString<'t>);
 
 impl<'t> TopicName<'t> {
-    // Derived from rumqtt, licensed under Apache-2.0
-    // https://github.com/bytebeamio/rumqtt/blob/main/rumqttc/src/v5/mqttbytes/mod.rs, 2026-01-08
-    //
-    // Modified by Julian Graf, 2026
-    //
     /// Creates a new topic name while checking for correct syntax of the topic name string.
+    #[const_fn(cfg(not(feature = "alloc")))]
     pub fn new(string: MqttString<'t>) -> Option<Self> {
-        let s = string.as_ref();
+        let s = string.as_str().as_bytes();
 
         // [MQTT-4.7.3-1]
         // Topic names must be at least one character long.
-        // (Except when using a topic alias, in which case `new_unchecked` is used.)
         if s.is_empty() {
             return None;
         }
 
-        // [MQTT-4.7.3-2]
-        // Topic names must not include the null character.
-        if s.contains('\0') {
-            return None;
+        let mut i = 0;
+
+        while i < s.len() {
+            let b = s[i];
+
+            // [MQTT-4.7.3-2]
+            // Topic names must not include the null character.
+            if b == b'\0' {
+                return None;
+            }
+
+            // [MQTT-4.7.0-1]
+            // Wildcard characters must not be used within a topic name.
+            if b == b'+' || b == b'#' {
+                return None;
+            }
+
+            i += 1;
         }
 
-        // [MQTT-4.7.0-1]
-        // Wildcard characters must not be used within a topic name.
-        if s.contains('+') || s.contains('#') {
-            None
-        } else {
-            Some(Self(string))
-        }
+        Some(Self(string))
     }
 
     /// Creates a new topic name without checking for correct syntax of the topic name string.
@@ -90,14 +94,10 @@ impl<'t> From<TopicName<'t>> for MqttString<'t> {
 pub struct TopicFilter<'t>(MqttString<'t>);
 
 impl<'t> TopicFilter<'t> {
-    // Derived from rumqtt, licensed under Apache-2.0
-    // https://github.com/bytebeamio/rumqtt/blob/main/rumqttc/src/v5/mqttbytes/mod.rs, 2026-01-08
-    //
-    // Modified by Julian Graf, 2026
-    //
     /// Creates a new topic filter while checking for correct syntax of the topic filter string
+    #[const_fn(cfg(not(feature = "alloc")))]
     pub fn new(string: MqttString<'t>) -> Option<Self> {
-        let s = string.as_ref();
+        let s = string.as_str().as_bytes();
 
         // [MQTT-4.7.3-1]
         // Topic filters must be at least one character long.
@@ -105,38 +105,50 @@ impl<'t> TopicFilter<'t> {
             return None;
         }
 
-        // [MQTT-4.7.3-2]
-        // Topic filters must not include the null character.
-        if s.contains('\0') {
-            return None;
-        }
+        let mut i = 0;
+        let mut level_len = 0;
+        let mut level_contains_wildcard = false;
 
-        let mut topic_levels = s.rsplit('/');
+        while i < s.len() {
+            let b = s[i];
 
-        let last = topic_levels.next().unwrap();
-
-        // [MQTT-4.7.1-1]
-        // The multi-level wildcard character must be specified on its own.
-        // The multi-level wildcard character must be the last character specified in the topic filter.
-        if last.len() > 1 && (last.contains('+') || last.contains('#')) {
-            return None;
-        }
-
-        for level in topic_levels {
-            // [MQTT-4.7.1-1]
-            // The multi-level wildcard character must be the last character specified in the topic filter.
-            // -> Any level after it must not contain the multi-level wildcard character.
-            if level.contains('#') {
+            // [MQTT-4.7.3-2]
+            // Topic filters must not include the null character.
+            if b == b'\0' {
                 return None;
             }
 
-            // [MQTT-4.7.1-2]
-            // The single-level wildcard must occupy an entire level of the filter.
-            // -> If present at any level, the single-level wildcard character must be the only character
-            //    in that level.
-            if level.len() > 1 && level.contains('+') {
-                return None;
+            if b == b'#' {
+                // [MQTT-4.7.1-1]
+                // The multi-level wildcard character must be specified on its own.
+                // The multi-level wildcard character must be the last character specified in the topic filter.
+                if i == s.len() - 1 {
+                    level_contains_wildcard = true;
+                } else {
+                    return None;
+                }
             }
+
+            if b == b'+' {
+                level_contains_wildcard = true;
+            }
+
+            if b == b'/' {
+                level_len = 0;
+                level_contains_wildcard = false;
+            } else {
+                level_len += 1;
+
+                // [MQTT-4.7.1-2]
+                // The single-level wildcard must occupy an entire level of the filter.
+                // [MQTT-4.7.1-1]
+                // The multi-level wildcard character must be specified on its own.
+                if level_len > 1 && level_contains_wildcard {
+                    return None;
+                }
+            }
+
+            i += 1;
         }
 
         Some(Self(string))
@@ -293,6 +305,26 @@ mod unit {
 
     #[test]
     fn topic_filter_with_invalid_wildcard() {
+        assert_invalid!(TopicFilter, "++/");
+        assert_invalid!(TopicFilter, "/++");
+
+        assert_invalid!(TopicFilter, "a+/");
+        assert_invalid!(TopicFilter, "+a/");
+        assert_invalid!(TopicFilter, "/a+/");
+        assert_invalid!(TopicFilter, "/+a/");
+        assert_invalid!(TopicFilter, "/a+");
+
+        assert_invalid!(TopicFilter, "##");
+        assert_invalid!(TopicFilter, "a#");
+        assert_invalid!(TopicFilter, "#a");
+        
+        assert_invalid!(TopicFilter, "a#/");
+        assert_invalid!(TopicFilter, "#a/");
+        assert_invalid!(TopicFilter, "/a#/");
+        assert_invalid!(TopicFilter, "/#a/");
+        assert_invalid!(TopicFilter, "/a#");
+        assert_invalid!(TopicFilter, "/#a");
+
         assert_invalid!(TopicFilter, "+wrong");
         assert_invalid!(TopicFilter, "wro#ng");
         assert_invalid!(TopicFilter, "w/r/o/n/g+");
@@ -301,13 +333,23 @@ mod unit {
 
     #[test]
     fn topic_filter_valid() {
+        assert_valid!(TopicFilter, "#");
+        assert_valid!(TopicFilter, "/#");
+        assert_valid!(TopicFilter, "a/#");
+
+        assert_valid!(TopicFilter, "+");
+        assert_valid!(TopicFilter, "/+");
+        assert_valid!(TopicFilter, "+/");
+        assert_valid!(TopicFilter, "a/+");
+        assert_valid!(TopicFilter, "+/a");
+
+        assert_valid!(TopicFilter, "/");
+        assert_valid!(TopicFilter, "//");
+        assert_valid!(TopicFilter, "r");
+
         assert_valid!(TopicFilter, "r/i/g/+/t");
         assert_valid!(TopicFilter, "correct/+/path");
         assert_valid!(TopicFilter, "right/path/#");
-        assert_valid!(TopicFilter, "#");
-        assert_valid!(TopicFilter, "+");
-        assert_valid!(TopicFilter, "/");
-        assert_valid!(TopicFilter, "r");
         assert_valid!(TopicFilter, "right");
         assert_valid!(TopicFilter, "sport/tennis/player1");
         assert_valid!(TopicFilter, "sport/tennis/player1/ranking");
