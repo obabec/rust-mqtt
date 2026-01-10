@@ -35,7 +35,7 @@ pub fn unique_topic() -> (TopicName<'static>, TopicFilter<'static>) {
     let b = s.into_bytes().into_boxed_slice();
     let s = MqttString::new(Bytes::Owned(b)).unwrap();
 
-    let n = unsafe { TopicName::new_unchecked(s) };
+    let n = TopicName::new(s).unwrap();
     let f = n.clone().into();
 
     (n, f)

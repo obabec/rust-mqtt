@@ -23,15 +23,13 @@ use crate::{
 pub struct TopicName<'t>(MqttString<'t>);
 
 impl<'t> TopicName<'t> {
-    /// Creates a new topic name while checking for correct syntax of the topic name string.
-    #[const_fn(cfg(not(feature = "alloc")))]
-    pub fn new(string: MqttString<'t>) -> Option<Self> {
-        let s = string.as_str().as_bytes();
+    const fn is_valid(s: &str) -> bool {
+        let s = s.as_bytes();
 
         // [MQTT-4.7.3-1]
         // Topic names must be at least one character long.
         if s.is_empty() {
-            return None;
+            return false;
         }
 
         let mut i = 0;
@@ -42,27 +40,29 @@ impl<'t> TopicName<'t> {
             // [MQTT-4.7.3-2]
             // Topic names must not include the null character.
             if b == b'\0' {
-                return None;
+                return false;
             }
 
             // [MQTT-4.7.0-1]
             // Wildcard characters must not be used within a topic name.
             if b == b'+' || b == b'#' {
-                return None;
+                return false;
             }
 
             i += 1;
         }
 
-        Some(Self(string))
+        true
     }
 
-    /// Creates a new topic name without checking for correct syntax of the topic name string.
-    ///
-    /// # Safety
-    /// The syntax of the topic name is valid.
-    pub const unsafe fn new_unchecked(topic: MqttString<'t>) -> Self {
-        Self(topic)
+    /// Creates a new topic name while checking for correct syntax of the topic name string.
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub fn new(string: MqttString<'t>) -> Option<Self> {
+        if Self::is_valid(string.as_str()) {
+            Some(Self(string))
+        } else {
+            None
+        }
     }
 
     /// Delegates to `Bytes::as_borrowed()`.
@@ -94,15 +94,13 @@ impl<'t> From<TopicName<'t>> for MqttString<'t> {
 pub struct TopicFilter<'t>(MqttString<'t>);
 
 impl<'t> TopicFilter<'t> {
-    /// Creates a new topic filter while checking for correct syntax of the topic filter string
-    #[const_fn(cfg(not(feature = "alloc")))]
-    pub fn new(string: MqttString<'t>) -> Option<Self> {
-        let s = string.as_str().as_bytes();
+    const fn is_valid(s: &str) -> bool {
+        let s = s.as_bytes();
 
         // [MQTT-4.7.3-1]
         // Topic filters must be at least one character long.
         if s.is_empty() {
-            return None;
+            return false;
         }
 
         let mut i = 0;
@@ -115,7 +113,7 @@ impl<'t> TopicFilter<'t> {
             // [MQTT-4.7.3-2]
             // Topic filters must not include the null character.
             if b == b'\0' {
-                return None;
+                return false;
             }
 
             if b == b'#' {
@@ -125,7 +123,7 @@ impl<'t> TopicFilter<'t> {
                 if i == s.len() - 1 {
                     level_contains_wildcard = true;
                 } else {
-                    return None;
+                    return false;
                 }
             }
 
@@ -144,22 +142,24 @@ impl<'t> TopicFilter<'t> {
                 // [MQTT-4.7.1-1]
                 // The multi-level wildcard character must be specified on its own.
                 if level_len > 1 && level_contains_wildcard {
-                    return None;
+                    return false;
                 }
             }
 
             i += 1;
         }
 
-        Some(Self(string))
+        true
     }
 
-    /// Creates a new topic filter without checking for correct syntax of the topic filter string.
-    ///
-    /// # Safety
-    /// The syntax of the topic filter is valid.
-    pub const unsafe fn new_unchecked(topic: MqttString<'t>) -> Self {
-        Self(topic)
+    /// Creates a new topic filter while checking for correct syntax of the topic filter string
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub fn new(string: MqttString<'t>) -> Option<Self> {
+        if Self::is_valid(string.as_str()) {
+            Some(Self(string))
+        } else {
+            None
+        }
     }
 
     /// Delegates to `Bytes::as_borrowed()`.
@@ -317,7 +317,7 @@ mod unit {
         assert_invalid!(TopicFilter, "##");
         assert_invalid!(TopicFilter, "a#");
         assert_invalid!(TopicFilter, "#a");
-        
+
         assert_invalid!(TopicFilter, "a#/");
         assert_invalid!(TopicFilter, "#a/");
         assert_invalid!(TopicFilter, "/a#/");

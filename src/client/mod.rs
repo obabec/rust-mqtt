@@ -483,11 +483,11 @@ impl<
             .topic
             .topic_name()
             .map(TopicName::as_borrowed)
+            .map(Into::into)
             .unwrap_or_else(|| {
                 // Safety: Empty string does not exceed MqttString::MAX_LENGTH
                 //         An empty string is a valid topic when a topic alias is present.
-                const EMPTY_TOPIC: TopicName =
-                    unsafe { TopicName::new_unchecked(MqttString::from_slice_unchecked("")) };
+                const EMPTY_TOPIC: MqttString = unsafe { MqttString::from_slice_unchecked("") };
 
                 EMPTY_TOPIC
             });
@@ -505,7 +505,7 @@ impl<
             identified_qos,
             options.message_expiry_interval.map(Into::into),
             topic_alias,
-            topic_name.into(),
+            topic_name,
             message,
         )?;
 
@@ -603,11 +603,11 @@ impl<
             .topic
             .topic_name()
             .map(TopicName::as_borrowed)
+            .map(Into::into)
             .unwrap_or_else(|| {
                 // Safety: Empty string does not exceed MqttString::MAX_LENGTH
                 //         An empty string is a valid topic when a topic alias is present.
-                const EMPTY_TOPIC: TopicName =
-                    unsafe { TopicName::new_unchecked(MqttString::from_slice_unchecked("")) };
+                const EMPTY_TOPIC: MqttString = unsafe { MqttString::from_slice_unchecked("") };
 
                 EMPTY_TOPIC
             });
@@ -625,7 +625,7 @@ impl<
             identified_qos,
             options.message_expiry_interval.map(Into::into),
             topic_alias,
-            topic_name.into(),
+            topic_name,
             message,
         )?;
 

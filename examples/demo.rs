@@ -97,8 +97,7 @@ async fn main() {
         subscription_identifier,
     };
 
-    let topic =
-        unsafe { TopicName::new_unchecked(MqttString::from_slice("rust-mqtt/is/great").unwrap()) };
+    let topic = TopicName::new(MqttString::from_slice("rust-mqtt/is/great").unwrap()).unwrap();
 
     match client.subscribe(topic.clone().into(), sub_options).await {
         Ok(_) => info!("Sent Subscribe"),
