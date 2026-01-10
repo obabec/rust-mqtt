@@ -30,12 +30,12 @@ impl QoS {
         bits << left_shift
     }
 
-    pub(crate) const fn try_from_bits(bits: u8) -> Result<Self, ()> {
+    pub(crate) const fn try_from_bits(bits: u8) -> Option<Self> {
         match bits {
-            0x00 => Ok(Self::AtMostOnce),
-            0x01 => Ok(Self::AtLeastOnce),
-            0x02 => Ok(Self::ExactlyOnce),
-            _ => Err(()),
+            0x00 => Some(Self::AtMostOnce),
+            0x01 => Some(Self::AtLeastOnce),
+            0x02 => Some(Self::ExactlyOnce),
+            _ => None,
         }
     }
 }

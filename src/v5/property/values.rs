@@ -218,7 +218,7 @@ impl Property for MaximumQoS {
 impl<R: Read> Readable<R> for MaximumQoS {
     async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
         let byte = u8::read(read).await?;
-        let qos = QoS::try_from_bits(byte).map_err(|_| ReadError::MalformedPacket)?;
+        let qos = QoS::try_from_bits(byte).ok_or(ReadError::MalformedPacket)?;
         Ok(Self(qos))
     }
 }

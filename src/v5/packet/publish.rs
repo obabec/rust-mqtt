@@ -59,7 +59,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
 
         trace!("decoding flags");
         let dup = flags >> 3 == 1;
-        let qos = QoS::try_from_bits((flags >> 1) & 0x03).map_err(|_| RxError::MalformedPacket)?;
+        let qos = QoS::try_from_bits((flags >> 1) & 0x03).ok_or(RxError::MalformedPacket)?;
         let retain = flags & 0x01 == 1;
 
         let r = &mut reader;
