@@ -1,5 +1,7 @@
 use core::fmt;
 
+use const_fn::const_fn;
+
 use crate::{
     bytes::Bytes,
     types::{MqttString, TooLargeToEncode},
@@ -53,16 +55,8 @@ impl<'b> MqttBinary<'b> {
     pub const MAX_LENGTH: usize = u16::MAX as usize;
 
     /// Creates MQTT binary data and checks for the max length in bytes of `Self::MAX_LENGTH`.
-    #[cfg(not(feature = "alloc"))]
+    #[const_fn(cfg(not(feature = "alloc")))]
     pub const fn new(bytes: Bytes<'b>) -> Result<Self, TooLargeToEncode> {
-        match bytes.len() {
-            ..=Self::MAX_LENGTH => Ok(Self(bytes)),
-            _ => Err(TooLargeToEncode),
-        }
-    }
-    /// Creates MQTT binary data and checks for the max length in bytes of `Self::MAX_LENGTH`.
-    #[cfg(feature = "alloc")]
-    pub fn new(bytes: Bytes<'b>) -> Result<Self, TooLargeToEncode> {
         match bytes.len() {
             ..=Self::MAX_LENGTH => Ok(Self(bytes)),
             _ => Err(TooLargeToEncode),

@@ -3,6 +3,8 @@ use core::{
     str::{Utf8Error, from_utf8, from_utf8_unchecked},
 };
 
+use const_fn::const_fn;
+
 use crate::{
     Bytes,
     types::{MqttBinary, TooLargeToEncode},
@@ -58,19 +60,8 @@ impl<'s> MqttString<'s> {
     ///
     /// # Important
     /// Does not check that the data is valid UTF-8!
-    #[cfg(not(feature = "alloc"))]
+    #[const_fn(cfg(not(feature = "alloc")))]
     pub const fn new(bytes: Bytes<'s>) -> Result<Self, TooLargeToEncode> {
-        match MqttBinary::new(bytes) {
-            Ok(b) => Ok(Self(b)),
-            Err(e) => Err(e),
-        }
-    }
-    /// Creates an MQTT string and checks for the max length in bytes of `Self::MAX_LENGTH`.
-    ///
-    /// # Important
-    /// Does not check that the data is valid UTF-8!
-    #[cfg(feature = "alloc")]
-    pub fn new(bytes: Bytes<'s>) -> Result<Self, TooLargeToEncode> {
         match MqttBinary::new(bytes) {
             Ok(b) => Ok(Self(b)),
             Err(e) => Err(e),
