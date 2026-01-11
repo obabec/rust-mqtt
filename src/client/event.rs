@@ -37,11 +37,15 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// The server sent a PUBACK or PUBREC with an erroneous reason code,
     /// therefore rejecting the publication.
     ///
+    /// The included reason code is always erroneous.
+    ///
     /// The publication process is aborted.
     PublishRejected(Pubrej),
 
     /// The server sent a PUBACK packet matching a QoS 1 PUBLISH packet
     /// confirming that the PUBLISH has been received.
+    ///
+    /// The included reason code is always successful.
     ///
     /// The QoS 1 publication process is complete,
     /// the PUBLISH packet won't have to be resent.
@@ -49,6 +53,8 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
 
     /// The server sent a PUBREC packet matching a QoS 2 PUBLISH packet
     /// confirming that the PUBLISH has been received.
+    ///
+    /// The included reason code is always successful.
     ///
     /// The client has responded with a PUBREL packet.
     ///
@@ -59,6 +65,8 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// The server sent a PUBREL packet matching a QoS 2 PUBREC packet
     /// confirming that the PUBREC has been received.
     ///
+    /// The included reason code is always successful.
+    ///
     /// The client has responded with a PUBCOMP packet.
     ///
     /// The QoS 2 publication process is complete,
@@ -67,6 +75,8 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
 
     /// The server sent a PUBCOMP packet matching a QoS 2 PUBREL packet
     /// confirming that the PUBREL has been received.
+    ///
+    /// The included reason code is always successful.
     ///
     /// The QoS 2 publication process is complete,
     /// the PUBREL packet won't have to be resent.
@@ -133,6 +143,8 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
 
 /// Content of `Event::PublishAcknowledged`, `Event::PublishReceived`, `Event::PublishReleased` and
 /// `Event::PublishComplete`.
+///
+/// The reason code is always successful.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Puback {
@@ -143,6 +155,8 @@ pub struct Puback {
 }
 
 /// Content of `Event::PublishRejecetd`.
+///
+/// The reason code is always erroneous.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Pubrej {
