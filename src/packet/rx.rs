@@ -33,6 +33,7 @@ pub enum RxError<E, B> {
 
     MalformedPacket,
     ProtocolError,
+    InvalidTopicName,
 }
 
 impl<E, B: fmt::Debug> From<BodyReadError<E, B>> for RxError<E, B> {
