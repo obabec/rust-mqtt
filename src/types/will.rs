@@ -84,13 +84,13 @@ impl<'p> Will<'p> {
             + self.response_topic.written_len()
             + self.correlation_data.written_len();
 
-        // Safety: 196626 < VarByteInt::MAX_ENCODABLE
+        // Invariant: 196626 < VarByteInt::MAX_ENCODABLE
         // will delay interval: 5
         // payload format indicator: 2
         // message expiry interval: 5
         // content type: 65538
         // response topic: 65538
         // correlation data: 65538
-        unsafe { VarByteInt::new_unchecked(will_properties_length as u32) }
+        VarByteInt::new(will_properties_length as u32)
     }
 }

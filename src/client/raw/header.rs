@@ -76,9 +76,9 @@ impl HeaderState {
         } else {
             let slice = &self.buffer[1..=i];
 
-            // Safety: We checked that the slice is within the valid range and
+            // Invariant: We checked that the slice is within the valid length range and
             // that the last byte matches the end condition of the variable byte integer encoding
-            let remaining_len = unsafe { VarByteInt::from_slice_unchecked(slice) };
+            let remaining_len = VarByteInt::from_slice_unchecked(slice);
 
             self.read = 0;
             Ok(Some(FixedHeader {

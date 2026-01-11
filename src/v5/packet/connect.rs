@@ -61,14 +61,14 @@ impl<'p> TxPacket for ConnectPacket<'p> {
 
         let total_length = variable_header_length + total_properties_length + body_length;
 
-        // Safety: Max length = 393253 < VarByteInt::MAX_ENCODABLE
+        // Invariant: Max length = 393253 < VarByteInt::MAX_ENCODABLE
         // variable header: 8
         // properties length: 4
         // properties: 131093
         // will: 2 * 65537 (will topic & will payload)
         // username: 65537
         // password: 65537
-        unsafe { VarByteInt::new_unchecked(total_length as u32) }
+        VarByteInt::new(total_length as u32)
     }
 
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
@@ -158,7 +158,7 @@ impl<'p> ConnectPacket<'p> {
             + self.authentication_method.written_len()
             + self.authentication_data.written_len();
 
-        // Safety: Max length = 131093 < VarByteInt::MAX_ENCODABLE
+        // Invariant: Max length = 131093 < VarByteInt::MAX_ENCODABLE
         // session expiry interval: 5
         // maximum packet size: 5
         // topic alias maximum: 3
@@ -166,7 +166,7 @@ impl<'p> ConnectPacket<'p> {
         // request problem information: 2
         // authentication method: 65538
         // authentication data: 65538
-        unsafe { VarByteInt::new_unchecked(len as u32) }
+        VarByteInt::new(len as u32)
     }
 
     pub fn add_user_name(&mut self, user_name: MqttString<'p>) {

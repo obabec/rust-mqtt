@@ -289,14 +289,14 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
             + self.correlation_data.written_len()
             + self.content_type.written_len();
 
-        // Safety: Max length = 196624 < VarByteInt::MAX_ENCODABLE
+        // Invariant: Max length = 196624 < VarByteInt::MAX_ENCODABLE
         // payload format indicator: 2
         // message expiry interval: 5
         // topic alias: 3
         // response topic: 65538
         // correlation data: 65538
         // content type: 65538
-        unsafe { VarByteInt::new_unchecked(len as u32) }
+        VarByteInt::new(len as u32)
     }
 }
 

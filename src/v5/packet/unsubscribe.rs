@@ -85,8 +85,8 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS
     }
 
     pub fn properties_length(&self) -> VarByteInt {
-        // Safety: Max length = 0 < VarByteInt::MAX_ENCODABLE
-        unsafe { VarByteInt::new_unchecked(0) }
+        // Invariant: Max length = 0 < VarByteInt::MAX_ENCODABLE
+        VarByteInt::new(0)
     }
 }
 

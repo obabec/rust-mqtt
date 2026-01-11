@@ -171,11 +171,11 @@ impl<'p> TxPacket for DisconnectPacket<'p> {
 
         let total_length = variable_header_length + total_properties_length;
 
-        // Safety: Max length: 131086 < VarByteInt::MAX_ENCODABLE
+        // Invariant: Max length: 131086 < VarByteInt::MAX_ENCODABLE
         // variable header (reason_code): 1
         // properties length: 4
         // properties: 131081
-        unsafe { VarByteInt::new_unchecked(total_length as u32) }
+        VarByteInt::new(total_length as u32)
     }
 }
 
@@ -203,11 +203,11 @@ impl<'p> DisconnectPacket<'p> {
             + self.reason_string.written_len()
             + self.server_reference.written_len();
 
-        // Safety: Max length = 131081 < VarByteInt::MAX_ENCODABLE
+        // Invariant: Max length = 131081 < VarByteInt::MAX_ENCODABLE
         // session expiry interval: 5
         // reason string: 65538
         // server reference: 65538
-        unsafe { VarByteInt::new_unchecked(len as u32) }
+        VarByteInt::new(len as u32)
     }
 }
 

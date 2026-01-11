@@ -89,9 +89,9 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> 
     pub fn properties_length(&self) -> VarByteInt {
         let len = self.subscription_identifier.written_len();
 
-        // Safety: Max length = 5 < VarByteInt::MAX_ENCODABLE
+        // Invariant: Max length = 5 < VarByteInt::MAX_ENCODABLE
         // subscription identifier: 5
-        unsafe { VarByteInt::new_unchecked(len as u32) }
+        VarByteInt::new(len as u32)
     }
 }
 
