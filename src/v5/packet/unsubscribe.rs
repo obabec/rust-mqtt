@@ -106,10 +106,10 @@ mod unit {
         let mut topics = Vec::new();
 
         topics
-            .push(TopicFilter::new(MqttString::try_from("test/+/topic").unwrap()).unwrap())
+            .push(TopicFilter::new_checked(MqttString::try_from("test/+/topic").unwrap()).unwrap())
             .unwrap();
         topics
-            .push(TopicFilter::new(MqttString::try_from("test/#").unwrap()).unwrap())
+            .push(TopicFilter::new_checked(MqttString::try_from("test/#").unwrap()).unwrap())
             .unwrap();
 
         let packet: UnsubscribePacket<'_, 2> = UnsubscribePacket::new(9874, topics).unwrap();

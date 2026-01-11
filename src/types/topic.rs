@@ -57,12 +57,28 @@ impl<'t> TopicName<'t> {
 
     /// Creates a new topic name while checking for correct syntax of the topic name string.
     #[const_fn(cfg(not(feature = "alloc")))]
-    pub fn new(string: MqttString<'t>) -> Option<Self> {
+    pub fn new_checked(string: MqttString<'t>) -> Option<Self> {
         if Self::is_valid(string.as_str()) {
             Some(Self(string))
         } else {
             None
         }
+    }
+
+    /// Creates a new topic name without checking for correct syntax of the topic name string.
+    ///
+    /// # Invariants
+    /// The syntax of the topic name is valid. For a fallible version, use [`TopicName::new_checked`]
+    ///
+    /// # Panics
+    /// In debug builds, this function will panic if the syntax of `string` is incorrect.
+    pub const fn new(string: MqttString<'t>) -> Self {
+        debug_assert!(
+            Self::is_valid(string.as_str()),
+            "the provided string is not valid TopicName syntax"
+        );
+
+        Self(string)
     }
 
     /// Delegates to `Bytes::as_borrowed()`.
@@ -154,12 +170,28 @@ impl<'t> TopicFilter<'t> {
 
     /// Creates a new topic filter while checking for correct syntax of the topic filter string
     #[const_fn(cfg(not(feature = "alloc")))]
-    pub fn new(string: MqttString<'t>) -> Option<Self> {
+    pub fn new_checked(string: MqttString<'t>) -> Option<Self> {
         if Self::is_valid(string.as_str()) {
             Some(Self(string))
         } else {
             None
         }
+    }
+
+    /// Creates a new topic filter without checking for correct syntax of the topic filter string.
+    ///
+    /// # Invariants
+    /// The syntax of the topic filter is valid. For a fallible version, use [`TopicFilter::new_checked`].
+    ///
+    /// # Panics
+    /// In debug builds, this function will panic if the syntax of `string` is incorrect.
+    pub const fn new(string: MqttString<'t>) -> Self {
+        debug_assert!(
+            Self::is_valid(string.as_str()),
+            "the provided string is not valid TopicFilter syntax"
+        );
+
+        Self(string)
     }
 
     /// Delegates to `Bytes::as_borrowed()`.
@@ -250,13 +282,13 @@ mod unit {
     macro_rules! assert_valid {
         ($t:ty, $l:literal) => {
             let s = assert_ok!(MqttString::from_slice($l));
-            assert!(<$t>::new(s).is_some())
+            assert!(<$t>::new_checked(s).is_some())
         };
     }
     macro_rules! assert_invalid {
         ($t:ty, $l:literal) => {
             let s = assert_ok!(MqttString::from_slice($l));
-            assert!(<$t>::new(s).is_none())
+            assert!(<$t>::new_checked(s).is_none())
         };
     }
 

@@ -113,7 +113,7 @@ mod unit {
 
         topics
             .push(SubscriptionFilter::new(
-                TopicFilter::new(MqttString::try_from("test/hello").unwrap()).unwrap(),
+                TopicFilter::new_checked(MqttString::try_from("test/hello").unwrap()).unwrap(),
                 &SubscriptionOptions {
                     retain_handling: RetainHandling::AlwaysSend,
                     retain_as_published: false,
@@ -126,7 +126,7 @@ mod unit {
 
         topics
             .push(SubscriptionFilter::new(
-                TopicFilter::new(MqttString::try_from("asdfjklo/#").unwrap()).unwrap(),
+                TopicFilter::new_checked(MqttString::try_from("asdfjklo/#").unwrap()).unwrap(),
                 &SubscriptionOptions {
                     retain_handling: RetainHandling::NeverSend,
                     retain_as_published: true,
@@ -181,7 +181,7 @@ mod unit {
         let mut topics = Vec::new();
         topics
             .push(SubscriptionFilter::new(
-                TopicFilter::new(MqttString::try_from("abc/+/y").unwrap()).unwrap(),
+                TopicFilter::new_checked(MqttString::try_from("abc/+/y").unwrap()).unwrap(),
                 &SubscriptionOptions {
                     retain_handling: RetainHandling::SendIfNotSubscribedBefore,
                     retain_as_published: true,

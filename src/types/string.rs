@@ -115,7 +115,7 @@ impl<'s> MqttString<'s> {
         // Safety: MqttString contains valid UTF-8
         unsafe { from_utf8_unchecked(self.0.as_bytes()) }
     }
-    
+
     /// Delegates to `Bytes::as_borrowed()`.
     #[inline]
     pub const fn as_borrowed(&'s self) -> Self {
