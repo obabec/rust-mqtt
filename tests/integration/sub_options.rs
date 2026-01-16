@@ -2,22 +2,19 @@ use std::time::Duration;
 
 use rust_mqtt::{
     client::{
-        Client, MqttError,
+        Client,
         options::{PublicationOptions, RetainHandling, TopicReference},
     },
     types::{MqttString, QoS, VarByteInt},
 };
-use tokio::{
-    net::TcpStream,
-    time::{sleep, timeout},
-};
+use tokio::time::{sleep, timeout};
 use tokio_test::assert_err;
 
 use crate::common::{
-    BROKER_ADDRESS, DEFAULT_DC_OPTIONS, DEFAULT_QOS0_SUB_OPTIONS, NO_SESSION_CONNECT_OPTIONS, Tcp,
+    BROKER_ADDRESS, DEFAULT_DC_OPTIONS, DEFAULT_QOS0_SUB_OPTIONS, NO_SESSION_CONNECT_OPTIONS,
     assert::{assert_ok, assert_published, assert_recv, assert_subscribe},
     fmt::warn_inspect,
-    utils::{ALLOC, connected_client, disconnect, unique_topic},
+    utils::{ALLOC, connected_client, disconnect, tcp_connection, unique_topic},
 };
 
 #[tokio::test]
@@ -106,7 +103,7 @@ async fn subscribe_retain_handling_default() {
     sleep(Duration::from_secs(1)).await;
     assert_ok!(
         rx.connect(
-            Tcp::new(assert_ok!(TcpStream::connect(BROKER_ADDRESS).await)),
+            assert_ok!(tcp_connection(BROKER_ADDRESS).await),
             NO_SESSION_CONNECT_OPTIONS,
             Some(rx_id),
         )
@@ -319,14 +316,7 @@ async fn subscription_identifier() {
     let mut rx: Client<'_, _, _, 1, 1, 1, 1> = {
         let mut client = Client::new(ALLOC.get());
 
-        let tcp = assert_ok!(
-            warn_inspect!(
-                TcpStream::connect(BROKER_ADDRESS).await,
-                "Error while connecting TCP session"
-            )
-            .map(Tcp::new)
-            .map_err(|_| MqttError::RecoveryRequired)
-        );
+        let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
 
         assert_ok!(
             warn_inspect!(
