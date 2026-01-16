@@ -10,7 +10,7 @@ use crate::{
         raw::Raw,
     },
     config::{ClientConfig, MaximumPacketSize, ServerConfig, SessionExpiryInterval, SharedConfig},
-    fmt::{debug, error, panic, warn},
+    fmt::{debug, error, panic, unreachable, warn},
     header::{FixedHeader, PacketType},
     io::net::Transport,
     packet::{Packet, TxPacket},
@@ -1103,6 +1103,21 @@ impl<
                     }
                     Some(s) => {
                         warn!("packet identifier {} in PUBCOMP is actually {:?}", pid, s);
+
+                        // Readd this packet identifier to the session so that it can be republished
+                        // after reconnecting.
+
+                        match s {
+                            CPublishFlightState::AwaitingPuback =>
+                            // Safety: Session::remove_cpublish returning Some and therefore successfully
+                            // removing a cpublish frees space to add a new in flight entry.
+                            unsafe { self.session.await_puback(pid) },
+                            CPublishFlightState::AwaitingPubrec =>
+                            // Safety: Session::remove_cpublish returning Some and therefore successfully
+                            // removing a cpublish frees space to add a new in flight entry.
+                            unsafe { self.session.await_pubrec(pid) },
+                            CPublishFlightState::AwaitingPubcomp => unreachable!(),
+                        }
 
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
