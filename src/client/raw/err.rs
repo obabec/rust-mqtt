@@ -52,7 +52,7 @@ impl<E: eio::Error, B> From<RxError<E, B>> for (Error<B>, Option<ReasonCode>) {
             RxError::UnexpectedEOF => (Error::Network(ErrorKind::NotConnected), None),
             RxError::MalformedPacket => (Error::Server, Some(ReasonCode::MalformedPacket)),
             RxError::ProtocolError => (Error::Server, Some(ReasonCode::ProtocolError)),
-            RxError::InvalidTopicName => (Error::Server, Some(ReasonCode::TopicNameInvalid))
+            RxError::InvalidTopicName => (Error::Server, Some(ReasonCode::TopicNameInvalid)),
         }
     }
 }
