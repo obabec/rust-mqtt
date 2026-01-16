@@ -960,9 +960,7 @@ impl<
                 let reason_code = pubrec.reason_code;
 
                 match self.session.remove_cpublish(pid) {
-                    Some(
-                        CPublishFlightState::AwaitingPubrec | CPublishFlightState::AwaitingPubcomp,
-                    ) if reason_code.is_success() => {
+                    Some(CPublishFlightState::AwaitingPubrec) if reason_code.is_success() => {
                         // Safety: Session::remove_cpublish returning Some and therefore successfully
                         // removing a cpublish frees space to add a new in flight entry.
                         unsafe { self.session.await_pubcomp(pid) };
@@ -982,9 +980,7 @@ impl<
                             reason_code,
                         })
                     }
-                    Some(
-                        CPublishFlightState::AwaitingPubrec | CPublishFlightState::AwaitingPubcomp,
-                    ) => {
+                    Some(CPublishFlightState::AwaitingPubrec) => {
                         // After receiving an erroneous PUBREC, we have to treat any subsequent PUBLISH packet
                         // with the same packet identifier as a new message. This is achieved by already having
                         // removed the packet identifier's in flight entry.
@@ -996,19 +992,23 @@ impl<
                             reason_code,
                         })
                     }
-
-                    Some(CPublishFlightState::AwaitingPuback) => {
-                        warn!(
-                            "packet identifier {} in PUBREC is actually awaiting PUBACK",
-                            pid
-                        );
+                    Some(s) => {
+                        warn!("packet identifier {} in PUBREC is actually {:?}", pid, s);
 
                         // Readd this packet identifier to the session so that it can be republished
                         // after reconnecting.
 
-                        // Safety: Session::remove_cpublish returning Some and therefore successfully
-                        // removing a cpublish frees space to add a new in flight entry.
-                        unsafe { self.session.await_puback(pid) };
+                        match s {
+                            CPublishFlightState::AwaitingPuback =>
+                            // Safety: Session::remove_cpublish returning Some and therefore successfully
+                            // removing a cpublish frees space to add a new in flight entry.
+                            unsafe { self.session.await_puback(pid) },
+                            CPublishFlightState::AwaitingPubrec => unreachable!(),
+                            CPublishFlightState::AwaitingPubcomp =>
+                            // Safety: Session::remove_cpublish returning Some and therefore successfully
+                            // removing a cpublish frees space to add a new in flight entry.
+                            unsafe { self.session.await_pubcomp(pid) },
+                        }
 
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
