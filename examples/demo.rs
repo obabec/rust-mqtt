@@ -11,7 +11,7 @@ use rust_mqtt::{
     buffer::*,
     client::{
         Client,
-        event::{Event, Suback},
+        event::{Event, Puback, Suback},
         options::{
             ConnectOptions, DisconnectOptions, PublicationOptions, RetainHandling,
             SubscriptionOptions, TopicReference, WillOptions,
@@ -44,14 +44,14 @@ async fn main() {
             connection,
             &ConnectOptions {
                 session_expiry_interval: SessionExpiryInterval::Seconds(5),
-                clean_start: false,
+                clean_start: true,
                 keep_alive: KeepAlive::Seconds(3),
                 will: Some(WillOptions {
                     will_qos: QoS::ExactlyOnce,
                     will_retain: true,
-                    will_topic: MqttString::try_from("dead").unwrap(),
-                    will_payload: MqttBinary::try_from("joe mama").unwrap(),
-                    will_delay_interval: 10,
+                    will_topic: MqttString::try_from("i/am/dead").unwrap(),
+                    will_payload: MqttBinary::try_from("Have a nice day!").unwrap(),
+                    will_delay_interval: 1,
                     is_payload_utf8: true,
                     message_expiry_interval: Some(20),
                     content_type: Some(MqttString::try_from("txt").unwrap()),
@@ -130,7 +130,7 @@ async fn main() {
         qos: QoS::ExactlyOnce,
     };
 
-    let publish_packet_id = match client
+    match client
         .publish(&pub_options, Bytes::from("anything".as_bytes()))
         .await
     {
@@ -143,21 +143,6 @@ async fn main() {
             return;
         }
     };
-
-    let pub_options = PublicationOptions {
-        retain: false,
-        message_expiry_interval: None,
-        topic: TopicReference::Mapping(topic.clone(), 1),
-        qos: QoS::ExactlyOnce,
-    };
-    client
-        .republish(
-            publish_packet_id,
-            &pub_options,
-            Bytes::from("anything".as_bytes()),
-        )
-        .await
-        .unwrap();
 
     loop {
         match client.poll().await {
@@ -217,7 +202,7 @@ async fn main() {
         }
     }
 
-    match client.unsubscribe(topic.into()).await {
+    match client.unsubscribe(topic.clone().into()).await {
         Ok(_) => info!("Sent Unsubscribe"),
         Err(e) => {
             error!("Failed to unsubscribe: {:?}", e);
@@ -240,22 +225,123 @@ async fn main() {
         }
     }
 
+    // Start a Quality of Service 2 publish flow
     let pub_options = PublicationOptions {
         retain: false,
         message_expiry_interval: None,
         topic: TopicReference::Alias(1),
-        qos: QoS::AtMostOnce,
+        qos: QoS::ExactlyOnce,
     };
-    match client
+    let incomplete_publish_packet_identifier = match client
         .publish(&pub_options, Bytes::from("something".as_bytes()))
         .await
     {
-        Ok(_) => info!("Published to topic alias 1 aka \"rust-mqtt/is/great\""),
+        Ok(pid) => {
+            info!("Published to topic alias 1 aka \"rust-mqtt/is/great\"");
+            pid
+        }
         Err(e) => {
             error!("Failed to publish to topic alias {:?}", e);
             return;
         }
     };
+
+    // Extract the session manually so we can simulate a dropped network connection.
+    let session = client.session().clone();
+
+    // Drop the client to simulate a lost network connection.
+    drop(client);
+
+    info!("Network connection dropped");
+
+    // Wait at least 1 second so that server publishes our will.
+    sleep(Duration::from_secs(2)).await;
+
+    // The reason why a new bump buffer has to be created is because BufferProvider<'b> is also borrowed for 'b.
+    // This is an inconvenience here but in reality it should be fine if the existing client is reused by reconnecting.
+    #[cfg(feature = "bump")]
+    let mut buffer = [0; 1024];
+    #[cfg(feature = "bump")]
+    let mut buffer = BumpBuffer::new(&mut buffer);
+
+    // Continue the previous session
+    let mut client = Client::<'_, _, _, 1, 1, 1, 1>::with_session(session, &mut buffer);
+
+    let addr = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 1883);
+    let connection = TcpStream::connect(addr).await.unwrap();
+    let connection = FromTokio::new(connection);
+
+    match client
+        .connect(
+            connection,
+            &ConnectOptions {
+                session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
+                clean_start: false,
+                keep_alive: KeepAlive::Infinite,
+                will: None,
+                user_name: Some(MqttString::try_from("test").unwrap()),
+                password: Some(MqttBinary::try_from("testPass").unwrap()),
+            },
+            Some(MqttString::try_from("rust-mqtt-demo-client").unwrap()),
+        )
+        .await
+    {
+        Ok(c) => {
+            info!("Connected to server: {:?}", c);
+            info!("{:?}", client.client_config());
+            info!("{:?}", client.server_config());
+            info!("{:?}", client.shared_config());
+            info!("{:?}", client.session());
+        }
+        Err(e) => {
+            error!("Failed to connect to server: {:?}", e);
+            return;
+        }
+    };
+
+    let pub_options = PublicationOptions {
+        retain: false,
+        message_expiry_interval: None,
+        topic: TopicReference::Name(topic.clone()),
+        qos: QoS::ExactlyOnce,
+    };
+    match client
+        .republish(
+            incomplete_publish_packet_identifier,
+            &pub_options,
+            Bytes::from("something".as_bytes()),
+        )
+        .await
+    {
+        Ok(_) => info!(
+            "Republished packet identifier {} after reconnecting",
+            incomplete_publish_packet_identifier
+        ),
+        Err(e) => error!(
+            "Failed to republish packet identifier {} due to {:?}",
+            incomplete_publish_packet_identifier, e
+        ),
+    }
+
+    loop {
+        match client.poll().await {
+            Ok(Event::PublishComplete(Puback {
+                packet_identifier,
+                reason_code,
+            })) if packet_identifier == incomplete_publish_packet_identifier => {
+                info!(
+                    "Completed republish of packet identifier {}",
+                    packet_identifier
+                );
+                break;
+            }
+            Ok(e) => info!("Received Event {:?}", e),
+            Err(e) => {
+                error!("Failed to poll: {:?}", e);
+                return;
+            }
+        }
+    }
 
     match client
         .disconnect(&DisconnectOptions {

@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add support for topic aliases to outgoing publications
 - Treat an incoming PUBLISH packet with an empty topic and no topic alias as a protocol error
 - Fix the session expiry interval property with a value of 0 being elided in DISCONNECT packets on the network
+- Add clearer errors for invalid republishes
+- Fix in flight packet identifiers being lost if transmission and retransmission of PUBLISH packets fail
+- Allow incoming QoS 1 publications to cause duplicate application messages
+- Add `Event::Duplicate` for duplicate incoming QoS 2 publications instead of using `Event::Ignored`
+- Correctly accept QoS 2 retransmissions if receive maximum is reached
+- Don't remove in-flight entries on protocol errors caused by received PUBACK, PUBREC & PUBCOMP packets mismatching with the client's session state
+- Rename error variant `Error::PacketMaxLengthExceeded` to `Error::PacketMaximumLengthExceeded`
+- Send appropriate PUBREL & PUBCOMP packets with reason code Packet Identifier Not Found when receiving such PUBREC & PUBREL packets instead of ignoring to prevent publish flow deadlocks
 
 ## 0.4.1 - 2026-01-06
 

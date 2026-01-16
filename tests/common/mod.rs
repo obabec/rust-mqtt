@@ -12,12 +12,17 @@ use rust_mqtt::{
 };
 use tokio::net::TcpStream;
 
+use crate::common::failing::FailingTcp;
+
 pub mod assert;
+pub mod failing;
 pub mod fmt;
 pub mod utils;
 
-pub type Tcp = FromTokio<TcpStream>;
-pub type TestClient<'a> = Client<'a, Tcp, AllocBuffer, 1, 1, 1, 1>;
+type DefaultClient<'a, T> = Client<'a, T, AllocBuffer, 1, 1, 1, 1>;
+
+pub type TestClient<'a> = DefaultClient<'a, FromTokio<TcpStream>>;
+pub type FailingClient<'a> = DefaultClient<'a, FromTokio<FailingTcp>>;
 
 pub const BROKER_ADDRESS: SocketAddr =
     SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1883));

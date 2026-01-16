@@ -1,5 +1,6 @@
 use std::{net::SocketAddr, sync::Mutex};
 
+use embedded_io_adapters::tokio_1::FromTokio;
 use log::{info, warn};
 use rust_mqtt::{
     Bytes,
@@ -13,7 +14,11 @@ use rust_mqtt::{
 };
 use tokio::net::TcpStream;
 
-use crate::common::{Tcp, TestClient, fmt::warn_inspect};
+use crate::common::{
+    FailingClient, TestClient,
+    failing::{ByteLimit, FailingTcp},
+    fmt::warn_inspect,
+};
 
 static UNIQUE_TOPIC_COUNTER: Mutex<u64> = Mutex::new(0);
 pub static ALLOC: StaticAlloc = StaticAlloc(AllocBuffer);
@@ -44,13 +49,18 @@ impl StaticAlloc {
     }
 }
 
-pub async fn tcp_connection(broker: SocketAddr) -> Result<Tcp, MqttError<'static>> {
+pub async fn tcp_connection_raw(broker: SocketAddr) -> Result<TcpStream, MqttError<'static>> {
     warn_inspect!(
         TcpStream::connect(broker).await,
         "Error while connecting TCP session"
     )
-    .map(Tcp::new)
     .map_err(|_| MqttError::RecoveryRequired)
+}
+
+pub async fn tcp_connection(
+    broker: SocketAddr,
+) -> Result<FromTokio<TcpStream>, MqttError<'static>> {
+    tcp_connection_raw(broker).await.map(FromTokio::new)
 }
 
 pub async fn connected_client(
@@ -61,6 +71,26 @@ pub async fn connected_client(
     let mut client = Client::new(ALLOC.get());
 
     let tcp = tcp_connection(broker).await?;
+
+    warn_inspect!(
+        client.connect(tcp, options, client_identifier).await,
+        "Client::connect() failed"
+    )
+    .map(|_| client)
+}
+
+pub async fn connected_failing_client(
+    broker: SocketAddr,
+    options: &ConnectOptions<'static>,
+    client_identifier: Option<MqttString<'_>>,
+    read_limit: ByteLimit,
+    write_limit: ByteLimit,
+) -> Result<FailingClient<'static>, MqttError<'static>> {
+    let mut client = Client::new(ALLOC.get());
+
+    let tcp = tcp_connection_raw(broker).await?;
+    let tcp = FailingTcp::new(tcp, read_limit, write_limit);
+    let tcp = FromTokio::new(tcp);
 
     warn_inspect!(
         client.connect(tcp, options, client_identifier).await,
