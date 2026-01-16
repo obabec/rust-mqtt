@@ -93,8 +93,8 @@ pub enum PropertyType {
 }
 
 impl PropertyType {
-    pub const fn from_identifier(identifier: u8) -> Result<Self, ()> {
-        Ok(match identifier {
+    pub const fn from_identifier(identifier: u8) -> Option<Self> {
+        Some(match identifier {
             0x01 => Self::PayloadFormatIndicator,
             0x02 => Self::MessageExpiryInterval,
             0x03 => Self::ContentType,
@@ -122,7 +122,7 @@ impl PropertyType {
             0x28 => Self::WildcardSubscriptionAvailable,
             0x29 => Self::SubscriptionIdentifierAvailable,
             0x2A => Self::SharedSubscriptionAvailable,
-            _ => return Err(()),
+            _ => return None,
         })
     }
     pub const fn identifier(&self) -> u8 {
@@ -162,7 +162,7 @@ impl<R: Read> Readable<R> for PropertyType {
     async fn read(net: &mut R) -> Result<Self, ReadError<R::Error>> {
         let identifier = u8::read(net).await?;
 
-        Self::from_identifier(identifier).map_err(|_| ReadError::MalformedPacket)
+        Self::from_identifier(identifier).ok_or(ReadError::MalformedPacket)
     }
 }
 

@@ -1,3 +1,4 @@
+use const_fn::const_fn;
 use heapless::Vec;
 
 use crate::{
@@ -22,18 +23,68 @@ use crate::{
 pub struct TopicName<'t>(MqttString<'t>);
 
 impl<'t> TopicName<'t> {
+    const fn is_valid(s: &str) -> bool {
+        let s = s.as_bytes();
+
+        // [MQTT-4.7.3-1]
+        // Topic names must be at least one character long.
+        if s.is_empty() {
+            return false;
+        }
+
+        let mut i = 0;
+
+        while i < s.len() {
+            let b = s[i];
+
+            // [MQTT-4.7.3-2]
+            // Topic names must not include the null character.
+            if b == b'\0' {
+                return false;
+            }
+
+            // [MQTT-4.7.0-1]
+            // Wildcard characters must not be used within a topic name.
+            if b == b'+' || b == b'#' {
+                return false;
+            }
+
+            i += 1;
+        }
+
+        true
+    }
+
+    /// Creates a new topic name while checking for correct syntax of the topic name string.
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub fn new_checked(string: MqttString<'t>) -> Option<Self> {
+        if Self::is_valid(string.as_str()) {
+            Some(Self(string))
+        } else {
+            None
+        }
+    }
+
     /// Creates a new topic name without checking for correct syntax of the topic name string.
     ///
-    /// # Safety
-    /// The syntax of the topic name is valid.
-    pub const unsafe fn new_unchecked(topic: MqttString<'t>) -> Self {
-        Self(topic)
+    /// # Invariants
+    /// The syntax of the topic name is valid. For a fallible version, use [`TopicName::new_checked`]
+    ///
+    /// # Panics
+    /// In debug builds, this function will panic if the syntax of `string` is incorrect.
+    pub const fn new(string: MqttString<'t>) -> Self {
+        debug_assert!(
+            Self::is_valid(string.as_str()),
+            "the provided string is not valid TopicName syntax"
+        );
+
+        Self(string)
     }
 
     /// Delegates to `Bytes::as_borrowed()`.
     #[inline]
-    pub fn as_borrowed(&'t self) -> Self {
-        Self(self.as_ref().as_borrowed())
+    pub const fn as_borrowed(&'t self) -> Self {
+        Self(self.0.as_borrowed())
     }
 }
 
@@ -59,18 +110,94 @@ impl<'t> From<TopicName<'t>> for MqttString<'t> {
 pub struct TopicFilter<'t>(MqttString<'t>);
 
 impl<'t> TopicFilter<'t> {
+    const fn is_valid(s: &str) -> bool {
+        let s = s.as_bytes();
+
+        // [MQTT-4.7.3-1]
+        // Topic filters must be at least one character long.
+        if s.is_empty() {
+            return false;
+        }
+
+        let mut i = 0;
+        let mut level_len = 0;
+        let mut level_contains_wildcard = false;
+
+        while i < s.len() {
+            let b = s[i];
+
+            // [MQTT-4.7.3-2]
+            // Topic filters must not include the null character.
+            if b == b'\0' {
+                return false;
+            }
+
+            if b == b'#' {
+                // [MQTT-4.7.1-1]
+                // The multi-level wildcard character must be specified on its own.
+                // The multi-level wildcard character must be the last character specified in the topic filter.
+                if i == s.len() - 1 {
+                    level_contains_wildcard = true;
+                } else {
+                    return false;
+                }
+            }
+
+            if b == b'+' {
+                level_contains_wildcard = true;
+            }
+
+            if b == b'/' {
+                level_len = 0;
+                level_contains_wildcard = false;
+            } else {
+                level_len += 1;
+
+                // [MQTT-4.7.1-2]
+                // The single-level wildcard must occupy an entire level of the filter.
+                // [MQTT-4.7.1-1]
+                // The multi-level wildcard character must be specified on its own.
+                if level_len > 1 && level_contains_wildcard {
+                    return false;
+                }
+            }
+
+            i += 1;
+        }
+
+        true
+    }
+
+    /// Creates a new topic filter while checking for correct syntax of the topic filter string
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub fn new_checked(string: MqttString<'t>) -> Option<Self> {
+        if Self::is_valid(string.as_str()) {
+            Some(Self(string))
+        } else {
+            None
+        }
+    }
+
     /// Creates a new topic filter without checking for correct syntax of the topic filter string.
     ///
-    /// # Safety
-    /// The syntax of the topic filter is valid.
-    pub const unsafe fn new_unchecked(topic: MqttString<'t>) -> Self {
-        Self(topic)
+    /// # Invariants
+    /// The syntax of the topic filter is valid. For a fallible version, use [`TopicFilter::new_checked`].
+    ///
+    /// # Panics
+    /// In debug builds, this function will panic if the syntax of `string` is incorrect.
+    pub const fn new(string: MqttString<'t>) -> Self {
+        debug_assert!(
+            Self::is_valid(string.as_str()),
+            "the provided string is not valid TopicFilter syntax"
+        );
+
+        Self(string)
     }
 
     /// Delegates to `Bytes::as_borrowed()`.
     #[inline]
-    pub fn as_borrowed(&'t self) -> Self {
-        Self(self.as_ref().as_borrowed())
+    pub const fn as_borrowed(&'t self) -> Self {
+        Self(self.0.as_borrowed())
     }
 }
 
@@ -144,5 +271,120 @@ impl<'t> SubscriptionFilter<'t> {
             topic,
             subscription_options: subscribe_options_bits,
         }
+    }
+}
+
+#[cfg(test)]
+mod unit {
+    use crate::types::{MqttString, TopicFilter, TopicName};
+    use tokio_test::assert_ok;
+
+    macro_rules! assert_valid {
+        ($t:ty, $l:literal) => {
+            let s = assert_ok!(MqttString::from_slice($l));
+            assert!(<$t>::new_checked(s).is_some())
+        };
+    }
+    macro_rules! assert_invalid {
+        ($t:ty, $l:literal) => {
+            let s = assert_ok!(MqttString::from_slice($l));
+            assert!(<$t>::new_checked(s).is_none())
+        };
+    }
+
+    #[test]
+    fn topic_name_zero_characters() {
+        assert_invalid!(TopicName, "");
+    }
+
+    #[test]
+    fn topic_name_null_character() {
+        assert_invalid!(TopicName, "he\0/yo");
+    }
+
+    #[test]
+    fn topic_name_with_wildcard() {
+        assert_invalid!(TopicName, "+wrong");
+        assert_invalid!(TopicName, "wro#ng");
+        assert_invalid!(TopicName, "w/r/o/n/g+");
+        assert_invalid!(TopicName, "w/r/o/+/g");
+        assert_invalid!(TopicName, "wrong/#/path");
+        assert_invalid!(TopicName, "wrong/+/path");
+        assert_invalid!(TopicName, "wrong/path/#");
+        assert_invalid!(TopicName, "#");
+        assert_invalid!(TopicName, "+");
+    }
+
+    #[test]
+    fn topic_name_valid() {
+        assert_valid!(TopicName, "/");
+        assert_valid!(TopicName, "r");
+        assert_valid!(TopicName, "right");
+        assert_valid!(TopicName, "sport/tennis/player1");
+        assert_valid!(TopicName, "sport/tennis/player1/ranking");
+        assert_valid!(TopicName, "sport/tennis/player1/score/wimbledon");
+    }
+
+    #[test]
+    fn topic_filter_zero_characters() {
+        assert_invalid!(TopicFilter, "");
+    }
+
+    #[test]
+    fn topic_filter_null_character() {
+        assert_invalid!(TopicFilter, "he\0/yo");
+    }
+
+    #[test]
+    fn topic_filter_with_invalid_wildcard() {
+        assert_invalid!(TopicFilter, "++/");
+        assert_invalid!(TopicFilter, "/++");
+
+        assert_invalid!(TopicFilter, "a+/");
+        assert_invalid!(TopicFilter, "+a/");
+        assert_invalid!(TopicFilter, "/a+/");
+        assert_invalid!(TopicFilter, "/+a/");
+        assert_invalid!(TopicFilter, "/a+");
+
+        assert_invalid!(TopicFilter, "##");
+        assert_invalid!(TopicFilter, "a#");
+        assert_invalid!(TopicFilter, "#a");
+
+        assert_invalid!(TopicFilter, "a#/");
+        assert_invalid!(TopicFilter, "#a/");
+        assert_invalid!(TopicFilter, "/a#/");
+        assert_invalid!(TopicFilter, "/#a/");
+        assert_invalid!(TopicFilter, "/a#");
+        assert_invalid!(TopicFilter, "/#a");
+
+        assert_invalid!(TopicFilter, "+wrong");
+        assert_invalid!(TopicFilter, "wro#ng");
+        assert_invalid!(TopicFilter, "w/r/o/n/g+");
+        assert_invalid!(TopicFilter, "wrong/#/path");
+    }
+
+    #[test]
+    fn topic_filter_valid() {
+        assert_valid!(TopicFilter, "#");
+        assert_valid!(TopicFilter, "/#");
+        assert_valid!(TopicFilter, "a/#");
+
+        assert_valid!(TopicFilter, "+");
+        assert_valid!(TopicFilter, "/+");
+        assert_valid!(TopicFilter, "+/");
+        assert_valid!(TopicFilter, "a/+");
+        assert_valid!(TopicFilter, "+/a");
+
+        assert_valid!(TopicFilter, "/");
+        assert_valid!(TopicFilter, "//");
+        assert_valid!(TopicFilter, "r");
+
+        assert_valid!(TopicFilter, "r/i/g/+/t");
+        assert_valid!(TopicFilter, "correct/+/path");
+        assert_valid!(TopicFilter, "right/path/#");
+        assert_valid!(TopicFilter, "right");
+        assert_valid!(TopicFilter, "sport/tennis/player1");
+        assert_valid!(TopicFilter, "sport/tennis/player1/ranking");
+        assert_valid!(TopicFilter, "sport/tennis/player1/score/wimbledon");
     }
 }

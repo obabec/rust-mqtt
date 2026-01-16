@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Don't remove in-flight entries on protocol errors caused by received PUBACK, PUBREC & PUBCOMP packets mismatching with the client's session state
 - Rename error variant `Error::PacketMaxLengthExceeded` to `Error::PacketMaximumLengthExceeded`
 - Send appropriate PUBREL & PUBCOMP packets with reason code Packet Identifier Not Found when receiving such PUBREC & PUBREL packets instead of ignoring to prevent publish flow deadlocks
+- Make methods throughout `types` module const where possible
+- Add syntax validating factory methods for `TopicName` and `TopicFilter`
+- Parse and validate topic names in incoming PUBLISH packets
+- Remove unsafe from unchecked factory methods from `TopicName`, `TopicFilter` and `VarByteInt` as they don't cause UB
+- Remove `VarByteInt::from_slice_unchecked` from public API
 
 ## 0.4.1 - 2026-01-06
 

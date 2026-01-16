@@ -114,9 +114,7 @@ property!(ResponseInformation<'c>, MqttString<'c>);
 property!(ServerReference<'c>, MqttString<'c>);
 property!(ReasonString<'c>, MqttString<'c>);
 property!(TopicAliasMaximum, u16);
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct TopicAlias(pub(crate) u16);
+property!(TopicAlias, u16);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MaximumQoS(pub(crate) QoS);
@@ -218,37 +216,8 @@ impl Property for MaximumQoS {
 impl<R: Read> Readable<R> for MaximumQoS {
     async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
         let byte = u8::read(read).await?;
-        let qos = QoS::try_from_bits(byte).map_err(|_| ReadError::MalformedPacket)?;
+        let qos = QoS::try_from_bits(byte).ok_or(ReadError::MalformedPacket)?;
         Ok(Self(qos))
-    }
-}
-
-impl Property for TopicAlias {
-    const TYPE: PropertyType = PropertyType::TopicAlias;
-    type Inner = u16;
-
-    fn into_inner(self) -> Self::Inner {
-        self.0
-    }
-}
-impl<R: Read> Readable<R> for TopicAlias {
-    async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
-        let topic_alias = u16::read(read).await?;
-        if topic_alias == 0 {
-            Err(ReadError::ProtocolError)
-        } else {
-            Ok(Self(topic_alias))
-        }
-    }
-}
-impl Writable for TopicAlias {
-    fn written_len(&self) -> usize {
-        Self::TYPE.written_len() + wlen!(u16)
-    }
-    async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
-        Self::TYPE.write(write).await?;
-        self.0.write(write).await?;
-        Ok(())
     }
 }
 

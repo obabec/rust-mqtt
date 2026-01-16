@@ -1,5 +1,7 @@
 use core::fmt;
 
+use const_fn::const_fn;
+
 use crate::{
     bytes::Bytes,
     types::{MqttString, TooLargeToEncode},
@@ -44,7 +46,7 @@ impl<'b> From<MqttString<'b>> for MqttBinary<'b> {
 
 impl<'b> AsRef<[u8]> for MqttBinary<'b> {
     fn as_ref(&self) -> &[u8] {
-        &self.0
+        self.as_bytes()
     }
 }
 
@@ -53,7 +55,8 @@ impl<'b> MqttBinary<'b> {
     pub const MAX_LENGTH: usize = u16::MAX as usize;
 
     /// Creates MQTT binary data and checks for the max length in bytes of `Self::MAX_LENGTH`.
-    pub fn new(bytes: Bytes<'b>) -> Result<Self, TooLargeToEncode> {
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub const fn new(bytes: Bytes<'b>) -> Result<Self, TooLargeToEncode> {
         match bytes.len() {
             ..=Self::MAX_LENGTH => Ok(Self(bytes)),
             _ => Err(TooLargeToEncode),
@@ -96,9 +99,15 @@ impl<'b> MqttBinary<'b> {
         self.0.is_empty()
     }
 
+    /// Returns the underlying bytes as `&[u8]`
+    #[inline]
+    pub const fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+
     /// Delegates to `Bytes::as_borrowed()`.
     #[inline]
-    pub fn as_borrowed(&'b self) -> Self {
+    pub const fn as_borrowed(&'b self) -> Self {
         Self(self.0.as_borrowed())
     }
 }

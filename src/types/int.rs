@@ -10,6 +10,8 @@ use crate::{
 };
 
 /// MQTT's variable byte integer encoding. Mainly used for packet length, but also throughout some properties.
+///
+/// Use its `TryFrom<u32>`, `From<u16>` and `From<u8>` implementations to construct a value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct VarByteInt(u32);
@@ -75,29 +77,51 @@ impl VarByteInt {
 
     /// Creates a variable byte integer without checking for the `VarByteInt::MAX_ENCODABLE` invariant.
     ///
-    /// # Safety
-    /// The value parameter is less than or equal to `VarByteInt::MAX_ENCODABLE`
-    pub const unsafe fn new_unchecked(value: u32) -> Self {
+    /// # Invariants
+    /// The value parameter must be less than or equal to [`VarByteInt::MAX_ENCODABLE`].
+    /// For a fallible version, use `TryFrom<u32>`
+    ///
+    /// # Panics
+    /// Panics in debug builds if `value` exceeds [`VarByteInt::MAX_ENCODABLE`]
+    pub const fn new(value: u32) -> Self {
+        debug_assert!(
+            value <= Self::MAX_ENCODABLE,
+            "the value exceeds MAX_ENCODABLE"
+        );
+
         Self(value)
     }
 
     /// Returns the inner value.
-    pub fn value(&self) -> u32 {
+    pub const fn value(&self) -> u32 {
         self.0
     }
 
     /// Returns `Self::value() as usize`
-    pub fn size(&self) -> usize {
+    pub const fn size(&self) -> usize {
         self.0 as usize
     }
 
     /// Decodes a variable byte integer from a slice.
     ///
-    /// # Safety
-    /// The slice contains a validly encoded variable byte integer and is not longer than that encoding.
-    pub unsafe fn from_slice_unchecked(slice: &[u8]) -> Self {
+    /// # Invariants
+    /// The slice must contain a correctly encoded variable byte integer and is
+    /// has exactly the length of that encoding.
+    pub(crate) fn from_slice_unchecked(slice: &[u8]) -> Self {
         let mut multiplier = 1;
         let mut value = 0;
+
+        debug_assert!(
+            !slice.is_empty() && slice.len() <= 4,
+            "encodings are always 1..=4 bytes long, {} is invalid",
+            slice.len()
+        );
+
+        debug_assert_eq!(
+            slice.last().unwrap() & 128,
+            0,
+            "the last byte of the encoding must not have bit 7 set"
+        );
 
         for b in slice {
             value += (b & 0x7F) as u32 * multiplier;
@@ -107,7 +131,7 @@ impl VarByteInt {
             }
         }
 
-        Self(value)
+        Self::new(value)
     }
 }
 

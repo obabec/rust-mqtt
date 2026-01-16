@@ -150,7 +150,7 @@ pub enum ReasonCode {
 
 impl ReasonCode {
     /// Returns the numeric value of the reason code.
-    pub fn value(&self) -> u8 {
+    pub const fn value(&self) -> u8 {
         match self {
             Self::Success => 0x00,
             Self::GrantedQoS1 => 0x01,
@@ -200,13 +200,13 @@ impl ReasonCode {
 
     /// Returns whether the reason code is successful.
     /// This is the case if the reason code's numeric value is less than 0x80.
-    pub fn is_success(&self) -> bool {
+    pub const fn is_success(&self) -> bool {
         self.value() < 0x80
     }
 
     /// Returns whether the reason code indicates an error.
     /// This is the case if the reason code's numeric value is greater than or equal to 0x80.
-    pub fn is_erroneous(&self) -> bool {
+    pub const fn is_erroneous(&self) -> bool {
         self.value() >= 0x80
     }
 }

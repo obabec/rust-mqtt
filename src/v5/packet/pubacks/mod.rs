@@ -131,11 +131,11 @@ impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
 
         let total_length = variable_header_length + total_properties_length;
 
-        // Safety: Max length = 65545 < VarByteInt::MAX_ENCODABLE
+        // Invariant: Max length = 65545 < VarByteInt::MAX_ENCODABLE
         // properties length: 4
         // properties: 65538
         // variable header: 3
-        unsafe { VarByteInt::new_unchecked(total_length as u32) }
+        VarByteInt::new(total_length as u32)
     }
 
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
@@ -146,17 +146,13 @@ impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
         self.packet_identifier.write(write).await?;
         self.reason_code.write(write).await?;
         match &self.reason_string {
-            // Safety: reason string length 65537 < VarByteInt::MAX_ENCODABLE
-            Some(r) => unsafe {
-                VarByteInt::new_unchecked(r.written_len() as u32)
-                    .write(write)
-                    .await?;
+            // Invariant: reason string length 65537 < VarByteInt::MAX_ENCODABLE
+            Some(r) => {
+                VarByteInt::new(r.written_len() as u32).write(write).await?;
                 r.write(write).await?;
-            },
-            // Safety: 0 < VarByteInt::MAX_ENCODABLE
-            None => unsafe {
-                VarByteInt::new_unchecked(0).write(write).await?;
-            },
+            }
+            // Invariant: 0 < VarByteInt::MAX_ENCODABLE
+            None => VarByteInt::new(0).write(write).await?,
         }
 
         Ok(())
@@ -176,8 +172,8 @@ impl<'p, T: PubackPacketType> GenericPubackPacket<'p, T> {
     fn properties_length(&self) -> VarByteInt {
         let len = self.reason_string.written_len();
 
-        // Safety: Max length of reason string is 65538 < VarByteInt::MAX_ENCODABLE
-        unsafe { VarByteInt::new_unchecked(len as u32) }
+        // Invariant: Max length of reason string is 65538 < VarByteInt::MAX_ENCODABLE
+        VarByteInt::new(len as u32)
     }
 }
 

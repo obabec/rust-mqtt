@@ -3,6 +3,7 @@ use heapless::Vec;
 use crate::{
     buffer::BufferProvider,
     bytes::Bytes,
+    client::options::TopicReference,
     eio::{Read, Write},
     fmt::{error, trace},
     header::{FixedHeader, PacketType},
@@ -11,7 +12,7 @@ use crate::{
         write::{Writable, wlen},
     },
     packet::{Packet, RxError, RxPacket, TxError, TxPacket},
-    types::{IdentifiedQoS, MqttString, QoS, TooLargeToEncode, VarByteInt},
+    types::{IdentifiedQoS, MqttString, QoS, TooLargeToEncode, TopicName, VarByteInt},
     v5::property::{
         AtMostOnceProperty, ContentType, CorrelationData, MessageExpiryInterval,
         PayloadFormatIndicator, Property, PropertyType, ResponseTopic, SubscriptionIdentifier,
@@ -26,14 +27,13 @@ pub struct PublishPacket<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     pub identified_qos: IdentifiedQoS,
     pub retain: bool,
 
-    pub topic: MqttString<'p>,
+    pub topic: TopicReference<'p>,
 
     // TODO clarify whether PayloadFormatIndicator can be included only once
     pub payload_format_indicator: Option<PayloadFormatIndicator>,
 
     // TODO clarify whether MessageExpiryInterval can be included only once
     pub message_expiry_interval: Option<MessageExpiryInterval>,
-    pub topic_alias: Option<TopicAlias>,
     pub response_topic: Option<ResponseTopic<'p>>,
     pub correlation_data: Option<CorrelationData<'p>>,
     pub subscription_identifiers: Vec<SubscriptionIdentifier, MAX_SUBSCRIPTION_IDENTIFIERS>,
@@ -59,13 +59,19 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
 
         trace!("decoding flags");
         let dup = flags >> 3 == 1;
-        let qos = QoS::try_from_bits((flags >> 1) & 0x03).map_err(|_| RxError::MalformedPacket)?;
+        let qos = QoS::try_from_bits((flags >> 1) & 0x03).ok_or(RxError::MalformedPacket)?;
         let retain = flags & 0x01 == 1;
 
         let r = &mut reader;
 
         trace!("reading topic name");
         let topic_name = MqttString::read(r).await?;
+
+        let topic_name = if topic_name.is_empty() {
+            None
+        } else {
+            Some(TopicName::new_checked(topic_name).ok_or(RxError::InvalidTopicName)?)
+        };
 
         let identified_qos = match qos {
             QoS::AtMostOnce => IdentifiedQoS::AtMostOnce,
@@ -170,9 +176,12 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
             };
         }
 
-        if topic_name.is_empty() && topic_alias.is_none() {
-            return Err(RxError::ProtocolError);
-        }
+        let topic = match (topic_name, topic_alias) {
+            (None, None) => return Err(RxError::ProtocolError),
+            (None, Some(alias)) => TopicReference::Alias(alias.into_inner()),
+            (Some(name), None) => TopicReference::Name(name),
+            (Some(name), Some(alias)) => TopicReference::Mapping(name, alias.into_inner()),
+        };
 
         let message_len = r.remaining_len();
 
@@ -184,10 +193,9 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
             dup,
             identified_qos,
             retain,
-            topic: topic_name,
+            topic,
             payload_format_indicator,
             message_expiry_interval,
-            topic_alias,
             response_topic,
             correlation_data,
             subscription_identifiers,
@@ -212,7 +220,14 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
             .write(write)
             .await?;
 
-        self.topic.write(write).await?;
+        self.topic
+            .topic_name()
+            .map(TopicName::as_borrowed)
+            .map(Into::into)
+            .unwrap_or(Self::EMPTY_TOPIC)
+            .write(write)
+            .await?;
+
         if let Some(p) = self.identified_qos.packet_identifier() {
             p.write(write).await?
         }
@@ -220,7 +235,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
         self.properties_length().write(write).await?;
         self.payload_format_indicator.write(write).await?;
         self.message_expiry_interval.write(write).await?;
-        self.topic_alias.write(write).await?;
+        self.topic.alias().map(TopicAlias).write(write).await?;
         self.response_topic.write(write).await?;
         self.correlation_data.write(write).await?;
         // Don't write subscription identifiers as they are irration when publishing from client to server
@@ -235,14 +250,16 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
 impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
     PublishPacket<'p, MAX_SUBSCRIPTION_IDENTIFIERS>
 {
+    // Safety: Empty string does not exceed MqttString::MAX_LENGTH
+    const EMPTY_TOPIC: MqttString<'static> = unsafe { MqttString::from_slice_unchecked("") };
+
     /// Creates a new packet with Quality of Service 0
     pub fn new(
         dup: bool,
         retain: bool,
         identified_qos: IdentifiedQoS,
         message_expiry_interval: Option<MessageExpiryInterval>,
-        topic_alias: Option<TopicAlias>,
-        topic: MqttString<'p>,
+        topic: TopicReference<'p>,
         message: Bytes<'p>,
     ) -> Result<Self, TooLargeToEncode> {
         let p = Self {
@@ -252,7 +269,6 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
             topic,
             payload_format_indicator: None,
             message_expiry_interval,
-            topic_alias,
             response_topic: None,
             correlation_data: None,
             subscription_identifiers: Vec::new(),
@@ -264,7 +280,15 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
     }
 
     fn remaining_len_raw(&self) -> Result<VarByteInt, TooLargeToEncode> {
-        let variable_header_length = self.topic.written_len()
+        let topic_name_length = self
+            .topic
+            .topic_name()
+            .map(TopicName::as_borrowed)
+            .map(Into::into)
+            .unwrap_or(Self::EMPTY_TOPIC)
+            .written_len();
+
+        let variable_header_length = topic_name_length
             + self
                 .identified_qos
                 .packet_identifier()
@@ -284,19 +308,19 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
     fn properties_length(&self) -> VarByteInt {
         let len = self.payload_format_indicator.written_len()
             + self.message_expiry_interval.written_len()
-            + self.topic_alias.written_len()
+            + self.topic.alias().map(TopicAlias).written_len()
             + self.response_topic.written_len()
             + self.correlation_data.written_len()
             + self.content_type.written_len();
 
-        // Safety: Max length = 196624 < VarByteInt::MAX_ENCODABLE
+        // Invariant: Max length = 196624 < VarByteInt::MAX_ENCODABLE
         // payload format indicator: 2
         // message expiry interval: 5
         // topic alias: 3
         // response topic: 65538
         // correlation data: 65538
         // content type: 65538
-        unsafe { VarByteInt::new_unchecked(len as u32) }
+        VarByteInt::new(len as u32)
     }
 }
 
@@ -304,13 +328,14 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
 mod unit {
     use crate::{
         bytes::Bytes,
+        client::options::TopicReference,
         test::{rx::decode, tx::encode},
-        types::{IdentifiedQoS, MqttBinary, MqttString},
+        types::{IdentifiedQoS, MqttBinary, MqttString, TopicName},
         v5::{
             packet::PublishPacket,
             property::{
                 ContentType, CorrelationData, MessageExpiryInterval, PayloadFormatIndicator,
-                Property, ResponseTopic, TopicAlias,
+                Property, ResponseTopic,
             },
         },
     };
@@ -323,8 +348,9 @@ mod unit {
             false,
             IdentifiedQoS::AtLeastOnce(5897),
             None,
-            None,
-            MqttString::try_from("test/topic").unwrap(),
+            TopicReference::Name(
+                TopicName::new_checked(MqttString::try_from("test/topic").unwrap()).unwrap(),
+            ),
             Bytes::from("hello".as_bytes()),
         )
         .unwrap();
@@ -364,8 +390,7 @@ mod unit {
             true,
             IdentifiedQoS::ExactlyOnce(9624),
             Some(481123u32.into()),
-            Some(TopicAlias(23408)),
-            MqttString::try_from("").unwrap(),
+            TopicReference::Alias(23408),
             Bytes::from("hello".as_bytes()),
         )
         .unwrap();
@@ -410,11 +435,15 @@ mod unit {
         assert_eq!(packet.identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!packet.dup);
         assert!(!packet.retain);
-        assert_eq!(packet.topic, MqttString::try_from("test/topic").unwrap());
+        assert_eq!(
+            packet.topic,
+            TopicReference::Name(
+                TopicName::new_checked(MqttString::try_from("test/topic").unwrap()).unwrap()
+            )
+        );
 
         assert!(packet.payload_format_indicator.is_none());
         assert!(packet.message_expiry_interval.is_none());
-        assert!(packet.topic_alias.is_none());
         assert!(packet.response_topic.is_none());
         assert!(packet.correlation_data.is_none());
         assert!(packet.content_type.is_none());
@@ -437,10 +466,14 @@ mod unit {
         assert_eq!(packet.identified_qos, IdentifiedQoS::ExactlyOnce(21539));
         assert!(packet.dup);
         assert!(packet.retain);
-        assert_eq!(packet.topic, MqttString::try_from("test").unwrap());
+        assert_eq!(
+            packet.topic,
+            TopicReference::Name(
+                TopicName::new_checked(MqttString::try_from("test").unwrap()).unwrap()
+            )
+        );
         assert!(packet.payload_format_indicator.is_none());
         assert!(packet.message_expiry_interval.is_none());
-        assert!(packet.topic_alias.is_none());
         assert!(packet.response_topic.is_none());
         assert!(packet.correlation_data.is_none());
         assert!(packet.content_type.is_none());
@@ -493,7 +526,13 @@ mod unit {
         assert_eq!(packet.identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!packet.dup);
         assert!(!packet.retain);
-        assert_eq!(packet.topic, MqttString::try_from("test").unwrap());
+        assert_eq!(
+            packet.topic,
+            TopicReference::Mapping(
+                TopicName::new_checked(MqttString::try_from("test").unwrap()).unwrap(),
+                10,
+            )
+        );
         assert_eq!(packet.message, Bytes::from("hello".as_bytes()));
         assert_eq!(
             packet.payload_format_indicator,
@@ -503,7 +542,6 @@ mod unit {
             packet.message_expiry_interval,
             Some(MessageExpiryInterval(7200))
         );
-        assert_eq!(packet.topic_alias, Some(TopicAlias(10)));
 
         assert_eq!(
             packet.response_topic,

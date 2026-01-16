@@ -30,7 +30,9 @@ pub struct Options<'p> {
 
 /// The options for specifiying which topic to publish to. Topic aliases only last for the
 /// duration of a single network connection and not necessarily until the session end.
-#[derive(Debug, Clone)]
+///
+/// Topic aliases must not be 0
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum TopicReference<'t> {
     /// Publish to the inner topic name without creating an alias.
@@ -48,16 +50,25 @@ pub enum TopicReference<'t> {
 impl<'t> TopicReference<'t> {
     pub(crate) fn alias(&self) -> Option<u16> {
         match self {
-            TopicReference::Name(_) => None,
-            TopicReference::Alias(alias) => Some(*alias),
-            TopicReference::Mapping(_, alias) => Some(*alias),
+            Self::Name(_) => None,
+            Self::Alias(alias) => Some(*alias),
+            Self::Mapping(_, alias) => Some(*alias),
         }
     }
     pub(crate) fn topic_name(&self) -> Option<&TopicName<'t>> {
         match self {
-            TopicReference::Name(topic_name) => Some(topic_name),
-            TopicReference::Alias(_) => None,
-            TopicReference::Mapping(topic_name, _) => Some(topic_name),
+            Self::Name(topic_name) => Some(topic_name),
+            Self::Alias(_) => None,
+            Self::Mapping(topic_name, _) => Some(topic_name),
+        }
+    }
+
+    /// Delegates to `Bytes::as_borrowed()`.
+    pub fn as_borrowed(&'t self) -> Self {
+        match self {
+            Self::Name(topic_name) => Self::Name(topic_name.as_borrowed()),
+            Self::Alias(alias) => Self::Alias(*alias),
+            Self::Mapping(topic_name, alias) => Self::Mapping(topic_name.as_borrowed(), *alias),
         }
     }
 }

@@ -44,8 +44,8 @@ impl<'p, T: PingPacketType> RxPacket<'p> for GenericPingPacket<T> {
 }
 impl<T: PingPacketType> TxPacket for GenericPingPacket<T> {
     fn remaining_len(&self) -> VarByteInt {
-        // Safety: 0 < VarByteInt::MAX_ENCODABLE
-        unsafe { VarByteInt::new_unchecked(0) }
+        // Invariant: 0 < VarByteInt::MAX_ENCODABLE
+        VarByteInt::new(0)
     }
 
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {

@@ -85,8 +85,8 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS
     }
 
     pub fn properties_length(&self) -> VarByteInt {
-        // Safety: Max length = 0 < VarByteInt::MAX_ENCODABLE
-        unsafe { VarByteInt::new_unchecked(0) }
+        // Invariant: Max length = 0 < VarByteInt::MAX_ENCODABLE
+        VarByteInt::new(0)
     }
 }
 
@@ -106,12 +106,10 @@ mod unit {
         let mut topics = Vec::new();
 
         topics
-            .push(unsafe {
-                TopicFilter::new_unchecked(MqttString::try_from("test/+/topic").unwrap())
-            })
+            .push(TopicFilter::new_checked(MqttString::try_from("test/+/topic").unwrap()).unwrap())
             .unwrap();
         topics
-            .push(unsafe { TopicFilter::new_unchecked(MqttString::try_from("test/#").unwrap()) })
+            .push(TopicFilter::new_checked(MqttString::try_from("test/#").unwrap()).unwrap())
             .unwrap();
 
         let packet: UnsubscribePacket<'_, 2> = UnsubscribePacket::new(9874, topics).unwrap();
