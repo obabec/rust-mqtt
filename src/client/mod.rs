@@ -944,6 +944,21 @@ impl<
                     Some(s) => {
                         warn!("packet identifier {} in PUBACK is actually {:?}", pid, s);
 
+                        // Readd this packet identifier to the session so that it can be republished
+                        // after reconnecting.
+
+                        match s {
+                            CPublishFlightState::AwaitingPuback => unreachable!(),
+                            CPublishFlightState::AwaitingPubrec =>
+                            // Safety: Session::remove_cpublish returning Some and therefore successfully
+                            // removing a cpublish frees space to add a new in flight entry.
+                            unsafe { self.session.await_puback(pid) },
+                            CPublishFlightState::AwaitingPubcomp =>
+                            // Safety: Session::remove_cpublish returning Some and therefore successfully
+                            // removing a cpublish frees space to add a new in flight entry.
+                            unsafe { self.session.await_pubcomp(pid) },
+                        }
+
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
                     }
