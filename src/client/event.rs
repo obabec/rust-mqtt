@@ -85,7 +85,8 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// The server sent a SUBACK, PUBACK, PUBREC, PUBREL or PUBCOMP
     /// packet with a packet identifier that is not in flight (anymore).
     ///
-    /// The client has not responded to the server.
+    /// The client has not responded to the server or has responded appropriately
+    /// to prevent a potential protocol deadlock.
     Ignored,
 
     /// The server sent a QoS 2 PUBLISH packet which would cause a duplicate.

@@ -1003,11 +1003,29 @@ impl<
                             pid
                         );
 
+                        // Readd this packet identifier to the session so that it can be republished
+                        // after reconnecting.
+
+                        // Safety: Session::remove_cpublish returning Some and therefore successfully
+                        // removing a cpublish frees space to add a new in flight entry.
+                        unsafe { self.session.await_puback(pid) };
+
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
                     }
                     None => {
                         warn!("packet identifier {} in PUBREC not in use", pid);
+
+                        let pubrel = PubrelPacket::new(pid, ReasonCode::PacketIdentifierNotFound);
+
+                        debug!("sending PUBREL packet");
+
+                        // Don't check whether length exceeds servers maximum packet size because we don't
+                        // add properties to PUBREL packets -> length is always minimal at 6 bytes.
+                        // The server really shouldn't reject this.
+                        self.raw.send(&pubrel).await?;
+                        self.raw.flush().await?;
+
                         Event::Ignored
                     }
                 }
@@ -1045,6 +1063,17 @@ impl<
                     }
                     None => {
                         warn!("packet identifier {} in PUBREL not in use", pid);
+
+                        let pubcomp = PubcompPacket::new(pid, ReasonCode::PacketIdentifierNotFound);
+
+                        debug!("sending PUBCOMP packet");
+
+                        // Don't check whether length exceeds servers maximum packet size because we don't
+                        // add properties to PUBCOMP packets -> length is always minimal at 6 bytes.
+                        // The server really shouldn't reject this.
+                        self.raw.send(&pubcomp).await?;
+                        self.raw.flush().await?;
+
                         Event::Ignored
                     }
                 }
