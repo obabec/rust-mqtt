@@ -104,13 +104,13 @@ async fn outgoing_qos1_retry() {
         let p = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
         ));
-        assert_eq!(p.topic, topic_name.as_borrowed().into());
+        assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
 
         let p = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
         ));
-        assert_eq!(p.topic, topic_name.as_borrowed().into());
+        assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
@@ -195,7 +195,7 @@ async fn outgoing_qos2_retry_publish() {
         let p = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
         ));
-        assert_eq!(p.topic, topic_name.as_borrowed().into());
+        assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
 
         assert_err!(timeout(Duration::from_secs(5), receive_publish(&mut rx)).await);
@@ -298,7 +298,7 @@ async fn outgoing_qos2_retry_pubrel() {
         let p = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
         ));
-        assert_eq!(p.topic, topic_name.as_borrowed().into());
+        assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
 
         assert_err!(timeout(Duration::from_secs(5), receive_publish(&mut rx)).await);
@@ -358,7 +358,7 @@ async fn incoming_qos2_retry_pubcomp() {
         );
         assert!(publish.identified_qos.packet_identifier().is_some());
         let pid = publish.identified_qos.packet_identifier().unwrap();
-        assert_eq!(publish.topic, topic_name.as_borrowed().into());
+        assert_eq!(publish.topic, topic_name.as_borrowed());
         assert_eq!(publish.message, msg.into());
 
         let session = rx.session().clone();

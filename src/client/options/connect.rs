@@ -1,6 +1,6 @@
 use crate::{
     config::{KeepAlive, SessionExpiryInterval},
-    types::{MqttBinary, MqttString, QoS, Will},
+    types::{MqttBinary, MqttString, QoS, TopicName, Will},
     v5::property::{PayloadFormatIndicator, WillDelayInterval},
 };
 
@@ -16,6 +16,10 @@ pub struct Options<'c> {
 
     /// The setting of the session expiry interval the server wishes. Can be set to a different value by the server.
     pub session_expiry_interval: SessionExpiryInterval,
+
+    #[cfg(feature = "request-response")]
+    /// When set to true, the broker may return response information used to construct response topics.
+    pub request_response_information: bool,
 
     /// The user name the client wishes to authenticate with.
     pub user_name: Option<MqttString<'c>>,
@@ -42,7 +46,7 @@ pub struct WillOptions<'c> {
     pub will_retain: bool,
 
     /// The topic of the will publication.
-    pub will_topic: MqttString<'c>,
+    pub will_topic: TopicName<'c>,
 
     /// The payload of the will publication.
     pub will_payload: MqttBinary<'c>,
@@ -68,10 +72,12 @@ pub struct WillOptions<'c> {
 
     /// The response topic property in the will publication. If set to `None`, the property is omitted
     /// on the network.
-    pub response_topic: Option<MqttString<'c>>,
+    #[cfg(feature = "request-response")]
+    pub response_topic: Option<TopicName<'c>>,
 
     /// The correlation data property in the will publication. If set to `None`, the property is omitted
     /// on the network.
+    #[cfg(feature = "request-response")]
     pub correlation_data: Option<MqttBinary<'c>>,
 }
 
@@ -93,11 +99,13 @@ impl<'c> WillOptions<'c> {
                 .as_ref()
                 .map(MqttString::as_borrowed)
                 .map(Into::into),
+            #[cfg(feature = "request-response")]
             response_topic: self
                 .response_topic
                 .as_ref()
-                .map(MqttString::as_borrowed)
+                .map(TopicName::as_borrowed)
                 .map(Into::into),
+            #[cfg(feature = "request-response")]
             correlation_data: self
                 .correlation_data
                 .as_ref()

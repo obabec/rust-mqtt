@@ -229,6 +229,8 @@ impl<
                 options.keep_alive,
                 options.session_expiry_interval,
                 RECEIVE_MAXIMUM as u16,
+                #[cfg(feature = "request-response")]
+                options.request_response_information,
             );
 
             if let Some(ref user_name) = options.user_name {
@@ -284,7 +286,10 @@ impl<
             subscription_identifier_available,
             shared_subscription_available,
             server_keep_alive,
-            response_information: _,
+            #[cfg(not(feature = "request-response"))]
+                response_information: _,
+            #[cfg(feature = "request-response")]
+            response_information,
             server_reference: _,
             authentication_method: _,
             authentication_data: _,
@@ -343,6 +348,8 @@ impl<
             Ok(ConnectInfo {
                 session_present,
                 client_identifier,
+                #[cfg(feature = "request-response")]
+                response_information: response_information.map(Property::into_inner),
             })
         } else {
             debug!("CONNACK packet indicates rejection");
@@ -839,7 +846,11 @@ impl<
                         .into_iter()
                         .map(Property::into_inner)
                         .collect(),
-                    topic: topic.into(),
+                    #[cfg(feature = "request-response")]
+                    response_topic: publish.response_topic.map(Property::into_inner),
+                    #[cfg(feature = "request-response")]
+                    correlation_data: publish.correlation_data.map(Property::into_inner),
+                    topic,
                     message: publish.message,
                 };
 

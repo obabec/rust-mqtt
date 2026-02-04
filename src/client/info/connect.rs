@@ -14,4 +14,8 @@ pub struct Info<'i> {
     /// or must assign a client identifier if none was included in the CONNECT packet.
     /// This is the final client identifier value used for this session.
     pub client_identifier: MqttString<'i>,
+
+    #[cfg(feature = "request-response")]
+    /// Response information used to create response topics.
+    pub response_information: Option<MqttString<'i>>,
 }

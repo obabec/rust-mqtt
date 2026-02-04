@@ -49,14 +49,13 @@ async fn main() {
                 will: Some(WillOptions {
                     will_qos: QoS::ExactlyOnce,
                     will_retain: true,
-                    will_topic: MqttString::try_from("i/am/dead").unwrap(),
+                    will_topic: TopicName::new_checked(MqttString::try_from("i/am/dead").unwrap())
+                        .unwrap(),
                     will_payload: MqttBinary::try_from("Have a nice day!").unwrap(),
                     will_delay_interval: 1,
                     is_payload_utf8: true,
                     message_expiry_interval: Some(20),
                     content_type: Some(MqttString::try_from("txt").unwrap()),
-                    response_topic: None,
-                    correlation_data: None,
                 }),
                 user_name: Some(MqttString::try_from("test").unwrap()),
                 password: Some(MqttBinary::try_from("testPass").unwrap()),

@@ -46,7 +46,7 @@ macro_rules! assert_recv_excl {
     ($client:expr, $topic:expr) => {{
         let p = assert_ok!(crate::common::utils::receive_and_complete(&mut $client).await);
         assert_eq!(
-            $topic.as_ref(),
+            &$topic,
             &p.topic,
             "expected message (left) != received message (right)"
         );

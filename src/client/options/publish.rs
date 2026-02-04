@@ -1,3 +1,5 @@
+#[cfg(feature = "request-response")]
+use crate::types::MqttBinary;
 use crate::types::{QoS, TopicName};
 
 /// Options for a publication.
@@ -26,6 +28,15 @@ pub struct Options<'p> {
     /// to subscribed clients is the minimum of this value and the quality of service
     /// value of the receiving client's subscription.
     pub qos: QoS,
+
+    #[cfg(feature = "request-response")]
+    /// The topic on which the receiver should publish the response.
+    pub response_topic: Option<TopicName<'p>>,
+
+    #[cfg(feature = "request-response")]
+    /// Arbitrary binary data which the receiver should attach in the response to associate
+    /// their response with this request.
+    pub correlation_data: Option<MqttBinary<'p>>,
 }
 
 /// The options for specifiying which topic to publish to. Topic aliases only last for the

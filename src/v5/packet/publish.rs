@@ -1,5 +1,7 @@
 use heapless::Vec;
 
+#[cfg(feature = "request-response")]
+use crate::types::MqttBinary;
 use crate::{
     buffer::BufferProvider,
     bytes::Bytes,
@@ -261,6 +263,8 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
         message_expiry_interval: Option<MessageExpiryInterval>,
         topic: TopicReference<'p>,
         message: Bytes<'p>,
+        #[cfg(feature = "request-response")] response_topic: Option<TopicName<'p>>,
+        #[cfg(feature = "request-response")] correlation_data: Option<MqttBinary<'p>>,
     ) -> Result<Self, TooLargeToEncode> {
         let p = Self {
             dup,
@@ -269,7 +273,13 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
             topic,
             payload_format_indicator: None,
             message_expiry_interval,
+            #[cfg(feature = "request-response")]
+            response_topic: response_topic.map(Into::into),
+            #[cfg(not(feature = "request-response"))]
             response_topic: None,
+            #[cfg(feature = "request-response")]
+            correlation_data: correlation_data.map(Into::into),
+            #[cfg(not(feature = "request-response"))]
             correlation_data: None,
             subscription_identifiers: Vec::new(),
             content_type: None,
@@ -546,7 +556,7 @@ mod unit {
         assert_eq!(
             packet.response_topic,
             Some(ResponseTopic(
-                MqttString::try_from("response/topic").unwrap()
+                TopicName::new_checked(MqttString::try_from("response/topic").unwrap()).unwrap()
             ))
         );
         assert_eq!(

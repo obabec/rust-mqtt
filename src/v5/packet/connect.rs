@@ -120,6 +120,7 @@ impl<'p> ConnectPacket<'p> {
         keep_alive: KeepAlive,
         session_expiry_interval: SessionExpiryInterval,
         receive_maximum: u16,
+        #[cfg(feature = "request-response")] request_response_information: bool,
     ) -> Self {
         Self {
             will_retain: false,
@@ -130,6 +131,11 @@ impl<'p> ConnectPacket<'p> {
             receive_maximum: ReceiveMaximum(receive_maximum),
             maximum_packet_size: MaximumPacketSize::default(),
             topic_alias_maximum: None,
+            #[cfg(feature = "request-response")]
+            request_response_information: request_response_information
+                .then_some(true)
+                .map(Into::into),
+            #[cfg(not(feature = "request-response"))]
             request_response_information: None,
             request_problem_information: None,
             authentication_method: None,
@@ -188,12 +194,11 @@ mod unit {
     use crate::{
         config::{KeepAlive, SessionExpiryInterval},
         test::tx::encode,
-        types::{MqttBinary, MqttString, QoS, Will},
+        types::{MqttBinary, MqttString, QoS, TopicName, Will},
         v5::{
             packet::ConnectPacket,
             property::{
-                ContentType, CorrelationData, MessageExpiryInterval, PayloadFormatIndicator,
-                ResponseTopic, WillDelayInterval,
+                ContentType, MessageExpiryInterval, PayloadFormatIndicator, WillDelayInterval,
             },
         },
     };
@@ -305,17 +310,11 @@ mod unit {
         packet.add_password(MqttBinary::try_from("security!".as_bytes()).unwrap());
         packet.add_will(
             Will {
-                will_topic: MqttString::try_from("dead").unwrap(),
+                will_topic: TopicName::new_checked(MqttString::try_from("dead").unwrap()).unwrap(),
                 will_delay_interval: Some(WillDelayInterval(234589)),
                 payload_format_indicator: Some(PayloadFormatIndicator(true)),
                 message_expiry_interval: Some(MessageExpiryInterval(84807612)),
                 content_type: Some(ContentType(MqttString::try_from("text/plain").unwrap())),
-                response_topic: Some(ResponseTopic(
-                    MqttString::try_from("calling/undertaker").unwrap(),
-                )),
-                correlation_data: Some(CorrelationData(
-                    MqttBinary::try_from([68, 98, 204, 101].as_slice()).unwrap(),
-                )),
                 will_payload: MqttBinary::try_from([12, 8, 98].as_slice()).unwrap(),
             },
             QoS::ExactlyOnce,
@@ -326,7 +325,7 @@ mod unit {
         encode!(packet,
             [
                 0x10,       // Packet type
-                0x68,       // Remaining length
+                0x4C,       // Remaining length
                 0x00,       // Protocol name len MSB
                 0x04,       // Protocol name len LSB
                 b'M',       // Protocol name
@@ -348,7 +347,7 @@ mod unit {
                 b'b',       //
                 b'a',       // Client identifier
 
-                0x35,       // Will properties length
+                0x19,       // Will properties length
 
                 0x18, 0x00, 0x03, 0x94, 0x5D, // Will delay interval
 
@@ -358,13 +357,6 @@ mod unit {
 
                 0x03, 0x00, 0x0A, // Content type
                 b't', b'e', b'x', b't', b'/', b'p', b'l', b'a', b'i', b'n', // Content type
-
-                0x08,       // Response topic
-                0x00, 0x12,
-                b'c', b'a', b'l', b'l', b'i', b'n', b'g', b'/', 
-                b'u', b'n', b'd', b'e', b'r', b't', b'a', b'k', b'e', b'r', // Response topic
-
-                0x09, 0x00, 0x04, 68, 98, 204, 101, // Correlation data value
 
                 0x00,       // Will topic len MSB
                 0x04,       // Will topic len LSB

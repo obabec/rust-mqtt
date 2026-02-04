@@ -22,6 +22,9 @@ compile_error!("You may not enable both `log` and `defmt` features.");
 #[cfg(all(test, not(any(feature = "bump", feature = "alloc"))))]
 compile_error!("Enable either one of `bump` or `alloc` features for testing.");
 
+#[cfg(all(feature = "request-response", not(feature = "v5")))]
+compile_error!("`request-response` is only available with MQTTv5, you have to activate `v5`.");
+
 mod bytes;
 mod fmt;
 mod header;

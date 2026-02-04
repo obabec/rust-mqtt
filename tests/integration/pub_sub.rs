@@ -57,7 +57,7 @@ async fn publish_recv_qos0() {
             subscription_identifiers: _,
             topic: _,
             message,
-        } = assert_recv_excl!(rx, topic_filter);
+        } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
@@ -222,7 +222,7 @@ async fn publish_recv_multiple_qos0() {
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter1.clone());
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter2.clone());
 
-        let mut messages = vec![(topic_filter1, msg), (topic_filter2, msg)];
+        let mut messages = vec![(topic_name1.clone(), msg), (topic_name2.clone(), msg)];
 
         let _ = timeout(Duration::from_secs(5), async {
             while !messages.is_empty() {
@@ -232,7 +232,7 @@ async fn publish_recv_multiple_qos0() {
                     messages
                         .iter()
                         .enumerate()
-                        .find(|(_, (t, m))| *t.as_ref() == p.topic && m == &msg)
+                        .find(|(_, (t, m))| *t == p.topic && m == &msg)
                         .ok_or("Option is None")
                 );
 
@@ -310,7 +310,7 @@ async fn publish_recv_multiple_qos1() {
                     messages
                         .iter()
                         .enumerate()
-                        .find(|(_, (t, m))| *t.as_ref() == p.topic && m == &msg)
+                        .find(|(_, (t, m))| *t == p.topic && m == &msg)
                         .ok_or("Option is None")
                 );
 
@@ -387,7 +387,7 @@ async fn publish_recv_multiple_qos2() {
                     messages
                         .iter()
                         .enumerate()
-                        .find(|(_, (t, m))| *t.as_ref() == p.topic && m == &msg)
+                        .find(|(_, (t, m))| *t == p.topic && m == &msg)
                         .ok_or("Option is None")
                 );
 
@@ -675,7 +675,7 @@ async fn recv_min_pub_qos1() {
             subscription_identifiers: _,
             topic: _,
             message,
-        } = assert_recv_excl!(rx, topic_filter);
+        } = assert_recv_excl!(rx, topic_name);
 
         assert!(!dup);
         assert!(!retain);
