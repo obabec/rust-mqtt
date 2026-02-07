@@ -49,7 +49,7 @@ async fn main() {
                 .user_name(MqttString::try_from("test").unwrap())
                 .password(MqttBinary::try_from("testPass").unwrap())
                 .will(
-                    WillOptions::builder(
+                    WillOptions::new(
                         TopicName::new_checked(MqttString::try_from("i/am/dead").unwrap()).unwrap(),
                         MqttBinary::try_from("Have a nice day!").unwrap(),
                     )
@@ -57,8 +57,7 @@ async fn main() {
                     .retain()
                     .delay_interval(1)
                     .mark_payload_utf8()
-                    .content_type(MqttString::try_from("txt").unwrap())
-                    .build(),
+                    .content_type(MqttString::try_from("txt").unwrap()),
                 ),
             Some(MqttString::try_from("rust-mqtt-demo-client").unwrap()),
         )
@@ -122,9 +121,8 @@ async fn main() {
         }
     }
 
-    let pub_options = PublicationOptions::builder(TopicReference::Mapping(topic.clone(), 1))
-        .exactly_once()
-        .build();
+    let pub_options =
+        PublicationOptions::new(TopicReference::Mapping(topic.clone(), 1)).exactly_once();
 
     match client
         .publish(&pub_options, Bytes::from("anything".as_bytes()))
@@ -222,9 +220,7 @@ async fn main() {
     }
 
     // Start a Quality of Service 2 publish flow
-    let pub_options = PublicationOptions::builder(TopicReference::Alias(1))
-        .exactly_once()
-        .build();
+    let pub_options = PublicationOptions::new(TopicReference::Alias(1)).exactly_once();
 
     let incomplete_publish_packet_identifier = match client
         .publish(&pub_options, Bytes::from("something".as_bytes()))
@@ -288,9 +284,7 @@ async fn main() {
         }
     };
 
-    let pub_options = PublicationOptions::builder(TopicReference::Name(topic.clone()))
-        .exactly_once()
-        .build();
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic.clone())).exactly_once();
 
     match client
         .republish(

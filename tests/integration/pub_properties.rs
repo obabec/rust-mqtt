@@ -31,10 +31,9 @@ async fn message_expiry_interval_basic() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
             .at_least_once()
-            .message_expiry_interval(10)
-            .build();
+            .message_expiry_interval(10);
 
         sleep(Duration::from_secs(5)).await;
         assert_published!(tx, pub_options.clone(), msg.into());
@@ -74,11 +73,10 @@ async fn message_expiry_interval_partially_expired() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
             .retain()
             .message_expiry_interval(10)
-            .at_least_once()
-            .build();
+            .at_least_once();
 
         assert_published!(tx, pub_options.clone(), msg.into());
         disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
@@ -118,11 +116,10 @@ async fn message_expiry_interval_completely_expired() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
             .retain()
             .message_expiry_interval(5)
-            .at_least_once()
-            .build();
+            .at_least_once();
 
         assert_published!(tx, pub_options.clone(), msg.into());
         disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
@@ -162,18 +159,15 @@ async fn topic_alias_basic() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options =
-            PublicationOptions::builder(TopicReference::Mapping(topic_name.clone(), 1))
-                .retain()
-                .at_least_once()
-                .build();
+        let pub_options = PublicationOptions::new(TopicReference::Mapping(topic_name.clone(), 1))
+            .retain()
+            .at_least_once();
 
         assert_published!(tx, pub_options.clone(), msg.into());
 
-        let pub_options = PublicationOptions::builder(TopicReference::Alias(1))
+        let pub_options = PublicationOptions::new(TopicReference::Alias(1))
             .retain()
-            .at_least_once()
-            .build();
+            .at_least_once();
 
         assert_published!(tx, pub_options.clone(), msg.into());
 
@@ -211,26 +205,21 @@ async fn topic_alias_remap() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options =
-            PublicationOptions::builder(TopicReference::Mapping(topic_name1.clone(), 1))
-                .retain()
-                .at_least_once()
-                .build();
-
-        assert_published!(tx, pub_options.clone(), msg.into());
-
-        let pub_options =
-            PublicationOptions::builder(TopicReference::Mapping(topic_name2.clone(), 1))
-                .retain()
-                .at_least_once()
-                .build();
-
-        assert_published!(tx, pub_options.clone(), msg.into());
-
-        let pub_options = PublicationOptions::builder(TopicReference::Alias(1))
+        let pub_options = PublicationOptions::new(TopicReference::Mapping(topic_name1.clone(), 1))
             .retain()
-            .at_least_once()
-            .build();
+            .at_least_once();
+
+        assert_published!(tx, pub_options.clone(), msg.into());
+
+        let pub_options = PublicationOptions::new(TopicReference::Mapping(topic_name2.clone(), 1))
+            .retain()
+            .at_least_once();
+
+        assert_published!(tx, pub_options.clone(), msg.into());
+
+        let pub_options = PublicationOptions::new(TopicReference::Alias(1))
+            .retain()
+            .at_least_once();
 
         assert_published!(tx, pub_options.clone(), msg.into());
 

@@ -52,9 +52,8 @@ async fn outgoing_qos1_retry() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .at_least_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).at_least_once();
 
         let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await);
         let session = tx.session().clone();
@@ -140,9 +139,8 @@ async fn outgoing_qos2_retry_publish() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .exactly_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await);
         let session = tx.session().clone();
@@ -224,9 +222,8 @@ async fn outgoing_qos2_retry_pubrel() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .exactly_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await);
 
@@ -324,9 +321,8 @@ async fn incoming_qos2_retry_pubcomp() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .exactly_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         assert_published!(tx, &pub_options, msg.into());
         disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
@@ -412,9 +408,8 @@ async fn outgoing_qos1_write_fail_retry() {
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .at_least_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).at_least_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -527,9 +522,8 @@ async fn outgoing_qos1_read_fail_retry() {
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .at_least_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).at_least_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -634,9 +628,8 @@ async fn outgoing_qos2_write_fail_retry() {
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .exactly_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -783,9 +776,8 @@ async fn outgoing_qos2_read_fail_retry() {
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .exactly_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -1454,9 +1446,7 @@ async fn publisher_task(
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let publish_options = PublicationOptions::builder(TopicReference::Name(topic))
-        .qos(qos)
-        .build();
+    let publish_options = PublicationOptions::new(TopicReference::Name(topic)).qos(qos);
 
     while let Some(content) = messages.recv().await {
         assert_published!(tx, publish_options, content.as_slice().into());

@@ -35,9 +35,8 @@ async fn publish_recv_qos0() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .retain()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).retain();
 
         sleep(Duration::from_secs(1)).await;
         assert_published!(tx, pub_options, msg.into());
@@ -81,9 +80,8 @@ async fn publish_recv_qos1() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .at_least_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).at_least_once();
 
         sleep(Duration::from_secs(1)).await;
         assert_published!(tx, pub_options, msg.into());
@@ -130,9 +128,8 @@ async fn publish_recv_qos2() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .exactly_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         sleep(Duration::from_secs(1)).await;
         assert_published!(tx, pub_options, msg.into());
@@ -182,16 +179,14 @@ async fn publish_recv_multiple_qos0() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher1 = async {
-        let pub_options =
-            PublicationOptions::builder(TopicReference::Name(topic_name1.clone())).build();
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name1.clone()));
 
         sleep(Duration::from_secs(1)).await;
         assert_published!(tx1, pub_options, msg.into());
         disconnect(&mut tx1, DEFAULT_DC_OPTIONS).await;
     };
     let publisher2 = async {
-        let pub_options =
-            PublicationOptions::builder(TopicReference::Name(topic_name2.clone())).build();
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name2.clone()));
 
         sleep(Duration::from_secs(2)).await;
         assert_published!(tx2, pub_options, msg.into());
@@ -245,18 +240,16 @@ async fn publish_recv_multiple_qos1() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher1 = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name1.clone()))
-            .at_least_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name1.clone())).at_least_once();
 
         sleep(Duration::from_secs(1)).await;
         assert_published!(tx1, pub_options, msg.into());
         disconnect(&mut tx1, DEFAULT_DC_OPTIONS).await;
     };
     let publisher2 = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name2.clone()))
-            .at_least_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name2.clone())).at_least_once();
 
         sleep(Duration::from_secs(2)).await;
         assert_published!(tx2, pub_options, msg.into());
@@ -316,18 +309,16 @@ async fn publish_recv_multiple_qos2() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher1 = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name1.clone()))
-            .exactly_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name1.clone())).exactly_once();
 
         sleep(Duration::from_secs(1)).await;
         assert_published!(tx1, pub_options, msg.into());
         disconnect(&mut tx1, DEFAULT_DC_OPTIONS).await;
     };
     let publisher2 = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name2.clone()))
-            .exactly_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name2.clone())).exactly_once();
 
         sleep(Duration::from_secs(2)).await;
         assert_published!(tx2, pub_options, msg.into());
@@ -388,9 +379,8 @@ async fn unsub_no_recv() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher1 = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name1.clone()))
-            .at_least_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name1.clone())).at_least_once();
 
         sleep(Duration::from_secs(5)).await;
         assert_published!(tx1, pub_options.clone(), msg1.into());
@@ -400,9 +390,8 @@ async fn unsub_no_recv() {
         disconnect(&mut tx1, DEFAULT_DC_OPTIONS).await;
     };
     let publisher2 = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name2.clone()))
-            .at_least_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name2.clone())).at_least_once();
 
         sleep(Duration::from_secs(6)).await;
         assert_published!(tx2, pub_options.clone(), msg2.into());
@@ -454,9 +443,8 @@ async fn recv_min_sub_qos0() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .exactly_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         sleep(Duration::from_secs(1)).await;
         assert_published!(tx, pub_options, msg.into());
@@ -502,9 +490,8 @@ async fn recv_min_sub_qos1() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .exactly_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         sleep(Duration::from_secs(1)).await;
         assert_published!(tx, pub_options, msg.into());
@@ -551,8 +538,7 @@ async fn recv_min_pub_qos0() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options =
-            PublicationOptions::builder(TopicReference::Name(topic_name.clone())).build();
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()));
 
         sleep(Duration::from_secs(1)).await;
         assert_published!(tx, pub_options, msg.into());
@@ -599,9 +585,8 @@ async fn recv_min_pub_qos1() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .at_least_once()
-            .build();
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).at_least_once();
 
         sleep(Duration::from_secs(1)).await;
         assert_published!(tx, pub_options, msg.into());

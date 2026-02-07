@@ -37,9 +37,8 @@ async fn simple_request_response() {
 
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
-            .response_topic(response_topic_name.clone())
-            .build();
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+            .response_topic(response_topic_name.clone());
 
         assert_published!(requester, pub_options, request_msg.into());
 
@@ -78,8 +77,7 @@ async fn simple_request_response() {
         assert_eq!(response_topic.as_ref().unwrap(), &response_topic_name);
         assert!(correlation_data.is_none());
 
-        let pub_options =
-            PublicationOptions::builder(TopicReference::Name(response_topic.unwrap())).build();
+        let pub_options = PublicationOptions::new(TopicReference::Name(response_topic.unwrap()));
         assert_published!(responder, pub_options, response_msg.into());
 
         disconnect(&mut responder, DEFAULT_DC_OPTIONS).await;
@@ -110,10 +108,9 @@ async fn simple_correlation_data() {
 
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
             .response_topic(response_topic_name.clone())
-            .correlation_data(correlation.clone())
-            .build();
+            .correlation_data(correlation.clone());
 
         assert_published!(requester, pub_options, request_msg.into());
 
@@ -154,10 +151,8 @@ async fn simple_correlation_data() {
         assert!(correlation_data.is_some());
         assert_eq!(correlation_data.as_ref().unwrap(), &correlation);
 
-        let pub_options =
-            PublicationOptions::builder(TopicReference::Name(response_topic.unwrap()))
-                .correlation_data(correlation_data.unwrap())
-                .build();
+        let pub_options = PublicationOptions::new(TopicReference::Name(response_topic.unwrap()))
+            .correlation_data(correlation_data.unwrap());
         assert_published!(responder, pub_options, response_msg.into());
 
         disconnect(&mut responder, DEFAULT_DC_OPTIONS).await;
@@ -194,10 +189,9 @@ async fn multiple_correlation_data() {
         sleep(Duration::from_secs(1)).await;
 
         for correlation in correlations.iter() {
-            let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
+            let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
                 .response_topic(response_topic_name.clone())
-                .correlation_data(correlation.clone())
-                .build();
+                .correlation_data(correlation.clone());
 
             assert_published!(requester, pub_options, request_msg.clone());
         }
@@ -248,9 +242,8 @@ async fn multiple_correlation_data() {
             let correlation = correlation_data.expect("Expected correlation data");
 
             let pub_options =
-                PublicationOptions::builder(TopicReference::Name(response_topic.unwrap()))
-                    .correlation_data(correlation.clone())
-                    .build();
+                PublicationOptions::new(TopicReference::Name(response_topic.unwrap()))
+                    .correlation_data(correlation.clone());
             assert_published!(responder, pub_options, correlation.as_ref().into());
         }
 

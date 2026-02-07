@@ -1,3 +1,5 @@
+use const_fn::const_fn;
+
 use crate::types::{MqttBinary, QoS, TopicName};
 
 /// Options for a publication.
@@ -36,70 +38,56 @@ pub struct Options<'p> {
 }
 
 impl<'p> Options<'p> {
-    /// Creates a builder with the default options coherent to `Default` implementations and `QoS::AtMostOnce`.
-    pub fn builder(topic: TopicReference<'p>) -> OptionsBuilder<'p> {
-        OptionsBuilder::new(topic)
-    }
-}
-
-/// Builder for `PublicationOptions`.
-pub struct OptionsBuilder<'p>(Options<'p>);
-
-impl<'p> OptionsBuilder<'p> {
-    /// Creates a builder with the default options coherent to `Default` implementations and `QoS::AtMostOnce`.
-    pub fn new(topic: TopicReference<'p>) -> OptionsBuilder<'p> {
-        OptionsBuilder(Options {
+    /// Creates options with values coherent to the `Default` implementations of the fields and `QoS::AtMostOnce`.
+    pub const fn new(topic: TopicReference<'p>) -> Options<'p> {
+        Options {
             retain: false,
             message_expiry_interval: None,
             topic,
             qos: QoS::AtMostOnce,
             response_topic: None,
             correlation_data: None,
-        })
+        }
     }
 
     /// Sets the Quality of Service level.
-    pub fn qos(mut self, qos: QoS) -> Self {
-        self.0.qos = qos;
+    pub const fn qos(mut self, qos: QoS) -> Self {
+        self.qos = qos;
         self
     }
     /// Sets the Quality of Service level to 1 (At Least Once).
-    pub fn at_least_once(mut self) -> Self {
-        self.0.qos = QoS::AtLeastOnce;
-        self
+    pub const fn at_least_once(self) -> Self {
+        self.qos(QoS::AtLeastOnce)
     }
     /// Sets the Quality of Service level to 1 (Exactly Once).
-    pub fn exactly_once(mut self) -> Self {
-        self.0.qos = QoS::ExactlyOnce;
-        self
+    pub const fn exactly_once(self) -> Self {
+        self.qos(QoS::ExactlyOnce)
     }
     /// Sets the retain flag to true.
-    pub fn retain(mut self) -> Self {
-        self.0.retain = true;
+    pub const fn retain(mut self) -> Self {
+        self.retain = true;
         self
     }
     /// Sets the message expiry interval in seconds.
-    pub fn message_expiry_interval(mut self, seconds: u32) -> Self {
-        self.0.message_expiry_interval = Some(seconds);
+    pub const fn message_expiry_interval(mut self, seconds: u32) -> Self {
+        self.message_expiry_interval = Some(seconds);
         self
     }
     /// Marks the publication as a request by setting the response topic property.
-    pub fn response_topic(mut self, topic: TopicName<'p>) -> Self {
-        self.0.response_topic = Some(topic);
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub const fn response_topic(mut self, topic: TopicName<'p>) -> Self {
+        self.response_topic = Some(topic);
         self
     }
     /// Sets the correlation data property in the request.
-    pub fn correlation_data(mut self, data: MqttBinary<'p>) -> Self {
-        self.0.correlation_data = Some(data);
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub const fn correlation_data(mut self, data: MqttBinary<'p>) -> Self {
+        self.correlation_data = Some(data);
         self
-    }
-    /// Builds to a complete `PublicationOptions` instance.
-    pub fn build(self) -> Options<'p> {
-        self.0
     }
 }
 
-/// The options for specifiying which topic to publish to. Topic aliases only last for the
+/// The options for specifying which topic to publish to. Topic aliases only last for the
 /// duration of a single network connection and not necessarily until the session end.
 ///
 /// Topic aliases must not be 0

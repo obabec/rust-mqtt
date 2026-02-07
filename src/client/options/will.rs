@@ -1,3 +1,5 @@
+use const_fn::const_fn;
+
 use crate::{
     types::{MqttBinary, MqttString, QoS, TopicName, Will},
     v5::property::{PayloadFormatIndicator, WillDelayInterval},
@@ -53,19 +55,9 @@ pub struct Options<'c> {
 }
 
 impl<'c> Options<'c> {
-    /// Creates a builder with the default options coherent to the `Default` implementation and `QoS::AtMostOnce`.
-    pub fn builder(topic: TopicName<'c>, payload: MqttBinary<'c>) -> OptionsBuilder<'c> {
-        OptionsBuilder::new(topic, payload)
-    }
-}
-
-/// Builder for `WillOptions`.
-pub struct OptionsBuilder<'c>(Options<'c>);
-
-impl<'c> OptionsBuilder<'c> {
-    /// Creates a builder with the default options coherent to the `Default` implementation and `QoS::AtMostOnce`.
-    pub fn new(topic: TopicName<'c>, payload: MqttBinary<'c>) -> OptionsBuilder<'c> {
-        OptionsBuilder(Options {
+    /// Creates options with values coherent to the `Default` implementations of the fields and `QoS::AtMostOnce`.
+    pub const fn new(topic: TopicName<'c>, payload: MqttBinary<'c>) -> Options<'c> {
+        Options {
             will_qos: QoS::AtMostOnce,
             will_retain: false,
             will_topic: topic,
@@ -76,58 +68,60 @@ impl<'c> OptionsBuilder<'c> {
             content_type: None,
             response_topic: None,
             correlation_data: None,
-        })
+        }
     }
 
-    /// Sets the Quality of Service level to 1 (At Least Once).
-    pub fn at_least_once(mut self) -> Self {
-        self.0.will_qos = QoS::AtLeastOnce;
+    /// Sets the Quality of Service level.
+    pub const fn qos(mut self, qos: QoS) -> Self {
+        self.will_qos = qos;
         self
+    }
+    /// Sets the Quality of Service level to 1 (At Least Once).
+    pub const fn at_least_once(self) -> Self {
+        self.qos(QoS::AtLeastOnce)
     }
     /// Sets the Quality of Service level to 1 (Exactly Once).
-    pub fn exactly_once(mut self) -> Self {
-        self.0.will_qos = QoS::ExactlyOnce;
-        self
+    pub const fn exactly_once(self) -> Self {
+        self.qos(QoS::ExactlyOnce)
     }
     /// Sets the retain flag in the will message to true.
-    pub fn retain(mut self) -> Self {
-        self.0.will_retain = true;
+    pub const fn retain(mut self) -> Self {
+        self.will_retain = true;
         self
     }
     /// Sets the delay in seconds after which the will message is published.
-    pub fn delay_interval(mut self, delay_interval: u32) -> Self {
-        self.0.will_delay_interval = delay_interval;
+    pub const fn delay_interval(mut self, delay_interval: u32) -> Self {
+        self.will_delay_interval = delay_interval;
         self
     }
     /// Sets the payload format indicator property to true thus marking the payload of the will message.
     /// as valid UTF-8.
-    pub fn mark_payload_utf8(mut self) -> Self {
-        self.0.is_payload_utf8 = true;
+    pub const fn mark_payload_utf8(mut self) -> Self {
+        self.is_payload_utf8 = true;
         self
     }
     /// Sets the message expiry interval in seconds of the will message.
-    pub fn message_expiry_interval(mut self, message_expiry_interval: u32) -> Self {
-        self.0.message_expiry_interval = Some(message_expiry_interval);
+    pub const fn message_expiry_interval(mut self, message_expiry_interval: u32) -> Self {
+        self.message_expiry_interval = Some(message_expiry_interval);
         self
     }
     /// Sets a custom content type of the will message's payload.
-    pub fn content_type(mut self, content_type: MqttString<'c>) -> Self {
-        self.0.content_type = Some(content_type);
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub const fn content_type(mut self, content_type: MqttString<'c>) -> Self {
+        self.content_type = Some(content_type);
         self
     }
     /// Marks the will message as a request by setting the response topic property.
-    pub fn response_topic(mut self, response_topic: TopicName<'c>) -> Self {
-        self.0.response_topic = Some(response_topic);
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub const fn response_topic(mut self, response_topic: TopicName<'c>) -> Self {
+        self.response_topic = Some(response_topic);
         self
     }
     /// Sets the correlation data property in the request.
-    pub fn correlation_data(mut self, correlation_data: MqttBinary<'c>) -> Self {
-        self.0.correlation_data = Some(correlation_data);
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub const fn correlation_data(mut self, correlation_data: MqttBinary<'c>) -> Self {
+        self.correlation_data = Some(correlation_data);
         self
-    }
-    /// Builds to a complete `WillOptions` instance.
-    pub fn build(self) -> Options<'c> {
-        self.0
     }
 }
 
