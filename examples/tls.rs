@@ -14,7 +14,6 @@ use rust_mqtt::{
         Client,
         options::{ConnectOptions, DisconnectOptions},
     },
-    config::{KeepAlive, SessionExpiryInterval},
 };
 use signature::SignerMut;
 use std::{
@@ -96,18 +95,7 @@ async fn main() {
         .expect("error establishing TLS connection");
 
     match client
-        .connect(
-            tls_connection,
-            &ConnectOptions {
-                session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
-                clean_start: true,
-                keep_alive: KeepAlive::Infinite,
-                will: None,
-                user_name: None,
-                password: None,
-            },
-            None,
-        )
+        .connect(tls_connection, &ConnectOptions::new().clean_start(), None)
         .await
     {
         Ok(c) => info!("Connected to server: {:?}", c),

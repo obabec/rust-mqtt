@@ -15,12 +15,12 @@ rust-mqtt is an MQTT client primarily for no_std environments. The library provi
 - Subscription identifiers
 - Message expiry interval
 - Topic alias
+- Request/Response
 
 ### Currently unsupported MQTT features & limitations
 
 - AUTH packet
 - User properties
-- Request/Response
 - Subscribing to multiple topics in a single packet
 
 ### Extension plans (more or less by priority)
@@ -34,7 +34,7 @@ rust-mqtt is an MQTT client primarily for no_std environments. The library provi
 - `log`: Enables logging via the `log` crate
 - `defmt`: Implements `defmt::Format` for crate items & enables logging via the `defmt` crate (version 1)
 - `bump`: Adds a simple bump allocator `BufferProvider` implementation
-- `alloc`: Adds a heap-allocation based `BufferProvider` implementation using the `alloc` crate
+- `alloc`: Adds an `Owned(Box<[u8]>)` variant to `Bytes` and a heap-allocation based `BufferProvider` implementation using the `alloc` crate
 - `v3`: Unused
 - `v5`: Enables MQTT version 5.0
 

@@ -6,7 +6,7 @@ use crate::{
         read::{Readable, Store},
         write::{Writable, wlen},
     },
-    types::{MqttBinary, MqttString, QoS, VarByteInt},
+    types::{MqttBinary, MqttString, QoS, TopicName, VarByteInt},
     v5::property::{Property, PropertyType},
 };
 
@@ -98,7 +98,7 @@ macro_rules! property {
 property!(PayloadFormatIndicator, bool);
 property!(MessageExpiryInterval, u32);
 property!(ContentType<'c>, MqttString<'c>);
-property!(ResponseTopic<'c>, MqttString<'c>);
+property!(ResponseTopic<'c>, TopicName<'c>);
 property!(CorrelationData<'c>, MqttBinary<'c>);
 property!(SubscriptionIdentifier, VarByteInt);
 property!(AssignedClientIdentifier<'c>, MqttString<'c>);

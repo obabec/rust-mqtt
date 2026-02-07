@@ -18,7 +18,10 @@ use crate::{
     io::net::Transport,
     packet::{Packet, TxPacket},
     session::{CPublishFlightState, SPublishFlightState, Session},
-    types::{IdentifiedQoS, MqttString, QoS, ReasonCode, SubscriptionFilter, TopicFilter},
+    types::{
+        IdentifiedQoS, MqttBinary, MqttString, QoS, ReasonCode, SubscriptionFilter, TopicFilter,
+        TopicName,
+    },
     v5::{
         packet::{
             ConnackPacket, ConnectPacket, DisconnectPacket, PingreqPacket, PingrespPacket,
@@ -229,6 +232,7 @@ impl<
                 options.keep_alive,
                 options.session_expiry_interval,
                 RECEIVE_MAXIMUM as u16,
+                options.request_response_information,
             );
 
             if let Some(ref user_name) = options.user_name {
@@ -242,7 +246,7 @@ impl<
                 let will_qos = will.will_qos;
                 let will_retain = will.will_retain;
 
-                packet.add_will(will.as_will(), will_qos, will_retain);
+                packet.add_will(will.as_borrowed_will(), will_qos, will_retain);
             }
 
             debug!("sending CONNECT packet");
@@ -284,7 +288,7 @@ impl<
             subscription_identifier_available,
             shared_subscription_available,
             server_keep_alive,
-            response_information: _,
+            response_information,
             server_reference: _,
             authentication_method: _,
             authentication_data: _,
@@ -343,6 +347,7 @@ impl<
             Ok(ConnectInfo {
                 session_present,
                 client_identifier,
+                response_information: response_information.map(Property::into_inner),
             })
         } else {
             debug!("CONNACK packet indicates rejection");
@@ -495,6 +500,11 @@ impl<
             options.message_expiry_interval.map(Into::into),
             options.topic.as_borrowed(),
             message,
+            options.response_topic.as_ref().map(TopicName::as_borrowed),
+            options
+                .correlation_data
+                .as_ref()
+                .map(MqttBinary::as_borrowed),
         )?;
 
         match self.server_config.maximum_packet_size {
@@ -602,6 +612,11 @@ impl<
             options.message_expiry_interval.map(Into::into),
             options.topic.as_borrowed(),
             message,
+            options.response_topic.as_ref().map(TopicName::as_borrowed),
+            options
+                .correlation_data
+                .as_ref()
+                .map(MqttBinary::as_borrowed),
         )?;
 
         match self.server_config.maximum_packet_size {
@@ -839,7 +854,9 @@ impl<
                         .into_iter()
                         .map(Property::into_inner)
                         .collect(),
-                    topic: topic.into(),
+                    response_topic: publish.response_topic.map(Property::into_inner),
+                    correlation_data: publish.correlation_data.map(Property::into_inner),
+                    topic,
                     message: publish.message,
                 };
 

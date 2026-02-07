@@ -29,12 +29,7 @@ async fn publish_multiple(
     assert_ok!(ready_rx.await);
     info!("[Publisher] Receiver is ready, starting to publish");
 
-    let pub_options = PublicationOptions {
-        retain: false,
-        message_expiry_interval: None,
-        topic: TopicReference::Name(topic.clone()),
-        qos,
-    };
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic.clone())).qos(qos);
 
     let topic_name = topic.as_ref();
     info!(

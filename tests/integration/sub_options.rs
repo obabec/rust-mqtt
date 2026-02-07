@@ -31,12 +31,8 @@ async fn publish_no_local() {
     options.no_local = true;
     assert_subscribe!(c, options, topic_filter.clone());
 
-    let pub_options = PublicationOptions {
-        retain: false,
-        message_expiry_interval: None,
-        topic: TopicReference::Name(topic_name.clone()),
-        qos: QoS::ExactlyOnce,
-    };
+    let pub_options =
+        PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
     assert_published!(c, pub_options, msg.into());
 
@@ -71,12 +67,10 @@ async fn subscribe_retain_handling_default() {
         .await
     );
 
-    let pub_options = PublicationOptions {
-        retain: true,
-        message_expiry_interval: None,
-        topic: TopicReference::Name(topic_name.clone()),
-        qos: QoS::AtLeastOnce,
-    };
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+        .retain()
+        .at_least_once();
+
     assert_published!(tx, pub_options, msg.into());
 
     sleep(Duration::from_secs(1)).await;
@@ -132,12 +126,10 @@ async fn subscribe_retain_handling_never() {
     let mut rx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, Some(rx_id)).await);
 
-    let pub_options = PublicationOptions {
-        retain: true,
-        message_expiry_interval: None,
-        topic: TopicReference::Name(topic_name.clone()),
-        qos: QoS::AtLeastOnce,
-    };
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+        .retain()
+        .at_least_once();
+
     assert_published!(tx, pub_options, msg.into());
 
     sleep(Duration::from_secs(1)).await;
@@ -184,12 +176,10 @@ async fn subscribe_retain_handling_clean_only() {
     let mut rx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, Some(rx_id)).await);
 
-    let pub_options = PublicationOptions {
-        retain: true,
-        message_expiry_interval: None,
-        topic: TopicReference::Name(topic_name.clone()),
-        qos: QoS::AtLeastOnce,
-    };
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+        .retain()
+        .at_least_once();
+
     assert_published!(tx, pub_options, msg.into());
 
     sleep(Duration::from_secs(1)).await;
@@ -231,12 +221,10 @@ async fn subscribe_retain_as_published_false() {
     let mut rx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let pub_options = PublicationOptions {
-        retain: true,
-        message_expiry_interval: None,
-        topic: TopicReference::Name(topic_name.clone()),
-        qos: QoS::AtLeastOnce,
-    };
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+        .retain()
+        .at_least_once();
+
     assert_published!(tx, pub_options.clone(), msg.into());
 
     sleep(Duration::from_secs(1)).await;
@@ -273,12 +261,10 @@ async fn subscribe_retain_as_published_true() {
     let mut rx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let pub_options = PublicationOptions {
-        retain: true,
-        message_expiry_interval: None,
-        topic: TopicReference::Name(topic_name.clone()),
-        qos: QoS::AtLeastOnce,
-    };
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+        .retain()
+        .at_least_once();
+
     assert_published!(tx, pub_options.clone(), msg.into());
 
     sleep(Duration::from_secs(1)).await;
@@ -332,12 +318,10 @@ async fn subscription_identifier() {
     options.subscription_identifier = Some(VarByteInt::from(83u16));
     assert_subscribe!(rx, options, topic_filter.clone());
 
-    let pub_options = PublicationOptions {
-        retain: true,
-        message_expiry_interval: None,
-        topic: TopicReference::Name(topic_name.clone()),
-        qos: QoS::AtLeastOnce,
-    };
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+        .retain()
+        .at_least_once();
+
     assert_published!(tx, pub_options.clone(), msg.into());
 
     let publish = assert_recv!(rx);

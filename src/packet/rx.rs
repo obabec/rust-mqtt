@@ -45,6 +45,7 @@ impl<E, B: fmt::Debug> From<BodyReadError<E, B>> for RxError<E, B> {
             BodyReadError::InsufficientRemainingLen => Self::MalformedPacket,
             BodyReadError::MalformedPacket => Self::MalformedPacket,
             BodyReadError::ProtocolError => Self::ProtocolError,
+            BodyReadError::InvalidTopicName => Self::InvalidTopicName,
         }
     }
 }
@@ -55,6 +56,7 @@ impl<E, B: fmt::Debug> From<ReadError<BodyReadError<E, B>>> for RxError<E, B> {
             ReadError::UnexpectedEOF => Self::UnexpectedEOF,
             ReadError::MalformedPacket => Self::MalformedPacket,
             ReadError::ProtocolError => Self::ProtocolError,
+            ReadError::InvalidTopicName => Self::InvalidTopicName,
         }
     }
 }
@@ -65,6 +67,7 @@ impl<E, B: fmt::Debug> From<ReadError<E>> for RxError<E, B> {
             ReadError::UnexpectedEOF => Self::UnexpectedEOF,
             ReadError::MalformedPacket => Self::MalformedPacket,
             ReadError::ProtocolError => Self::ProtocolError,
+            ReadError::InvalidTopicName => Self::InvalidTopicName,
         }
     }
 }

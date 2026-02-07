@@ -52,12 +52,8 @@ async fn outgoing_qos1_retry() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions {
-            retain: false,
-            message_expiry_interval: None,
-            topic: TopicReference::Name(topic_name.clone()),
-            qos: QoS::AtLeastOnce,
-        };
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).at_least_once();
 
         let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await);
         let session = tx.session().clone();
@@ -104,13 +100,13 @@ async fn outgoing_qos1_retry() {
         let p = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
         ));
-        assert_eq!(p.topic, topic_name.as_borrowed().into());
+        assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
 
         let p = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
         ));
-        assert_eq!(p.topic, topic_name.as_borrowed().into());
+        assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
@@ -143,12 +139,8 @@ async fn outgoing_qos2_retry_publish() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions {
-            retain: false,
-            message_expiry_interval: None,
-            topic: TopicReference::Name(topic_name.clone()),
-            qos: QoS::ExactlyOnce,
-        };
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await);
         let session = tx.session().clone();
@@ -195,7 +187,7 @@ async fn outgoing_qos2_retry_publish() {
         let p = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
         ));
-        assert_eq!(p.topic, topic_name.as_borrowed().into());
+        assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
 
         assert_err!(timeout(Duration::from_secs(5), receive_publish(&mut rx)).await);
@@ -230,12 +222,8 @@ async fn outgoing_qos2_retry_pubrel() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions {
-            retain: false,
-            message_expiry_interval: None,
-            topic: TopicReference::Name(topic_name.clone()),
-            qos: QoS::ExactlyOnce,
-        };
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await);
 
@@ -298,7 +286,7 @@ async fn outgoing_qos2_retry_pubrel() {
         let p = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
         ));
-        assert_eq!(p.topic, topic_name.as_borrowed().into());
+        assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
 
         assert_err!(timeout(Duration::from_secs(5), receive_publish(&mut rx)).await);
@@ -333,12 +321,8 @@ async fn incoming_qos2_retry_pubcomp() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions {
-            retain: false,
-            message_expiry_interval: None,
-            topic: TopicReference::Name(topic_name.clone()),
-            qos: QoS::ExactlyOnce,
-        };
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         assert_published!(tx, &pub_options, msg.into());
         disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
@@ -358,7 +342,7 @@ async fn incoming_qos2_retry_pubcomp() {
         );
         assert!(publish.identified_qos.packet_identifier().is_some());
         let pid = publish.identified_qos.packet_identifier().unwrap();
-        assert_eq!(publish.topic, topic_name.as_borrowed().into());
+        assert_eq!(publish.topic, topic_name.as_borrowed());
         assert_eq!(publish.message, msg.into());
 
         let session = rx.session().clone();
@@ -424,12 +408,8 @@ async fn outgoing_qos1_write_fail_retry() {
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let pub_options = PublicationOptions {
-            retain: false,
-            message_expiry_interval: None,
-            topic: TopicReference::Name(topic_name.clone()),
-            qos: QoS::AtLeastOnce,
-        };
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).at_least_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -542,12 +522,8 @@ async fn outgoing_qos1_read_fail_retry() {
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let pub_options = PublicationOptions {
-            retain: false,
-            message_expiry_interval: None,
-            topic: TopicReference::Name(topic_name.clone()),
-            qos: QoS::AtLeastOnce,
-        };
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).at_least_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -652,12 +628,8 @@ async fn outgoing_qos2_write_fail_retry() {
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let pub_options = PublicationOptions {
-            retain: false,
-            message_expiry_interval: None,
-            topic: TopicReference::Name(topic_name.clone()),
-            qos: QoS::ExactlyOnce,
-        };
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -804,12 +776,8 @@ async fn outgoing_qos2_read_fail_retry() {
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let pub_options = PublicationOptions {
-            retain: false,
-            message_expiry_interval: None,
-            topic: TopicReference::Name(topic_name.clone()),
-            qos: QoS::ExactlyOnce,
-        };
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -1029,11 +997,8 @@ async fn incoming_qos1_write_fail_retry() {
                         Ok(Event::Publish(Publish {
                             identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
                             dup: false,
-                            retain: _,
-                            message_expiry_interval: _,
-                            subscription_identifiers: _,
-                            topic: _,
                             message,
+                            ..
                         })) if &*message == msg.as_slice() => {}
                         Ok(Event::Publish(_)) => panic!("Received non-matching PUBLISH"),
                         Ok(_) => panic!("Should only receive a PUBLISH"),
@@ -1060,11 +1025,8 @@ async fn incoming_qos1_write_fail_retry() {
                     Event::Publish(Publish {
                         identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
                         dup: true,
-                        retain: _,
-                        message_expiry_interval: _,
-                        subscription_identifiers: _,
-                        topic: _,
                         message,
+                        ..
                     }) if &*message == msg.as_slice() => {}
                     Event::Publish(p) => panic!("Received non-matching PUBLISH: {:?}", p),
                     _ => panic!("Should only receive a PUBLISH"),
@@ -1148,11 +1110,8 @@ async fn incoming_qos1_read_fail_retry() {
                         Ok(Event::Publish(Publish {
                             identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
                             dup: false,
-                            retain: _,
-                            message_expiry_interval: _,
-                            subscription_identifiers: _,
-                            topic: _,
                             message,
+                            ..
                         })) if &*message == msg.as_slice() => {}
                         Ok(Event::Publish(_)) => panic!("Received non-matching PUBLISH"),
                         Ok(_) => panic!("Should only receive a PUBLISH"),
@@ -1178,12 +1137,8 @@ async fn incoming_qos1_read_fail_retry() {
                 match assert_ok!(rx.poll().await) {
                     Event::Publish(Publish {
                         identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
-                        dup: _,
-                        retain: _,
-                        message_expiry_interval: _,
-                        subscription_identifiers: _,
-                        topic: _,
                         message,
+                        ..
                     }) if &*message == msg.as_slice() => {}
                     Event::Publish(p) => panic!("Received non-matching PUBLISH: {:?}", p),
                     _ => panic!("Should only receive a PUBLISH"),
@@ -1266,11 +1221,8 @@ async fn incoming_qos2_write_fail_retry() {
                         Ok(Event::Publish(Publish {
                             identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
                             dup: false,
-                            retain: _,
-                            message_expiry_interval: _,
-                            subscription_identifiers: _,
-                            topic: _,
                             message,
+                            ..
                         })) if &*message == msg.as_slice() => pid,
                         Ok(Event::Publish(_)) => panic!("Received non-matching PUBLISH"),
                         Ok(_) => panic!("Should only receive a PUBLISH"),
@@ -1407,11 +1359,8 @@ async fn incoming_qos2_read_fail_retry() {
                         Ok(Event::Publish(Publish {
                             identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
                             dup: false,
-                            retain: _,
-                            message_expiry_interval: _,
-                            subscription_identifiers: _,
-                            topic: _,
                             message,
+                            ..
                         })) if &*message == msg.as_slice() => pid,
                         Ok(Event::Publish(_)) => panic!("Received non-matching PUBLISH"),
                         Ok(_) => panic!("Should only receive a PUBLISH"),
@@ -1463,12 +1412,8 @@ async fn incoming_qos2_read_fail_retry() {
                         Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
                         Event::Publish(Publish {
                             identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
-                            dup: _,
-                            retain: _,
-                            message_expiry_interval: _,
-                            subscription_identifiers: _,
-                            topic: _,
                             message,
+                            ..
                         }) if &*message == msg.as_slice() => packet_identifier,
                         Event::Publish(_) => panic!("Received non-matching PUBLISH"),
                         e => panic!("Should only receive PUBLISH or PUBREL: {:?}", e),
@@ -1501,12 +1446,7 @@ async fn publisher_task(
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let publish_options = PublicationOptions {
-        retain: false,
-        message_expiry_interval: None,
-        topic: TopicReference::Name(topic),
-        qos,
-    };
+    let publish_options = PublicationOptions::new(TopicReference::Name(topic)).qos(qos);
 
     while let Some(content) = messages.recv().await {
         assert_published!(tx, publish_options, content.as_slice().into());
