@@ -34,7 +34,7 @@ impl<'c> Options<'c> {
     pub fn new() -> Self {
         Self::default()
     }
-
+    
     /// Sets the clean start flag to true.
     pub fn clean_start(mut self) -> Self {
         self.clean_start = true;
