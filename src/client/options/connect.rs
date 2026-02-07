@@ -1,11 +1,11 @@
 use crate::{
+    client::options::WillOptions,
     config::{KeepAlive, SessionExpiryInterval},
-    types::{MqttBinary, MqttString, QoS, TopicName, Will},
-    v5::property::{PayloadFormatIndicator, WillDelayInterval},
+    types::{MqttBinary, MqttString},
 };
 
 /// Options for a connection.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Options<'c> {
     /// If set to true, a new session is started. If set to false, an existing session is continued.
@@ -17,7 +17,6 @@ pub struct Options<'c> {
     /// The setting of the session expiry interval the server wishes. Can be set to a different value by the server.
     pub session_expiry_interval: SessionExpiryInterval,
 
-    #[cfg(feature = "request-response")]
     /// When set to true, the broker may return response information used to construct response topics.
     pub request_response_information: bool,
 
@@ -30,88 +29,46 @@ pub struct Options<'c> {
     pub will: Option<WillOptions<'c>>,
 }
 
-/// Options for configuring the client's will or last will in a session.
-/// The server can publish a single PUBLISH packet in place of the client.
-/// This process behaves as if the will message was published by the client.
-/// The will is published at the earlier of the following scenarios:
-/// - The session of the client ends.
-/// - The will delay interval passes.
-#[derive(Debug, Clone)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct WillOptions<'c> {
-    /// The quality of service that the server publishes the will message with in place of the client.
-    pub will_qos: QoS,
+impl<'c> Options<'c> {
+    /// Creates new connect options with no clean start, infinite keep alive and no session expiry.
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-    /// The value of the retain flag of the will message published by the server in place of the client.
-    pub will_retain: bool,
-
-    /// The topic of the will publication.
-    pub will_topic: TopicName<'c>,
-
-    /// The payload of the will publication.
-    pub will_payload: MqttBinary<'c>,
-
-    // Will properties starting here
-    /// The interval in seconds that passes after a disconnection before the server publishes the will.
-    /// The session of the client does not necessarily have to end for this scenario to happen.
-    /// The client can reconnect before this interval has passed to prevent the will publication.
-    /// If the value of the will delay interval is 0, the property is omitted on the network.
-    pub will_delay_interval: u32,
-
-    /// The payload format indicator property in the will publication. If set to false, the property
-    /// is omitted on the network.
-    pub is_payload_utf8: bool,
-
-    /// The message expiry interval in seconds of the will publication. If set to `None`, the message
-    /// does not expire and the message expiry interval property is omitted on the network.
-    pub message_expiry_interval: Option<u32>,
-
-    /// The content type property in the will publication. If set to `None`, the property is omitted
-    /// on the network.
-    pub content_type: Option<MqttString<'c>>,
-
-    /// The response topic property in the will publication. If set to `None`, the property is omitted
-    /// on the network.
-    #[cfg(feature = "request-response")]
-    pub response_topic: Option<TopicName<'c>>,
-
-    /// The correlation data property in the will publication. If set to `None`, the property is omitted
-    /// on the network.
-    #[cfg(feature = "request-response")]
-    pub correlation_data: Option<MqttBinary<'c>>,
-}
-
-impl<'c> WillOptions<'c> {
-    pub(crate) fn as_will(&'c self) -> Will<'c> {
-        Will {
-            will_topic: self.will_topic.as_borrowed(),
-            will_delay_interval: match self.will_delay_interval {
-                0 => None,
-                i => Some(WillDelayInterval(i)),
-            },
-            payload_format_indicator: match self.is_payload_utf8 {
-                false => None,
-                true => Some(PayloadFormatIndicator(true)),
-            },
-            message_expiry_interval: self.message_expiry_interval.map(Into::into),
-            content_type: self
-                .content_type
-                .as_ref()
-                .map(MqttString::as_borrowed)
-                .map(Into::into),
-            #[cfg(feature = "request-response")]
-            response_topic: self
-                .response_topic
-                .as_ref()
-                .map(TopicName::as_borrowed)
-                .map(Into::into),
-            #[cfg(feature = "request-response")]
-            correlation_data: self
-                .correlation_data
-                .as_ref()
-                .map(MqttBinary::as_borrowed)
-                .map(Into::into),
-            will_payload: self.will_payload.as_borrowed(),
-        }
+    /// Sets the clean start flag to true.
+    pub fn clean_start(mut self) -> Self {
+        self.clean_start = true;
+        self
+    }
+    /// Sets the desired keep alive of the connection.
+    pub fn keep_alive(mut self, keep_alive: KeepAlive) -> Self {
+        self.keep_alive = keep_alive;
+        self
+    }
+    /// Sets the desired session expiry interval of the connection.
+    pub fn session_expiry_interval(mut self, interval: SessionExpiryInterval) -> Self {
+        self.session_expiry_interval = interval;
+        self
+    }
+    /// Sets the request response information property to true prompting the server to return
+    /// a response information property to construct construct response topics.
+    pub fn request_response_information(mut self) -> Self {
+        self.request_response_information = true;
+        self
+    }
+    /// Sets the user name.
+    pub fn user_name(mut self, user_name: MqttString<'c>) -> Self {
+        self.user_name = Some(user_name);
+        self
+    }
+    /// Sets the password.
+    pub fn password(mut self, password: MqttBinary<'c>) -> Self {
+        self.password = Some(password);
+        self
+    }
+    /// Sets the will.
+    pub fn will(mut self, will: WillOptions<'c>) -> Self {
+        self.will = Some(will);
+        self
     }
 }

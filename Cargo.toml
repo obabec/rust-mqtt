@@ -63,8 +63,6 @@ alloc = []
 v3 = []
 v5 = []
 
-request-response = []
-
 
 [[example]]
 name = "demo"

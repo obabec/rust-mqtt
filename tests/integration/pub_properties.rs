@@ -31,12 +31,10 @@ async fn message_expiry_interval_basic() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions {
-            retain: false,
-            message_expiry_interval: Some(10),
-            topic: TopicReference::Name(topic_name.clone()),
-            qos: QoS::AtLeastOnce,
-        };
+        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
+            .at_least_once()
+            .message_expiry_interval(10)
+            .build();
 
         sleep(Duration::from_secs(5)).await;
         assert_published!(tx, pub_options.clone(), msg.into());
@@ -49,13 +47,9 @@ async fn message_expiry_interval_basic() {
         assert_subscribe!(rx, options, topic_filter.clone());
 
         let Publish {
-            identified_qos: _,
-            dup: _,
-            retain: _,
             message_expiry_interval,
-            subscription_identifiers: _,
-            topic: _,
             message,
+            ..
         } = assert_recv_excl!(rx, topic_name);
 
         assert_eq!(&*message, msg.as_bytes());
@@ -80,12 +74,11 @@ async fn message_expiry_interval_partially_expired() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions {
-            retain: true,
-            message_expiry_interval: Some(10),
-            topic: TopicReference::Name(topic_name.clone()),
-            qos: QoS::AtLeastOnce,
-        };
+        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
+            .retain()
+            .message_expiry_interval(10)
+            .at_least_once()
+            .build();
 
         assert_published!(tx, pub_options.clone(), msg.into());
         disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
@@ -99,13 +92,9 @@ async fn message_expiry_interval_partially_expired() {
         assert_subscribe!(rx, options, topic_filter.clone());
 
         let Publish {
-            identified_qos: _,
-            dup: _,
-            retain: _,
             message_expiry_interval,
-            subscription_identifiers: _,
-            topic: _,
             message,
+            ..
         } = assert_recv_excl!(rx, topic_name);
 
         assert_eq!(&*message, msg.as_bytes());
@@ -129,12 +118,11 @@ async fn message_expiry_interval_completely_expired() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let publisher = async {
-        let pub_options = PublicationOptions {
-            retain: true,
-            message_expiry_interval: Some(5),
-            topic: TopicReference::Name(topic_name.clone()),
-            qos: QoS::AtLeastOnce,
-        };
+        let pub_options = PublicationOptions::builder(TopicReference::Name(topic_name.clone()))
+            .retain()
+            .message_expiry_interval(5)
+            .at_least_once()
+            .build();
 
         assert_published!(tx, pub_options.clone(), msg.into());
         disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
@@ -174,20 +162,19 @@ async fn topic_alias_basic() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions {
-            retain: true,
-            message_expiry_interval: None,
-            topic: TopicReference::Mapping(topic_name.clone(), 1),
-            qos: QoS::AtLeastOnce,
-        };
+        let pub_options =
+            PublicationOptions::builder(TopicReference::Mapping(topic_name.clone(), 1))
+                .retain()
+                .at_least_once()
+                .build();
+
         assert_published!(tx, pub_options.clone(), msg.into());
 
-        let pub_options = PublicationOptions {
-            retain: true,
-            message_expiry_interval: None,
-            topic: TopicReference::Alias(1),
-            qos: QoS::AtLeastOnce,
-        };
+        let pub_options = PublicationOptions::builder(TopicReference::Alias(1))
+            .retain()
+            .at_least_once()
+            .build();
+
         assert_published!(tx, pub_options.clone(), msg.into());
 
         disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
@@ -224,28 +211,27 @@ async fn topic_alias_remap() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions {
-            retain: true,
-            message_expiry_interval: None,
-            topic: TopicReference::Mapping(topic_name1.clone(), 1),
-            qos: QoS::AtLeastOnce,
-        };
+        let pub_options =
+            PublicationOptions::builder(TopicReference::Mapping(topic_name1.clone(), 1))
+                .retain()
+                .at_least_once()
+                .build();
+
         assert_published!(tx, pub_options.clone(), msg.into());
 
-        let pub_options = PublicationOptions {
-            retain: true,
-            message_expiry_interval: None,
-            topic: TopicReference::Mapping(topic_name2.clone(), 1),
-            qos: QoS::AtLeastOnce,
-        };
+        let pub_options =
+            PublicationOptions::builder(TopicReference::Mapping(topic_name2.clone(), 1))
+                .retain()
+                .at_least_once()
+                .build();
+
         assert_published!(tx, pub_options.clone(), msg.into());
 
-        let pub_options = PublicationOptions {
-            retain: true,
-            message_expiry_interval: None,
-            topic: TopicReference::Alias(1),
-            qos: QoS::AtLeastOnce,
-        };
+        let pub_options = PublicationOptions::builder(TopicReference::Alias(1))
+            .retain()
+            .at_least_once()
+            .build();
+
         assert_published!(tx, pub_options.clone(), msg.into());
 
         disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;

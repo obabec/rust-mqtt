@@ -1,7 +1,5 @@
 use heapless::Vec;
 
-#[cfg(feature = "request-response")]
-use crate::types::MqttBinary;
 use crate::{
     buffer::BufferProvider,
     bytes::Bytes,
@@ -14,7 +12,7 @@ use crate::{
         write::{Writable, wlen},
     },
     packet::{Packet, RxError, RxPacket, TxError, TxPacket},
-    types::{IdentifiedQoS, MqttString, QoS, TooLargeToEncode, TopicName, VarByteInt},
+    types::{IdentifiedQoS, MqttBinary, MqttString, QoS, TooLargeToEncode, TopicName, VarByteInt},
     v5::property::{
         AtMostOnceProperty, ContentType, CorrelationData, MessageExpiryInterval,
         PayloadFormatIndicator, Property, PropertyType, ResponseTopic, SubscriptionIdentifier,
@@ -256,6 +254,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
     const EMPTY_TOPIC: MqttString<'static> = unsafe { MqttString::from_slice_unchecked("") };
 
     /// Creates a new packet with Quality of Service 0
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         dup: bool,
         retain: bool,
@@ -263,8 +262,8 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
         message_expiry_interval: Option<MessageExpiryInterval>,
         topic: TopicReference<'p>,
         message: Bytes<'p>,
-        #[cfg(feature = "request-response")] response_topic: Option<TopicName<'p>>,
-        #[cfg(feature = "request-response")] correlation_data: Option<MqttBinary<'p>>,
+        response_topic: Option<TopicName<'p>>,
+        correlation_data: Option<MqttBinary<'p>>,
     ) -> Result<Self, TooLargeToEncode> {
         let p = Self {
             dup,
@@ -273,14 +272,8 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
             topic,
             payload_format_indicator: None,
             message_expiry_interval,
-            #[cfg(feature = "request-response")]
             response_topic: response_topic.map(Into::into),
-            #[cfg(not(feature = "request-response"))]
-            response_topic: None,
-            #[cfg(feature = "request-response")]
             correlation_data: correlation_data.map(Into::into),
-            #[cfg(not(feature = "request-response"))]
-            correlation_data: None,
             subscription_identifiers: Vec::new(),
             content_type: None,
             message,
@@ -362,6 +355,8 @@ mod unit {
                 TopicName::new_checked(MqttString::try_from("test/topic").unwrap()).unwrap(),
             ),
             Bytes::from("hello".as_bytes()),
+            None,
+            None,
         )
         .unwrap();
 
@@ -402,18 +397,23 @@ mod unit {
             Some(481123u32.into()),
             TopicReference::Alias(23408),
             Bytes::from("hello".as_bytes()),
+            Some(
+                TopicName::new_checked(MqttString::from_slice("uno, dos, tres, catorce").unwrap())
+                    .unwrap(),
+            ),
+            Some(MqttBinary::from_slice(&[0, 1, 2, 3, 4, 5, 6, 7]).unwrap()),
         )
         .unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [
             0x3D,
-            0x12,
+            0x37,
             0x00, // Topic Name
             0x00, // Topic Name
             0x25, // Packet identifier
             0x98, // Packet identifier
-            0x08, // Property length
+            0x2D, // Property length
             0x02, // Message expiry interval
             0x00, //
             0x07, //
@@ -422,6 +422,15 @@ mod unit {
             0x23, // Topic alias
             0x5B, //
             0x70, // Topic alias
+
+            0x08, // Response Topic
+            0x00, 0x17,
+            b'u', b'n', b'o', b',', b' ', b'd', b'o', b's', b',', b' ', b't', b'r', b'e', b's', b',', b' ', b'c', b'a', b't', b'o', b'r', b'c', b'e', 
+            
+            0x09, // Correlation Data
+            0x00, 0x08,
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+
             b'h', // Payload
             b'e', //
             b'l', //

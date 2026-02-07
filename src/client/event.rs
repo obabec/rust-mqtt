@@ -2,11 +2,9 @@
 
 use heapless::Vec;
 
-#[cfg(feature = "request-response")]
-use crate::types::MqttBinary;
 use crate::{
     bytes::Bytes,
-    types::{IdentifiedQoS, ReasonCode, TopicName, VarByteInt},
+    types::{IdentifiedQoS, MqttBinary, ReasonCode, TopicName, VarByteInt},
 };
 
 /// Events emitted by the client when receiving an MQTT packet.
@@ -137,12 +135,10 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// be exhaustive.
     pub subscription_identifiers: Vec<VarByteInt, MAX_SUBSCRIPTION_IDENTIFIERS>,
 
-    #[cfg(feature = "request-response")]
     /// Identifies an incoming publication as a request and specifies the topic which the response should
     /// be published on.
     pub response_topic: Option<TopicName<'p>>,
 
-    #[cfg(feature = "request-response")]
     /// Present in incoming requests and responses. In either case this is arbitrary binary data used for
     /// associating either the following response with this specific request or in case of a response,
     /// link back to the original request.

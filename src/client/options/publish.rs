@@ -1,6 +1,4 @@
-#[cfg(feature = "request-response")]
-use crate::types::MqttBinary;
-use crate::types::{QoS, TopicName};
+use crate::types::{MqttBinary, QoS, TopicName};
 
 /// Options for a publication.
 #[derive(Debug, Clone)]
@@ -29,14 +27,76 @@ pub struct Options<'p> {
     /// value of the receiving client's subscription.
     pub qos: QoS,
 
-    #[cfg(feature = "request-response")]
     /// The topic on which the receiver should publish the response.
     pub response_topic: Option<TopicName<'p>>,
 
-    #[cfg(feature = "request-response")]
     /// Arbitrary binary data which the receiver should attach in the response to associate
     /// their response with this request.
     pub correlation_data: Option<MqttBinary<'p>>,
+}
+
+impl<'p> Options<'p> {
+    /// Creates a builder with the default options coherent to `Default` implementations and `QoS::AtMostOnce`.
+    pub fn builder(topic: TopicReference<'p>) -> OptionsBuilder<'p> {
+        OptionsBuilder::new(topic)
+    }
+}
+
+/// Builder for `PublicationOptions`.
+pub struct OptionsBuilder<'p>(Options<'p>);
+
+impl<'p> OptionsBuilder<'p> {
+    /// Creates a builder with the default options coherent to `Default` implementations and `QoS::AtMostOnce`.
+    pub fn new(topic: TopicReference<'p>) -> OptionsBuilder<'p> {
+        OptionsBuilder(Options {
+            retain: false,
+            message_expiry_interval: None,
+            topic,
+            qos: QoS::AtMostOnce,
+            response_topic: None,
+            correlation_data: None,
+        })
+    }
+
+    /// Sets the Quality of Service level.
+    pub fn qos(mut self, qos: QoS) -> Self {
+        self.0.qos = qos;
+        self
+    }
+    /// Sets the Quality of Service level to 1 (At Least Once).
+    pub fn at_least_once(mut self) -> Self {
+        self.0.qos = QoS::AtLeastOnce;
+        self
+    }
+    /// Sets the Quality of Service level to 1 (Exactly Once).
+    pub fn exactly_once(mut self) -> Self {
+        self.0.qos = QoS::ExactlyOnce;
+        self
+    }
+    /// Sets the retain flag to true.
+    pub fn retain(mut self) -> Self {
+        self.0.retain = true;
+        self
+    }
+    /// Sets the message expiry interval in seconds.
+    pub fn message_expiry_interval(mut self, seconds: u32) -> Self {
+        self.0.message_expiry_interval = Some(seconds);
+        self
+    }
+    /// Marks the publication as a request by setting the response topic property.
+    pub fn response_topic(mut self, topic: TopicName<'p>) -> Self {
+        self.0.response_topic = Some(topic);
+        self
+    }
+    /// Sets the correlation data property in the request.
+    pub fn correlation_data(mut self, data: MqttBinary<'p>) -> Self {
+        self.0.correlation_data = Some(data);
+        self
+    }
+    /// Builds to a complete `PublicationOptions` instance.
+    pub fn build(self) -> Options<'p> {
+        self.0
+    }
 }
 
 /// The options for specifiying which topic to publish to. Topic aliases only last for the

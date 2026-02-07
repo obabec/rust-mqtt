@@ -42,24 +42,24 @@ async fn main() {
     match client
         .connect(
             connection,
-            &ConnectOptions {
-                session_expiry_interval: SessionExpiryInterval::Seconds(5),
-                clean_start: true,
-                keep_alive: KeepAlive::Seconds(3),
-                will: Some(WillOptions {
-                    will_qos: QoS::ExactlyOnce,
-                    will_retain: true,
-                    will_topic: TopicName::new_checked(MqttString::try_from("i/am/dead").unwrap())
-                        .unwrap(),
-                    will_payload: MqttBinary::try_from("Have a nice day!").unwrap(),
-                    will_delay_interval: 1,
-                    is_payload_utf8: true,
-                    message_expiry_interval: Some(20),
-                    content_type: Some(MqttString::try_from("txt").unwrap()),
-                }),
-                user_name: Some(MqttString::try_from("test").unwrap()),
-                password: Some(MqttBinary::try_from("testPass").unwrap()),
-            },
+            &ConnectOptions::new()
+                .clean_start()
+                .session_expiry_interval(SessionExpiryInterval::Seconds(5))
+                .keep_alive(KeepAlive::Seconds(5))
+                .user_name(MqttString::try_from("test").unwrap())
+                .password(MqttBinary::try_from("testPass").unwrap())
+                .will(
+                    WillOptions::builder(
+                        TopicName::new_checked(MqttString::try_from("i/am/dead").unwrap()).unwrap(),
+                        MqttBinary::try_from("Have a nice day!").unwrap(),
+                    )
+                    .exactly_once()
+                    .retain()
+                    .delay_interval(1)
+                    .mark_payload_utf8()
+                    .content_type(MqttString::try_from("txt").unwrap())
+                    .build(),
+                ),
             Some(MqttString::try_from("rust-mqtt-demo-client").unwrap()),
         )
         .await
@@ -122,12 +122,9 @@ async fn main() {
         }
     }
 
-    let pub_options = PublicationOptions {
-        retain: false,
-        message_expiry_interval: None,
-        topic: TopicReference::Mapping(topic.clone(), 1),
-        qos: QoS::ExactlyOnce,
-    };
+    let pub_options = PublicationOptions::builder(TopicReference::Mapping(topic.clone(), 1))
+        .exactly_once()
+        .build();
 
     match client
         .publish(&pub_options, Bytes::from("anything".as_bytes()))
@@ -225,12 +222,10 @@ async fn main() {
     }
 
     // Start a Quality of Service 2 publish flow
-    let pub_options = PublicationOptions {
-        retain: false,
-        message_expiry_interval: None,
-        topic: TopicReference::Alias(1),
-        qos: QoS::ExactlyOnce,
-    };
+    let pub_options = PublicationOptions::builder(TopicReference::Alias(1))
+        .exactly_once()
+        .build();
+
     let incomplete_publish_packet_identifier = match client
         .publish(&pub_options, Bytes::from("something".as_bytes()))
         .await
@@ -273,14 +268,9 @@ async fn main() {
     match client
         .connect(
             connection,
-            &ConnectOptions {
-                session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
-                clean_start: false,
-                keep_alive: KeepAlive::Infinite,
-                will: None,
-                user_name: Some(MqttString::try_from("test").unwrap()),
-                password: Some(MqttBinary::try_from("testPass").unwrap()),
-            },
+            &ConnectOptions::new()
+                .user_name(MqttString::try_from("test").unwrap())
+                .password(MqttBinary::try_from("testPass").unwrap()),
             Some(MqttString::try_from("rust-mqtt-demo-client").unwrap()),
         )
         .await
@@ -298,12 +288,10 @@ async fn main() {
         }
     };
 
-    let pub_options = PublicationOptions {
-        retain: false,
-        message_expiry_interval: None,
-        topic: TopicReference::Name(topic.clone()),
-        qos: QoS::ExactlyOnce,
-    };
+    let pub_options = PublicationOptions::builder(TopicReference::Name(topic.clone()))
+        .exactly_once()
+        .build();
+
     match client
         .republish(
             incomplete_publish_packet_identifier,

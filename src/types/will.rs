@@ -1,11 +1,12 @@
-#[cfg(feature = "request-response")]
-use crate::v5::property::{CorrelationData, ResponseTopic};
 use crate::{
     client::options::WillOptions,
     eio::Write,
     io::{err::WriteError, write::Writable},
     types::{MqttBinary, TopicName, VarByteInt},
-    v5::property::{ContentType, MessageExpiryInterval, PayloadFormatIndicator, WillDelayInterval},
+    v5::property::{
+        ContentType, CorrelationData, MessageExpiryInterval, PayloadFormatIndicator, ResponseTopic,
+        WillDelayInterval,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -18,10 +19,7 @@ pub struct Will<'w> {
     pub payload_format_indicator: Option<PayloadFormatIndicator>,
     pub message_expiry_interval: Option<MessageExpiryInterval>,
     pub content_type: Option<ContentType<'w>>,
-
-    #[cfg(feature = "request-response")]
     pub response_topic: Option<ResponseTopic<'w>>,
-    #[cfg(feature = "request-response")]
     pub correlation_data: Option<CorrelationData<'w>>,
 
     pub will_payload: MqttBinary<'w>,
@@ -41,9 +39,7 @@ impl<'w> From<WillOptions<'w>> for Will<'w> {
             },
             message_expiry_interval: options.message_expiry_interval.map(Into::into),
             content_type: options.content_type.map(Into::into),
-            #[cfg(feature = "request-response")]
             response_topic: options.response_topic.map(Into::into),
-            #[cfg(feature = "request-response")]
             correlation_data: options.correlation_data.map(Into::into),
             will_payload: options.will_payload,
         }
@@ -69,9 +65,7 @@ impl<'p> Writable for Will<'p> {
         self.payload_format_indicator.write(write).await?;
         self.message_expiry_interval.write(write).await?;
         self.content_type.write(write).await?;
-        #[cfg(feature = "request-response")]
         self.response_topic.write(write).await?;
-        #[cfg(feature = "request-response")]
         self.correlation_data.write(write).await?;
 
         self.will_topic.write(write).await?;
@@ -83,19 +77,12 @@ impl<'p> Writable for Will<'p> {
 
 impl<'p> Will<'p> {
     pub fn will_properties_length(&self) -> VarByteInt {
-        #[cfg(feature = "request-response")]
         let will_properties_length = self.will_delay_interval.written_len()
             + self.payload_format_indicator.written_len()
             + self.message_expiry_interval.written_len()
             + self.content_type.written_len()
             + self.response_topic.written_len()
             + self.correlation_data.written_len();
-
-        #[cfg(not(feature = "request-response"))]
-        let will_properties_length = self.will_delay_interval.written_len()
-            + self.payload_format_indicator.written_len()
-            + self.message_expiry_interval.written_len()
-            + self.content_type.written_len();
 
         // Invariant: 196626 < VarByteInt::MAX_ENCODABLE
         // will delay interval: 5

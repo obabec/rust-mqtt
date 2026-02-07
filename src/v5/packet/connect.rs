@@ -120,7 +120,7 @@ impl<'p> ConnectPacket<'p> {
         keep_alive: KeepAlive,
         session_expiry_interval: SessionExpiryInterval,
         receive_maximum: u16,
-        #[cfg(feature = "request-response")] request_response_information: bool,
+        request_response_information: bool,
     ) -> Self {
         Self {
             will_retain: false,
@@ -131,12 +131,9 @@ impl<'p> ConnectPacket<'p> {
             receive_maximum: ReceiveMaximum(receive_maximum),
             maximum_packet_size: MaximumPacketSize::default(),
             topic_alias_maximum: None,
-            #[cfg(feature = "request-response")]
             request_response_information: request_response_information
                 .then_some(true)
                 .map(Into::into),
-            #[cfg(not(feature = "request-response"))]
-            request_response_information: None,
             request_problem_information: None,
             authentication_method: None,
             authentication_data: None,
@@ -212,6 +209,7 @@ mod unit {
             KeepAlive::Seconds(7439),
             SessionExpiryInterval::EndOnDisconnect,
             u16::MAX,
+            false,
         );
 
         #[rustfmt::skip]
@@ -244,6 +242,7 @@ mod unit {
             KeepAlive::Seconds(6789),
             SessionExpiryInterval::EndOnDisconnect,
             u16::MAX,
+            false,
         );
 
         packet.add_user_name(MqttString::try_from("Franz").unwrap());
@@ -304,6 +303,7 @@ mod unit {
             KeepAlive::Seconds(6789),
             SessionExpiryInterval::Seconds(893475),
             u16::MAX,
+            true,
         );
 
         packet.add_user_name(MqttString::try_from("Franz").unwrap());
@@ -315,6 +315,8 @@ mod unit {
                 payload_format_indicator: Some(PayloadFormatIndicator(true)),
                 message_expiry_interval: Some(MessageExpiryInterval(84807612)),
                 content_type: Some(ContentType(MqttString::try_from("text/plain").unwrap())),
+                response_topic: None,
+                correlation_data: None,
                 will_payload: MqttBinary::try_from([12, 8, 98].as_slice()).unwrap(),
             },
             QoS::ExactlyOnce,
@@ -325,7 +327,7 @@ mod unit {
         encode!(packet,
             [
                 0x10,       // Packet type
-                0x4C,       // Remaining length
+                0x4E,       // Remaining length
                 0x00,       // Protocol name len MSB
                 0x04,       // Protocol name len LSB
                 b'M',       // Protocol name
@@ -337,9 +339,11 @@ mod unit {
                 0x1A,       // Keep alive MSB
                 0x85,       // Keep alive LSB
 
-                0x05,       // Property length
+                0x07,       // Property length
 
                 0x11, 0x00, 0x0D, 0xA2, 0x23, // Session expiry interval
+
+                0x19, 0x01, // Request Response Information
 
                 0x00,       // Client identifier len MSB
                 0x03,       // Client identifier len LSB
