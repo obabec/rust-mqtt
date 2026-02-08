@@ -281,13 +281,13 @@ mod unit {
 
     macro_rules! assert_valid {
         ($t:ty, $l:literal) => {
-            let s = assert_ok!(MqttString::from_slice($l));
+            let s = assert_ok!(MqttString::from_str($l));
             assert!(<$t>::new_checked(s).is_some())
         };
     }
     macro_rules! assert_invalid {
         ($t:ty, $l:literal) => {
-            let s = assert_ok!(MqttString::from_slice($l));
+            let s = assert_ok!(MqttString::from_str($l));
             assert!(<$t>::new_checked(s).is_none())
         };
     }

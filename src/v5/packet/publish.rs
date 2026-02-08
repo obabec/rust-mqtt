@@ -250,8 +250,8 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
 impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
     PublishPacket<'p, MAX_SUBSCRIPTION_IDENTIFIERS>
 {
-    // Safety: Empty string does not exceed MqttString::MAX_LENGTH
-    const EMPTY_TOPIC: MqttString<'static> = unsafe { MqttString::from_slice_unchecked("") };
+    // Invariant: Empty string does not exceed MqttString::MAX_LENGTH
+    const EMPTY_TOPIC: MqttString<'static> = MqttString::from_str_unchecked("");
 
     /// Creates a new packet with Quality of Service 0
     #[allow(clippy::too_many_arguments)]
@@ -398,10 +398,10 @@ mod unit {
             TopicReference::Alias(23408),
             Bytes::from("hello".as_bytes()),
             Some(
-                TopicName::new_checked(MqttString::from_slice("uno, dos, tres, catorce").unwrap())
+                TopicName::new_checked(MqttString::from_str("uno, dos, tres, catorce").unwrap())
                     .unwrap(),
             ),
-            Some(MqttBinary::from_slice(&[0, 1, 2, 3, 4, 5, 6, 7]).unwrap()),
+            Some(MqttBinary::from_slice_unchecked(&[0, 1, 2, 3, 4, 5, 6, 7])),
         )
         .unwrap();
 

@@ -33,7 +33,7 @@ use crate::common::{
 async fn outgoing_qos1_retry() {
     let (topic_name, topic_filter) = unique_topic();
     let msg = "test message";
-    let tx_id = MqttString::from_slice("RETRY_OUTGOING_QOS1_TX_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS1_TX_CLIENT").unwrap();
 
     let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
@@ -120,7 +120,7 @@ async fn outgoing_qos1_retry() {
 async fn outgoing_qos2_retry_publish() {
     let (topic_name, topic_filter) = unique_topic();
     let msg = "test message";
-    let tx_id = MqttString::from_slice("RETRY_OUTGOING_QOS2_PUBLISH_TX_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS2_PUBLISH_TX_CLIENT").unwrap();
 
     let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
@@ -203,7 +203,7 @@ async fn outgoing_qos2_retry_publish() {
 async fn outgoing_qos2_retry_pubrel() {
     let (topic_name, topic_filter) = unique_topic();
     let msg = "test message";
-    let tx_id = MqttString::from_slice("RETRY_OUTGOING_QOS2_PUBREL_TX_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS2_PUBREL_TX_CLIENT").unwrap();
 
     let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
@@ -302,7 +302,7 @@ async fn outgoing_qos2_retry_pubrel() {
 async fn incoming_qos2_retry_pubcomp() {
     let (topic_name, topic_filter) = unique_topic();
     let msg = "test message";
-    let rx_id = MqttString::from_slice("RETRY_INCOMING_QOS2_RX_CLIENT").unwrap();
+    let rx_id = MqttString::from_str("RETRY_INCOMING_QOS2_RX_CLIENT").unwrap();
 
     let mut rx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     rx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
@@ -389,7 +389,7 @@ async fn incoming_qos2_retry_pubcomp() {
 #[tokio::test]
 #[test_log::test]
 async fn outgoing_qos1_write_fail_retry() {
-    let tx_id = MqttString::from_slice("RETRY_OUTGOING_QOS1_WRITE_FAIL_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS1_WRITE_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
     let (messages, rx_messages) = mpsc::channel(1);
@@ -503,7 +503,7 @@ async fn outgoing_qos1_write_fail_retry() {
 #[tokio::test]
 #[test_log::test]
 async fn outgoing_qos1_read_fail_retry() {
-    let tx_id = MqttString::from_slice("RETRY_OUTGOING_QOS1_READ_FAIL_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS1_READ_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
     let (messages, rx_messages) = mpsc::channel(1);
@@ -609,7 +609,7 @@ async fn outgoing_qos1_read_fail_retry() {
 #[tokio::test]
 #[test_log::test]
 async fn outgoing_qos2_write_fail_retry() {
-    let tx_id = MqttString::from_slice("RETRY_OUTGOING_QOS2_WRITE_FAIL_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS2_WRITE_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
     let (messages, rx_messages) = mpsc::channel(1);
@@ -757,7 +757,7 @@ async fn outgoing_qos2_write_fail_retry() {
 #[tokio::test]
 #[test_log::test]
 async fn outgoing_qos2_read_fail_retry() {
-    let tx_id = MqttString::from_slice("RETRY_OUTGOING_QOS2_READ_FAIL_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS2_READ_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
     let (messages, rx_messages) = mpsc::channel(1);
@@ -931,7 +931,7 @@ async fn receiver_task(
 #[tokio::test]
 #[test_log::test]
 async fn incoming_qos1_write_fail_retry() {
-    let tx_id = MqttString::from_slice("RETRY_INCOMING_QOS1_WRITE_FAIL_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_INCOMING_QOS1_WRITE_FAIL_CLIENT").unwrap();
 
     let (messages, tx_messages) = mpsc::channel(1);
     let (received, tx_received) = mpsc::channel(1);
@@ -1043,7 +1043,7 @@ async fn incoming_qos1_write_fail_retry() {
 #[tokio::test]
 #[test_log::test]
 async fn incoming_qos1_read_fail_retry() {
-    let tx_id = MqttString::from_slice("RETRY_INCOMING_QOS1_READ_FAIL_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_INCOMING_QOS1_READ_FAIL_CLIENT").unwrap();
 
     let (messages, tx_messages) = mpsc::channel(1);
     let (received, tx_received) = mpsc::channel(1);
@@ -1155,7 +1155,7 @@ async fn incoming_qos1_read_fail_retry() {
 #[tokio::test]
 #[test_log::test]
 async fn incoming_qos2_write_fail_retry() {
-    let tx_id = MqttString::from_slice("RETRY_INCOMING_QOS2_WRITE_FAIL_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_INCOMING_QOS2_WRITE_FAIL_CLIENT").unwrap();
 
     let (messages, tx_messages) = mpsc::channel(1);
     let (received, tx_received) = mpsc::channel(1);
@@ -1292,7 +1292,7 @@ async fn incoming_qos2_write_fail_retry() {
 #[tokio::test]
 #[test_log::test]
 async fn incoming_qos2_read_fail_retry() {
-    let tx_id = MqttString::from_slice("RETRY_INCOMING_QOS2_READ_FAIL_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_INCOMING_QOS2_READ_FAIL_CLIENT").unwrap();
 
     let (messages, tx_messages) = mpsc::channel(1);
     let (received, tx_received) = mpsc::channel(1);
