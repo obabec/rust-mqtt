@@ -310,7 +310,7 @@ mod unit {
         packet.add_password(MqttBinary::try_from("security!".as_bytes()).unwrap());
         packet.add_will(
             Will {
-                will_topic: TopicName::new_checked(MqttString::try_from("dead").unwrap()).unwrap(),
+                will_topic: TopicName::new(MqttString::try_from("dead").unwrap()).unwrap(),
                 will_delay_interval: Some(WillDelayInterval(234589)),
                 payload_format_indicator: Some(PayloadFormatIndicator(true)),
                 message_expiry_interval: Some(MessageExpiryInterval(84807612)),

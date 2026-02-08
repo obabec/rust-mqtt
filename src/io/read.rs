@@ -77,7 +77,7 @@ impl<'s, R: Read + Store<'s>> Readable<R> for TopicName<'s> {
     async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         let str = MqttString::read(read).await?;
 
-        TopicName::new_checked(str).ok_or(ReadError::InvalidTopicName)
+        TopicName::new(str).ok_or(ReadError::InvalidTopicName)
     }
 }
 

@@ -38,7 +38,7 @@ pub fn unique_topic() -> (TopicName<'static>, TopicFilter<'static>) {
         .try_into()
         .unwrap();
 
-    let n = TopicName::new_checked(s).unwrap();
+    let n = TopicName::new(s).unwrap();
     let f = n.clone().into();
 
     (n, f)
