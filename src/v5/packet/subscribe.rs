@@ -192,12 +192,9 @@ mod unit {
             ))
             .unwrap();
 
-        let packet: SubscribePacket<'_, 10> = SubscribePacket::new(
-            23197,
-            Some(VarByteInt::new(87986078u32).unwrap()),
-            topics,
-        )
-        .unwrap();
+        let packet: SubscribePacket<'_, 10> =
+            SubscribePacket::new(23197, Some(VarByteInt::new(87986078u32).unwrap()), topics)
+                .unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [

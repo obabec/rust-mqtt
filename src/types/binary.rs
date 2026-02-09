@@ -29,10 +29,10 @@ use crate::{
 ///
 /// let from_slice_unchecked = MqttBinary::from_slice_unchecked(&slice);
 /// assert_eq!(from_slice_unchecked.as_bytes(), &slice);
-/// 
+///
 /// let from_bytes_unchecked = MqttBinary::from_bytes_unchecked(Bytes::Borrowed(&slice));
 /// assert_eq!(from_bytes_unchecked.as_bytes(), &slice);
-/// 
+///
 /// # Ok::<(), TooLargeToEncode>(())
 /// ```
 #[derive(Default, Clone, PartialEq, Eq)]

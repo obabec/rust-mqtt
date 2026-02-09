@@ -148,7 +148,9 @@ impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
         match &self.reason_string {
             // Invariant: reason string length 65537 < VarByteInt::MAX_ENCODABLE
             Some(r) => {
-                VarByteInt::new_unchecked(r.written_len() as u32).write(write).await?;
+                VarByteInt::new_unchecked(r.written_len() as u32)
+                    .write(write)
+                    .await?;
                 r.write(write).await?;
             }
             // Invariant: 0 < VarByteInt::MAX_ENCODABLE

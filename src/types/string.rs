@@ -65,7 +65,7 @@ impl From<TooLargeToEncode> for MqttStringError {
 /// let b = MqttBinary::from_slice_unchecked(slice.as_bytes());
 /// let s = unsafe { MqttString::from_utf8_binary_unchecked(b) };
 /// assert_eq!(s.as_str(), slice);
-/// 
+///
 /// # Ok::<(), MqttStringError>(())
 /// ```
 #[derive(Default, Clone, PartialEq, Eq)]

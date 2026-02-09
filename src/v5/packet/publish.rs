@@ -397,10 +397,7 @@ mod unit {
             Some(481123u32.into()),
             TopicReference::Alias(23408),
             Bytes::from("hello".as_bytes()),
-            Some(
-                TopicName::new(MqttString::from_str("uno, dos, tres, catorce").unwrap())
-                    .unwrap(),
-            ),
+            Some(TopicName::new(MqttString::from_str("uno, dos, tres, catorce").unwrap()).unwrap()),
             Some(MqttBinary::from_slice_unchecked(&[0, 1, 2, 3, 4, 5, 6, 7])),
         )
         .unwrap();
@@ -487,9 +484,7 @@ mod unit {
         assert!(packet.retain);
         assert_eq!(
             packet.topic,
-            TopicReference::Name(
-                TopicName::new(MqttString::try_from("test").unwrap()).unwrap()
-            )
+            TopicReference::Name(TopicName::new(MqttString::try_from("test").unwrap()).unwrap())
         );
         assert!(packet.payload_format_indicator.is_none());
         assert!(packet.message_expiry_interval.is_none());
