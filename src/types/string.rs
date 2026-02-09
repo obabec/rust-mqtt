@@ -130,7 +130,9 @@ impl<'s> MqttString<'s> {
     pub const fn from_utf8_binary(b: MqttBinary<'s>) -> Result<Self, MqttStringError> {
         let mut i = 0;
         while i < b.as_bytes().len() {
-            debug_assert!(b.as_bytes()[i] != 0);
+            if b.as_bytes()[i] == 0 {
+                return Err(MqttStringError::NullCharacter);
+            }
             i += 1;
         }
 
