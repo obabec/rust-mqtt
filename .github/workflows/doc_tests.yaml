@@ -2,7 +2,7 @@ on: [pull_request, workflow_dispatch]
 name: Doc Tests
 
 jobs:
-  unit_tests:
+  doc_tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
