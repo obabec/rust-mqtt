@@ -7,11 +7,17 @@ use const_fn::const_fn;
 
 use crate::types::{MqttBinary, TooLargeToEncode};
 
-#[derive(Debug, Clone, Copy)]
+/// Error returned when creating `MqttString` failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum MqttStringError {
+    /// The passed data is not valid UTF-8.
     Utf8Error(Utf8Error),
+
+    /// The passed data contains at least one null character.
     NullCharacter,
+
+    /// The passed data exceeds the max length of `MqttString::MAX_LENGTH`.
     TooLargeToEncode,
 }
 
@@ -26,8 +32,41 @@ impl From<TooLargeToEncode> for MqttStringError {
     }
 }
 
-/// Arbitrary UTF-8 encoded string with a length in bytes less than or equal to `Self::MAX_LENGTH`
+/// Arbitrary UTF-8 encoded string with a length in bytes less than or equal to `MqttString::MAX_LENGTH`
 /// and no null characters.
+///
+/// # Examples
+///
+/// ```rust
+/// use rust_mqtt::types::{MqttBinary, MqttString, MqttStringError};
+///
+/// let bytes = [b'a'; MqttString::MAX_LENGTH];
+/// let too_long = [b'a'; MqttString::MAX_LENGTH + 1];
+/// let null_character = "hi\0there";
+///
+/// let slice = core::str::from_utf8(&bytes)?;
+/// let too_long = core::str::from_utf8(&too_long)?;
+///
+/// let b = MqttBinary::from_slice(&bytes)?;
+/// let s = MqttString::from_utf8_binary(b)?;
+/// assert_eq!(s.as_str(), slice);
+/// let b = MqttBinary::from_slice(null_character.as_bytes())?;
+/// assert_eq!(MqttString::from_utf8_binary(b).unwrap_err(), MqttStringError::NullCharacter);
+///
+/// let s = MqttString::from_str(slice)?;
+/// assert_eq!(s.as_str(), slice);
+/// assert_eq!(MqttString::from_str(too_long).unwrap_err(), MqttStringError::TooLargeToEncode);
+/// assert_eq!(MqttString::from_str(&null_character).unwrap_err(), MqttStringError::NullCharacter);
+///
+/// let s = MqttString::from_str_unchecked(slice);
+/// assert_eq!(s.as_str(), slice);
+///
+/// let b = MqttBinary::from_slice_unchecked(slice.as_bytes());
+/// let s = unsafe { MqttString::from_utf8_binary_unchecked(b) };
+/// assert_eq!(s.as_str(), slice);
+/// 
+/// # Ok::<(), MqttStringError>(())
+/// ```
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct MqttString<'s>(pub(crate) MqttBinary<'s>);
 

@@ -7,7 +7,33 @@ use crate::{
     types::{MqttString, TooLargeToEncode},
 };
 
-/// Arbitrary binary data with a length less than or equal to `Self::MAX_LENGTH`
+/// Arbitrary binary data with a length less than or equal to `MqttBinary::MAX_LENGTH`.
+///
+/// # Examples
+///
+/// ```rust
+/// use rust_mqtt::Bytes;
+/// use rust_mqtt::types::{MqttBinary, MqttString, TooLargeToEncode};
+///
+/// let slice = [0x00; MqttBinary::MAX_LENGTH];
+/// let too_long = [0x00; MqttBinary::MAX_LENGTH + 1];
+///
+/// let b = MqttBinary::from_slice(&slice)?;
+/// assert_eq!(b.as_bytes(), &slice);
+/// assert!(MqttBinary::from_slice(&too_long).is_err());
+///
+/// let b = MqttBinary::from_bytes(Bytes::Borrowed(&slice))?;
+/// assert_eq!(b.as_bytes(), &slice);
+/// assert!(MqttBinary::from_bytes(Bytes::Borrowed(&too_long)).is_err());
+///
+/// let from_slice_unchecked = MqttBinary::from_slice_unchecked(&slice);
+/// assert_eq!(from_slice_unchecked.as_bytes(), &slice);
+/// 
+/// let from_bytes_unchecked = MqttBinary::from_bytes_unchecked(Bytes::Borrowed(&slice));
+/// assert_eq!(from_bytes_unchecked.as_bytes(), &slice);
+/// 
+/// # Ok::<(), TooLargeToEncode>(())
+/// ```
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct MqttBinary<'b>(pub(crate) Bytes<'b>);
 
