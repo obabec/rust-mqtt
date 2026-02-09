@@ -9,7 +9,6 @@ use crate::types::{MqttBinary, TooLargeToEncode};
 
 /// Error returned when creating `MqttString` failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum MqttStringError {
     /// The passed data is not valid UTF-8.
     Utf8Error(Utf8Error),
@@ -21,6 +20,21 @@ pub enum MqttStringError {
     TooLargeToEncode,
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for MqttStringError {
+    fn format(&self, fmt: defmt::Formatter) {
+        match self {
+            Self::Utf8Error(e) => defmt::write!(
+                fmt,
+                "Utf8Error(Utf8Error {{ valid_up_to: {:?}, error_len: {:?} }})",
+                e.valid_up_to(),
+                e.error_len()
+            ),
+            Self::NullCharacter => defmt::write!(fmt, "NullCharacter"),
+            Self::TooLargeToEncode => defmt::write!(fmt, "TooLargeToEncode"),
+        }
+    }
+}
 impl From<Utf8Error> for MqttStringError {
     fn from(e: Utf8Error) -> Self {
         Self::Utf8Error(e)
