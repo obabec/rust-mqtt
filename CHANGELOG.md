@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Parse and validate topic names in incoming PUBLISH packets
 - Remove unsafe from unchecked factory methods from `TopicName`, `TopicFilter` and `VarByteInt` as they don't cause UB
 - Remove `VarByteInt::from_slice_unchecked` from public API
+- Add request/response pattern support
+- Add builder pattern to `ConnectOptions`, `DisconnectOptions`, `PublicationOptions`, `SubscriptionOptions` and `WillOptions`
+- Change the type of `WillOptions`'s `will_topic` and `Publish`'s `topic` from `MqttString` to `TopicName`
 
 ## 0.4.1 - 2026-01-06
 

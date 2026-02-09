@@ -2,7 +2,7 @@ use crate::{
     client::options::WillOptions,
     eio::Write,
     io::{err::WriteError, write::Writable},
-    types::{MqttBinary, MqttString, VarByteInt},
+    types::{MqttBinary, TopicName, VarByteInt},
     v5::property::{
         ContentType, CorrelationData, MessageExpiryInterval, PayloadFormatIndicator, ResponseTopic,
         WillDelayInterval,
@@ -12,7 +12,7 @@ use crate::{
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Will<'w> {
-    pub will_topic: MqttString<'w>,
+    pub will_topic: TopicName<'w>,
 
     // Will properties
     pub will_delay_interval: Option<WillDelayInterval>,

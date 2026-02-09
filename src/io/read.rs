@@ -6,7 +6,7 @@ use crate::{
     eio::{ErrorType, Read},
     fmt::trace,
     io::err::{BodyReadError, ReadError},
-    types::{MqttBinary, MqttString},
+    types::{MqttBinary, MqttString, TopicName},
 };
 
 pub trait Readable<R: Read>: Sized {
@@ -71,6 +71,13 @@ impl<'s, R: Read + Store<'s>> Readable<R> for MqttString<'s> {
             .await?
             .try_into()
             .map_err(|_| ReadError::MalformedPacket)
+    }
+}
+impl<'s, R: Read + Store<'s>> Readable<R> for TopicName<'s> {
+    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
+        let str = MqttString::read(read).await?;
+
+        TopicName::new_checked(str).ok_or(ReadError::InvalidTopicName)
     }
 }
 

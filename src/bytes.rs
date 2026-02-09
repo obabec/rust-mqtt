@@ -3,7 +3,7 @@ use core::{borrow::Borrow, fmt, ops::Deref};
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
 
-/// Contiguous bytes in memory. Is either a `u8` slice or (with crate feature "alloc") an owned `Box<u8>`.
+/// Contiguous bytes in memory. Is either a `u8` slice or (with crate feature "alloc") an owned `Box<[u8]>`.
 ///
 /// It is recommended to almost always use owned `Bytes<'a>` instead of a reference `&Bytes<'a>`,
 /// as it makes this type compatible for code designed for both owned and borrowed variants.
@@ -12,7 +12,7 @@ use alloc::boxed::Box;
 /// You can however borrow another owned `Bytes<'a>` by calling `as_borrowed()`.
 /// The `as_borrowed()` method is passed on through wrapper types, for example `MqttString`.
 pub enum Bytes<'a> {
-    /// Owned variant, only available with the `std` or `alloc` feature enabled.
+    /// Owned variant, only available with the `alloc` feature enabled.
     #[cfg(feature = "alloc")]
     Owned(Box<[u8]>),
 

@@ -12,17 +12,19 @@ pub enum ReadError<E> {
     UnexpectedEOF,
     MalformedPacket,
     ProtocolError,
+    InvalidTopicName,
 }
 
 impl<E, B: fmt::Debug> From<BodyReadError<E, B>> for ReadError<BodyReadError<E, B>> {
     fn from(e: BodyReadError<E, B>) -> Self {
         match e {
-            e @ BodyReadError::InsufficientRemainingLen => ReadError::Read(e),
-            e @ BodyReadError::Read(_) => ReadError::Read(e),
-            e @ BodyReadError::Buffer(_) => ReadError::Read(e),
-            BodyReadError::UnexpectedEOF => ReadError::UnexpectedEOF,
-            BodyReadError::MalformedPacket => ReadError::MalformedPacket,
-            BodyReadError::ProtocolError => ReadError::ProtocolError,
+            e @ BodyReadError::InsufficientRemainingLen => Self::Read(e),
+            e @ BodyReadError::Read(_) => Self::Read(e),
+            e @ BodyReadError::Buffer(_) => Self::Read(e),
+            BodyReadError::UnexpectedEOF => Self::UnexpectedEOF,
+            BodyReadError::MalformedPacket => Self::MalformedPacket,
+            BodyReadError::ProtocolError => Self::ProtocolError,
+            BodyReadError::InvalidTopicName => Self::InvalidTopicName,
         }
     }
 }
@@ -46,6 +48,7 @@ pub enum BodyReadError<E, B: fmt::Debug> {
 
     MalformedPacket,
     ProtocolError,
+    InvalidTopicName,
 }
 impl<E: fmt::Debug, B: fmt::Debug> Display for BodyReadError<E, B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -61,6 +64,7 @@ impl<E: Error, B: fmt::Debug> Error for BodyReadError<E, B> {
             Self::InsufficientRemainingLen => None,
             Self::MalformedPacket => None,
             Self::ProtocolError => None,
+            Self::InvalidTopicName => None,
         }
     }
 }
@@ -73,6 +77,7 @@ impl<E: eio::Error, B: fmt::Debug> eio::Error for BodyReadError<E, B> {
             Self::InsufficientRemainingLen => ErrorKind::InvalidData,
             Self::MalformedPacket => ErrorKind::InvalidData,
             Self::ProtocolError => ErrorKind::InvalidData,
+            Self::InvalidTopicName => ErrorKind::InvalidData,
         }
     }
 }
@@ -97,6 +102,7 @@ impl<E, B: fmt::Debug> From<ReadError<E>> for BodyReadError<E, B> {
             ReadError::UnexpectedEOF => Self::UnexpectedEOF,
             ReadError::MalformedPacket => Self::MalformedPacket,
             ReadError::ProtocolError => Self::ProtocolError,
+            ReadError::InvalidTopicName => Self::InvalidTopicName,
         }
     }
 }

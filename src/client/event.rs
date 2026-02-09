@@ -4,7 +4,7 @@ use heapless::Vec;
 
 use crate::{
     bytes::Bytes,
-    types::{IdentifiedQoS, MqttString, ReasonCode, VarByteInt},
+    types::{IdentifiedQoS, MqttBinary, ReasonCode, TopicName, VarByteInt},
 };
 
 /// Events emitted by the client when receiving an MQTT packet.
@@ -128,15 +128,24 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
 
     /// The message expiry interval in seconds.
     /// This is calculated by subtracting the elapsed time since the publish from the message expiry
-    /// interval in original publication
+    /// interval in original publication.
     pub message_expiry_interval: Option<u32>,
 
     /// The subscription identifiers in the PUBLISH packet. If the vector is full, this list might not
     /// be exhaustive.
     pub subscription_identifiers: Vec<VarByteInt, MAX_SUBSCRIPTION_IDENTIFIERS>,
 
+    /// Identifies an incoming publication as a request and specifies the topic which the response should
+    /// be published on.
+    pub response_topic: Option<TopicName<'p>>,
+
+    /// Present in incoming requests and responses. In either case this is arbitrary binary data used for
+    /// associating either the following response with this specific request or in case of a response,
+    /// link back to the original request.
+    pub correlation_data: Option<MqttBinary<'p>>,
+
     /// The exact topic of this publication.
-    pub topic: MqttString<'p>,
+    pub topic: TopicName<'p>,
 
     /// The application message of this publication.
     pub message: Bytes<'p>,

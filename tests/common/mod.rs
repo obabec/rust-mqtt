@@ -35,6 +35,7 @@ pub const NO_SESSION_CONNECT_OPTIONS: &ConnectOptions<'static> = &ConnectOptions
     clean_start: true,
     keep_alive: KeepAlive::Infinite,
     session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
+    request_response_information: false,
     user_name: Some(USERNAME),
     password: Some(PASSWORD),
     will: None,

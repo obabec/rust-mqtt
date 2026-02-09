@@ -1,4 +1,6 @@
-use crate::types::{QoS, TopicName};
+use const_fn::const_fn;
+
+use crate::types::{MqttBinary, QoS, TopicName};
 
 /// Options for a publication.
 #[derive(Debug, Clone)]
@@ -26,9 +28,66 @@ pub struct Options<'p> {
     /// to subscribed clients is the minimum of this value and the quality of service
     /// value of the receiving client's subscription.
     pub qos: QoS,
+
+    /// The topic on which the receiver should publish the response.
+    pub response_topic: Option<TopicName<'p>>,
+
+    /// Arbitrary binary data which the receiver should attach in the response to associate
+    /// their response with this request.
+    pub correlation_data: Option<MqttBinary<'p>>,
 }
 
-/// The options for specifiying which topic to publish to. Topic aliases only last for the
+impl<'p> Options<'p> {
+    /// Creates options with values coherent to the `Default` implementations of the fields and `QoS::AtMostOnce`.
+    pub const fn new(topic: TopicReference<'p>) -> Options<'p> {
+        Options {
+            retain: false,
+            message_expiry_interval: None,
+            topic,
+            qos: QoS::AtMostOnce,
+            response_topic: None,
+            correlation_data: None,
+        }
+    }
+
+    /// Sets the Quality of Service level.
+    pub const fn qos(mut self, qos: QoS) -> Self {
+        self.qos = qos;
+        self
+    }
+    /// Sets the Quality of Service level to 1 (At Least Once).
+    pub const fn at_least_once(self) -> Self {
+        self.qos(QoS::AtLeastOnce)
+    }
+    /// Sets the Quality of Service level to 1 (Exactly Once).
+    pub const fn exactly_once(self) -> Self {
+        self.qos(QoS::ExactlyOnce)
+    }
+    /// Sets the retain flag to true.
+    pub const fn retain(mut self) -> Self {
+        self.retain = true;
+        self
+    }
+    /// Sets the message expiry interval in seconds.
+    pub const fn message_expiry_interval(mut self, seconds: u32) -> Self {
+        self.message_expiry_interval = Some(seconds);
+        self
+    }
+    /// Marks the publication as a request by setting the response topic property.
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub const fn response_topic(mut self, topic: TopicName<'p>) -> Self {
+        self.response_topic = Some(topic);
+        self
+    }
+    /// Sets the correlation data property in the request.
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub const fn correlation_data(mut self, data: MqttBinary<'p>) -> Self {
+        self.correlation_data = Some(data);
+        self
+    }
+}
+
+/// The options for specifying which topic to publish to. Topic aliases only last for the
 /// duration of a single network connection and not necessarily until the session end.
 ///
 /// Topic aliases must not be 0
