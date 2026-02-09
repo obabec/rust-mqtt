@@ -114,10 +114,10 @@ impl<'s> MqttString<'s> {
     /// Valid length is guaranteed by `MqttBinary`'s invariant.
     #[const_fn(cfg(not(feature = "alloc")))]
     pub const fn from_utf8_binary(b: MqttBinary<'s>) -> Result<Self, MqttStringError> {
-        for b in b.as_bytes() {
-            if *b == 0 {
-                return Err(MqttStringError::NullCharacter);
-            }
+        let mut i = 0;
+        while i < b.as_bytes().len() {
+            debug_assert!(b.as_bytes()[i] != 0);
+            i += 1;
         }
 
         match from_utf8(b.as_bytes()) {
