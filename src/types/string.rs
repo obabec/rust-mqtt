@@ -33,7 +33,8 @@ impl From<TooLargeToEncode> for MqttStringError {
 }
 
 /// Arbitrary UTF-8 encoded string with a length in bytes less than or equal to `MqttString::MAX_LENGTH`
-/// and no null characters.
+/// (`u16::MAX`) and no null characters.
+/// Exceeding this size ultimately leads to malformed packets.
 ///
 /// # Examples
 ///

@@ -7,7 +7,8 @@ use crate::{
     types::{MqttString, TooLargeToEncode},
 };
 
-/// Arbitrary binary data with a length less than or equal to `MqttBinary::MAX_LENGTH`.
+/// Arbitrary binary data with a length less than or equal to `MqttBinary::MAX_LENGTH` (`u16::MAX`).
+/// Exceeding this size ultimately leads to malformed packets.
 ///
 /// # Examples
 ///
