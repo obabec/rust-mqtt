@@ -91,7 +91,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> 
 
         // Invariant: Max length = 5 < VarByteInt::MAX_ENCODABLE
         // subscription identifier: 5
-        VarByteInt::new(len as u32)
+        VarByteInt::new_unchecked(len as u32)
     }
 }
 
@@ -194,7 +194,7 @@ mod unit {
 
         let packet: SubscribePacket<'_, 10> = SubscribePacket::new(
             23197,
-            Some(VarByteInt::try_from(87986078u32).unwrap()),
+            Some(VarByteInt::new(87986078u32).unwrap()),
             topics,
         )
         .unwrap();

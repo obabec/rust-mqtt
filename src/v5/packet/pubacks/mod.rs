@@ -135,7 +135,7 @@ impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
         // properties length: 4
         // properties: 65538
         // variable header: 3
-        VarByteInt::new(total_length as u32)
+        VarByteInt::new_unchecked(total_length as u32)
     }
 
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
@@ -148,11 +148,11 @@ impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
         match &self.reason_string {
             // Invariant: reason string length 65537 < VarByteInt::MAX_ENCODABLE
             Some(r) => {
-                VarByteInt::new(r.written_len() as u32).write(write).await?;
+                VarByteInt::new_unchecked(r.written_len() as u32).write(write).await?;
                 r.write(write).await?;
             }
             // Invariant: 0 < VarByteInt::MAX_ENCODABLE
-            None => VarByteInt::new(0).write(write).await?,
+            None => VarByteInt::new_unchecked(0).write(write).await?,
         }
 
         Ok(())
@@ -173,7 +173,7 @@ impl<'p, T: PubackPacketType> GenericPubackPacket<'p, T> {
         let len = self.reason_string.written_len();
 
         // Invariant: Max length of reason string is 65538 < VarByteInt::MAX_ENCODABLE
-        VarByteInt::new(len as u32)
+        VarByteInt::new_unchecked(len as u32)
     }
 }
 

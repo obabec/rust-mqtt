@@ -1,89 +1,41 @@
-use crate::{
-    eio::{Read, Write},
-    fmt::unreachable,
-    io::{
-        err::{ReadError, WriteError},
-        read::Readable,
-        write::Writable,
-    },
-    types::TooLargeToEncode,
-};
+use crate::types::TooLargeToEncode;
 
-/// MQTT's variable byte integer encoding. Mainly used for packet length, but also throughout some properties.
+/// MQTT's variable byte integer encoding. The value has to be less than `VarByteInt::MAX_ENCODABLE`
+/// (268_435_455). Exceeding this ultimately leads to panics or malformed packets.
+///
+/// Used for packet length and some properties.
 ///
 /// Use its `TryFrom<u32>`, `From<u16>` and `From<u8>` implementations to construct a value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct VarByteInt(u32);
 
-impl<R: Read> Readable<R> for VarByteInt {
-    async fn read(net: &mut R) -> Result<Self, ReadError<R::Error>> {
-        let mut multiplier = 1;
-        let mut value = 0;
-
-        loop {
-            let byte = u8::read(net).await?;
-
-            value += (byte & 0x7F) as u32 * multiplier;
-            if multiplier > 128 * 128 * 128 {
-                return Err(ReadError::MalformedPacket);
-            }
-            multiplier *= 128;
-            if byte & 128 == 0 {
-                break;
-            }
-        }
-
-        Ok(Self(value))
-    }
-}
-
-impl Writable for VarByteInt {
-    fn written_len(&self) -> usize {
-        match self.0 {
-            0..=127 => 1,
-            128..=16_383 => 2,
-            16_384..=2_097_151 => 3,
-            2_097_152..=Self::MAX_ENCODABLE => 4,
-            _ => unreachable!(
-                "Invariant, never occurs if VarByteInts are generated using From and TryFrom"
-            ),
-        }
-    }
-
-    async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
-        let mut x = self.0;
-        let mut encoded_byte: u8;
-
-        loop {
-            encoded_byte = (x % 128) as u8;
-            x /= 128;
-
-            if x > 0 {
-                encoded_byte |= 128;
-            }
-            encoded_byte.write(write).await?;
-
-            if x == 0 {
-                return Ok(());
-            }
-        }
-    }
-}
-
 impl VarByteInt {
-    /// The maximum encodable value using the variable byte integer encoding according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901011>.
+    /// The maximum encodable value using the variable byte integer encoding according to
+    /// <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901011>.
     pub const MAX_ENCODABLE: u32 = 268_435_455;
 
-    /// Creates a variable byte integer without checking for the `VarByteInt::MAX_ENCODABLE` invariant.
+    /// Creates a variable byte integer by checking for the maximum value of [`VarByteInt::MAX_ENCODABLE`].
+    /// For a version accepting `u16` and `u8`, use `From::from`.
+    pub const fn new(value: u32) -> Option<Self> {
+        if value > Self::MAX_ENCODABLE {
+            None
+        } else {
+            Some(Self(value))
+        }
+    }
+
+    /// Creates a variable byte integer without checking for the maximum value of
+    /// `VarByteInt::MAX_ENCODABLE`.
+    /// For a fallible version, use `VarByteInt::new`.
+    /// For an infallible version accepting `u16` and `u8`, use `From::from`.
     ///
     /// # Invariants
     /// The value parameter must be less than or equal to [`VarByteInt::MAX_ENCODABLE`].
-    /// For a fallible version, use `TryFrom<u32>`
     ///
     /// # Panics
     /// Panics in debug builds if `value` exceeds [`VarByteInt::MAX_ENCODABLE`]
-    pub const fn new(value: u32) -> Self {
+    pub const fn new_unchecked(value: u32) -> Self {
         debug_assert!(
             value <= Self::MAX_ENCODABLE,
             "the value exceeds MAX_ENCODABLE"
@@ -105,8 +57,8 @@ impl VarByteInt {
     /// Decodes a variable byte integer from a slice.
     ///
     /// # Invariants
-    /// The slice must contain a correctly encoded variable byte integer and is
-    /// has exactly the length of that encoding.
+    /// The slice must contain a correctly encoded variable byte integer and
+    /// have exactly the length of that encoding.
     pub(crate) fn from_slice_unchecked(slice: &[u8]) -> Self {
         let mut multiplier = 1;
         let mut value = 0;
@@ -131,7 +83,7 @@ impl VarByteInt {
             }
         }
 
-        Self::new(value)
+        Self::new_unchecked(value)
     }
 }
 
@@ -139,11 +91,7 @@ impl TryFrom<u32> for VarByteInt {
     type Error = TooLargeToEncode;
 
     fn try_from(value: u32) -> Result<Self, Self::Error> {
-        if value > Self::MAX_ENCODABLE {
-            Err(TooLargeToEncode)
-        } else {
-            Ok(Self(value))
-        }
+        Self::new(value).ok_or(TooLargeToEncode)
     }
 }
 impl From<u16> for VarByteInt {

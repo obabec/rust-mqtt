@@ -1,7 +1,7 @@
 use crate::{
     eio::Write,
     io::err::WriteError,
-    types::{MqttBinary, MqttString, TopicName},
+    types::{MqttBinary, MqttString, TopicName, VarByteInt},
 };
 
 pub trait Writable {
@@ -78,6 +78,38 @@ impl Writable for bool {
 
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
         <Self as Into<u8>>::into(*self).write(write).await
+    }
+}
+impl Writable for VarByteInt {
+    fn written_len(&self) -> usize {
+        match self.value() {
+            0..=127 => 1,
+            128..=16_383 => 2,
+            16_384..=2_097_151 => 3,
+            2_097_152..=Self::MAX_ENCODABLE => 4,
+            _ => unreachable!(
+                "Invariant, never occurs if VarByteInts are generated using From, TryFrom and new"
+            ),
+        }
+    }
+
+    async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
+        let mut x = self.value();
+        let mut encoded_byte: u8;
+
+        loop {
+            encoded_byte = (x % 128) as u8;
+            x /= 128;
+
+            if x > 0 {
+                encoded_byte |= 128;
+            }
+            encoded_byte.write(write).await?;
+
+            if x == 0 {
+                return Ok(());
+            }
+        }
     }
 }
 impl<'b> Writable for MqttBinary<'b> {

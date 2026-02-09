@@ -193,7 +193,7 @@ mod unit {
                 h,
                 FixedHeader {
                     type_and_flags: 0x10,
-                    remaining_len: VarByteInt::try_from(VarByteInt::MAX_ENCODABLE).unwrap(),
+                    remaining_len: VarByteInt::new(VarByteInt::MAX_ENCODABLE).unwrap(),
                 }
             );
         };
@@ -230,7 +230,7 @@ mod unit {
                 h,
                 FixedHeader {
                     type_and_flags: 0x10,
-                    remaining_len: VarByteInt::try_from(2_097_151u32).unwrap(),
+                    remaining_len: VarByteInt::new(2_097_151u32).unwrap(),
                 }
             );
 

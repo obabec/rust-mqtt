@@ -175,7 +175,7 @@ impl<'p> TxPacket for DisconnectPacket<'p> {
         // variable header (reason_code): 1
         // properties length: 4
         // properties: 131081
-        VarByteInt::new(total_length as u32)
+        VarByteInt::new_unchecked(total_length as u32)
     }
 }
 
@@ -207,7 +207,7 @@ impl<'p> DisconnectPacket<'p> {
         // session expiry interval: 5
         // reason string: 65538
         // server reference: 65538
-        VarByteInt::new(len as u32)
+        VarByteInt::new_unchecked(len as u32)
     }
 }
 

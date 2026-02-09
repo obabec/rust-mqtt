@@ -323,7 +323,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
         // response topic: 65538
         // correlation data: 65538
         // content type: 65538
-        VarByteInt::new(len as u32)
+        VarByteInt::new_unchecked(len as u32)
     }
 }
 
