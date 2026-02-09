@@ -20,7 +20,7 @@ impl<'b> fmt::Debug for MqttBinary<'b> {
 #[cfg(feature = "defmt")]
 impl<'a> defmt::Format for MqttBinary<'a> {
     fn format(&self, fmt: defmt::Formatter) {
-        defmt::write!(fmt, "MqttBinary({:?}", self.as_ref());
+        defmt::write!(fmt, "MqttBinary({:?})", self.as_ref());
     }
 }
 

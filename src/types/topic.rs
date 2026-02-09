@@ -23,8 +23,8 @@ use crate::{
 pub struct TopicName<'t>(MqttString<'t>);
 
 impl<'t> TopicName<'t> {
-    const fn is_valid(s: &str) -> bool {
-        let s = s.as_bytes();
+    const fn is_valid(s: &MqttString) -> bool {
+        let s = s.as_str().as_bytes();
 
         // [MQTT-4.7.3-1]
         // Topic names must be at least one character long.
@@ -39,9 +39,7 @@ impl<'t> TopicName<'t> {
 
             // [MQTT-4.7.3-2]
             // Topic names must not include the null character.
-            if b == b'\0' {
-                return false;
-            }
+            // No null characters are an invariant of `MqttString`
 
             // [MQTT-4.7.0-1]
             // Wildcard characters must not be used within a topic name.
@@ -58,7 +56,7 @@ impl<'t> TopicName<'t> {
     /// Creates a new topic name while checking for correct syntax of the topic name string.
     #[const_fn(cfg(not(feature = "alloc")))]
     pub fn new(string: MqttString<'t>) -> Option<Self> {
-        if Self::is_valid(string.as_str()) {
+        if Self::is_valid(&string) {
             Some(Self(string))
         } else {
             None
@@ -68,13 +66,13 @@ impl<'t> TopicName<'t> {
     /// Creates a new topic name without checking for correct syntax of the topic name string.
     ///
     /// # Invariants
-    /// The syntax of the topic name is valid. For a fallible version, use [`TopicName::new_checked`]
+    /// The syntax of the topic name is valid. For a fallible version, use [`TopicName::new`]
     ///
     /// # Panics
     /// In debug builds, this function will panic if the syntax of `string` is incorrect.
     pub const fn new_unchecked(string: MqttString<'t>) -> Self {
         debug_assert!(
-            Self::is_valid(string.as_str()),
+            Self::is_valid(&string),
             "the provided string is not valid TopicName syntax"
         );
 
@@ -110,8 +108,8 @@ impl<'t> From<TopicName<'t>> for MqttString<'t> {
 pub struct TopicFilter<'t>(MqttString<'t>);
 
 impl<'t> TopicFilter<'t> {
-    const fn is_valid(s: &str) -> bool {
-        let s = s.as_bytes();
+    const fn is_valid(s: &MqttString) -> bool {
+        let s = s.as_str().as_bytes();
 
         // [MQTT-4.7.3-1]
         // Topic filters must be at least one character long.
@@ -128,9 +126,7 @@ impl<'t> TopicFilter<'t> {
 
             // [MQTT-4.7.3-2]
             // Topic filters must not include the null character.
-            if b == b'\0' {
-                return false;
-            }
+            // No null characters are an invariant of `MqttString`
 
             if b == b'#' {
                 // [MQTT-4.7.1-1]
@@ -171,7 +167,7 @@ impl<'t> TopicFilter<'t> {
     /// Creates a new topic filter while checking for correct syntax of the topic filter string
     #[const_fn(cfg(not(feature = "alloc")))]
     pub fn new(string: MqttString<'t>) -> Option<Self> {
-        if Self::is_valid(string.as_str()) {
+        if Self::is_valid(&string) {
             Some(Self(string))
         } else {
             None
@@ -181,13 +177,13 @@ impl<'t> TopicFilter<'t> {
     /// Creates a new topic filter without checking for correct syntax of the topic filter string.
     ///
     /// # Invariants
-    /// The syntax of the topic filter is valid. For a fallible version, use [`TopicFilter::new_checked`].
+    /// The syntax of the topic filter is valid. For a fallible version, use [`TopicFilter::new`].
     ///
     /// # Panics
     /// In debug builds, this function will panic if the syntax of `string` is incorrect.
     pub const fn new_unchecked(string: MqttString<'t>) -> Self {
         debug_assert!(
-            Self::is_valid(string.as_str()),
+            Self::is_valid(&string),
             "the provided string is not valid TopicFilter syntax"
         );
 
@@ -287,8 +283,10 @@ mod unit {
     }
     macro_rules! assert_invalid {
         ($t:ty, $l:literal) => {
-            let s = assert_ok!(MqttString::from_str($l));
-            assert!(<$t>::new(s).is_none())
+            match MqttString::from_str($l) {
+                Ok(s) => assert!(<$t>::new(s).is_none()),
+                Err(_) => {}
+            }
         };
     }
 
