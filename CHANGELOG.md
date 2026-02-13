@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Change the type of `WillOptions`'s `will_topic` and `Publish`'s `topic` from `MqttString` to `TopicName`
 - Improve constructor naming & safety in `types` module
 - Add null character invariant to `MqttString`
+- Add `FixedHeader` and `PacketType` to public API
+- Remove `Raw`-related types from public API
 
 ## 0.4.1 - 2026-01-06
 
