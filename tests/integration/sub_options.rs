@@ -57,7 +57,7 @@ async fn subscribe_retain_handling_default() {
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     // Receiver client with specific ID to test session behavior
-    let rx_id = MqttString::new("RETAIN_HANDLING_DEFAULT_RECEIVER".into()).unwrap();
+    let rx_id = MqttString::from_str("RETAIN_HANDLING_DEFAULT_RECEIVER").unwrap();
     let mut rx = assert_ok!(
         connected_client(
             BROKER_ADDRESS,
@@ -122,7 +122,7 @@ async fn subscribe_retain_handling_never() {
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let rx_id = MqttString::new("RETAIN_HANDLING_NEVER_RECEIVER".into()).unwrap();
+    let rx_id = MqttString::from_str("RETAIN_HANDLING_NEVER_RECEIVER").unwrap();
     let mut rx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, Some(rx_id)).await);
 
@@ -172,7 +172,7 @@ async fn subscribe_retain_handling_clean_only() {
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let rx_id = MqttString::new("RETAIN_HANDLING_CLEAN_ONLY_RECEIVER".into()).unwrap();
+    let rx_id = MqttString::from_str("RETAIN_HANDLING_CLEAN_ONLY_RECEIVER").unwrap();
     let mut rx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, Some(rx_id)).await);
 

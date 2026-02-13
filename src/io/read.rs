@@ -1,4 +1,4 @@
-use core::{cmp::min, marker::PhantomData};
+use core::{cmp::min, hint::unreachable_unchecked, marker::PhantomData};
 
 use crate::{
     buffer::BufferProvider,
@@ -6,7 +6,7 @@ use crate::{
     eio::{ErrorType, Read},
     fmt::trace,
     io::err::{BodyReadError, ReadError},
-    types::{MqttBinary, MqttString, TopicName},
+    types::{MqttBinary, MqttString, TopicName, VarByteInt},
 };
 
 pub trait Readable<R: Read>: Sized {
@@ -56,6 +56,35 @@ impl<R: Read> Readable<R> for bool {
         }
     }
 }
+impl<R: Read> Readable<R> for VarByteInt {
+    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
+        let mut i = 0;
+        let mut buffer = [0; 4];
+
+        loop {
+            match read.read(&mut buffer[i..(i + 1)]).await {
+                Ok(0) => return Err(ReadError::UnexpectedEOF),
+                Ok(1) => {}
+                Ok(_) => unsafe { unreachable_unchecked() },
+                Err(e) => return Err(ReadError::Read(e)),
+            }
+
+            let is_continuation_byte = buffer[i] >= 128;
+            if is_continuation_byte {
+                if i == 3 {
+                    return Err(ReadError::MalformedPacket);
+                }
+                i += 1;
+            } else {
+                let slice = &buffer[0..=i];
+
+                // Invariant: We checked that the slice is within the valid length range and
+                // that the last byte matches the end condition of the variable byte integer encoding
+                break Ok(VarByteInt::from_slice_unchecked(slice));
+            }
+        }
+    }
+}
 impl<'b, R: Read + Store<'b>> Readable<R> for MqttBinary<'b> {
     async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         let len = u16::read(read).await? as usize;
@@ -77,7 +106,7 @@ impl<'s, R: Read + Store<'s>> Readable<R> for TopicName<'s> {
     async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         let str = MqttString::read(read).await?;
 
-        TopicName::new_checked(str).ok_or(ReadError::InvalidTopicName)
+        TopicName::new(str).ok_or(ReadError::InvalidTopicName)
     }
 }
 
@@ -167,7 +196,9 @@ mod unit {
     mod readable {
         use tokio_test::{assert_err, assert_ok};
 
-        use crate::{io::err::ReadError, io::read::Readable, test::read::SliceReader};
+        use crate::{
+            io::err::ReadError, io::read::Readable, test::read::SliceReader, types::VarByteInt,
+        };
 
         #[tokio::test]
         #[test_log::test]
@@ -219,6 +250,50 @@ mod unit {
 
         #[tokio::test]
         #[test_log::test]
+        async fn read_var_byte_int() {
+            let mut r = SliceReader::new(&[0x00]);
+            let v = assert_ok!(VarByteInt::read(&mut r).await);
+            assert_eq!(v.value(), 0);
+
+            let mut r = SliceReader::new(&[0x7F]);
+            let v = assert_ok!(VarByteInt::read(&mut r).await);
+            assert_eq!(v.value(), 127);
+
+            let mut r = SliceReader::new(&[0x80, 0x01]);
+            let v = assert_ok!(VarByteInt::read(&mut r).await);
+            assert_eq!(v.value(), 128);
+
+            let mut r = SliceReader::new(&[0xFF, 0x7F]);
+            let v = assert_ok!(VarByteInt::read(&mut r).await);
+            assert_eq!(v.value(), 16_383);
+
+            let mut r = SliceReader::new(&[0x80, 0x80, 0x01]);
+            let v = assert_ok!(VarByteInt::read(&mut r).await);
+            assert_eq!(v.value(), 16_384);
+
+            let mut r = SliceReader::new(&[0xFF, 0xFF, 0x7F]);
+            let v = assert_ok!(VarByteInt::read(&mut r).await);
+            assert_eq!(v.value(), 2_097_151);
+
+            let mut r = SliceReader::new(&[0x80, 0x80, 0x80, 0x01]);
+            let v = assert_ok!(VarByteInt::read(&mut r).await);
+            assert_eq!(v.value(), 2_097_152);
+
+            let mut r = SliceReader::new(&[0xFF, 0xFF, 0xFF, 0x7F]);
+            let v = assert_ok!(VarByteInt::read(&mut r).await);
+            assert_eq!(v.value(), VarByteInt::MAX_ENCODABLE);
+
+            let mut r = SliceReader::new(&[0x80, 0x80, 0x80, 0x80, 0x01]);
+            let res = VarByteInt::read(&mut r).await;
+            assert!(matches!(res, Err(ReadError::MalformedPacket)));
+
+            let mut r = SliceReader::new(&[0x80, 0x80, 0x80, 0x80]);
+            let res = VarByteInt::read(&mut r).await;
+            assert!(matches!(res, Err(ReadError::MalformedPacket)));
+        }
+
+        #[tokio::test]
+        #[test_log::test]
         async fn read_eof() {
             let mut r = SliceReader::new(b"abcdefghijklmno");
             let e = assert_err!(<[u8; 16]>::read(&mut r).await);
@@ -234,6 +309,14 @@ mod unit {
 
             let mut r = SliceReader::new(b"\x00\x00\x00");
             let e = assert_err!(u32::read(&mut r).await);
+            assert_eq!(e, ReadError::UnexpectedEOF);
+
+            let mut r = SliceReader::new(&[]);
+            let e = assert_err!(VarByteInt::read(&mut r).await);
+            assert_eq!(e, ReadError::UnexpectedEOF);
+
+            let mut r = SliceReader::new(&[0x80]);
+            let e = assert_err!(VarByteInt::read(&mut r).await);
             assert_eq!(e, ReadError::UnexpectedEOF);
         }
     }
@@ -252,7 +335,7 @@ mod unit {
                 read::{BodyReader, Readable},
             },
             test::read::SliceReader,
-            types::{MqttBinary, MqttString},
+            types::{MqttBinary, MqttString, VarByteInt},
         };
 
         #[tokio::test]
@@ -361,6 +444,22 @@ mod unit {
 
         #[tokio::test]
         #[test_log::test]
+        async fn read_var_byte_int() {
+            let mut s = SliceReader::new(&[0x80, 0x01]);
+            #[cfg(feature = "alloc")]
+            let mut b = AllocBuffer;
+            #[cfg(feature = "bump")]
+            let mut b = [0; 64];
+            #[cfg(feature = "bump")]
+            let mut b = BumpBuffer::new(&mut b);
+
+            let mut r = BodyReader::new(&mut s, &mut b, 2);
+            let v = assert_ok!(VarByteInt::read(&mut r).await);
+            assert_eq!(v.value(), 128);
+        }
+
+        #[tokio::test]
+        #[test_log::test]
         async fn read_binary() {
             let mut s = SliceReader::new(&[0x00, 0x05, 0x01, 0x02, 0x03, 0x04, 0xFF]);
             #[cfg(feature = "alloc")]
@@ -403,6 +502,7 @@ mod unit {
                     0x01, 0x02,                              // u16
                     0x01,                                    // bool (true)
                     0xDE, 0xAD, 0xBE, 0xEF,                  // u32
+                    0x80, 0x01,                              // varbyteint
                     0x00, 0x03, 0xAA, 0xBB, 0xCC,            // binary
                     0x00, 0x04, b't', b'e', b's', b't',      // string
                     0x11, 0x22, 0x33,                        // array[3]
@@ -415,7 +515,7 @@ mod unit {
             #[cfg(feature = "bump")]
             let mut b = BumpBuffer::new(&mut b);
 
-            let mut r = BodyReader::new(&mut s, &mut b, 22);
+            let mut r = BodyReader::new(&mut s, &mut b, 24);
 
             let v_u8 = assert_ok!(u8::read(&mut r).await);
             assert_eq!(v_u8, 0x42);
@@ -428,6 +528,9 @@ mod unit {
 
             let v_u32 = assert_ok!(u32::read(&mut r).await);
             assert_eq!(v_u32, 0xDEADBEEF);
+
+            let v_varbyteint = assert_ok!(VarByteInt::read(&mut r).await);
+            assert_eq!(v_varbyteint.value(), 128);
 
             let v_binary = assert_ok!(MqttBinary::read(&mut r).await);
             assert_eq!(v_binary.as_ref(), &[0xAA, 0xBB, 0xCC]);
@@ -464,6 +567,18 @@ mod unit {
 
             let mut r = BodyReader::new(&mut s, &mut b, 1);
             let e = assert_err!(u8::read(&mut r).await);
+            assert_eq!(e, ReadError::UnexpectedEOF);
+
+            let mut s = SliceReader::new(b"\x80");
+            #[cfg(feature = "alloc")]
+            let mut b = AllocBuffer;
+            #[cfg(feature = "bump")]
+            let mut b = [0; 64];
+            #[cfg(feature = "bump")]
+            let mut b = BumpBuffer::new(&mut b);
+
+            let mut r = BodyReader::new(&mut s, &mut b, 2);
+            let e = assert_err!(VarByteInt::read(&mut r).await);
             assert_eq!(e, ReadError::UnexpectedEOF);
 
             let mut s = SliceReader::new(b"\x00");
@@ -649,6 +764,34 @@ mod unit {
 
             let mut r = BodyReader::new(&mut s, &mut b, 3);
             let e = assert_err!(u32::read(&mut r).await);
+            assert_eq!(e, ReadError::Read(BodyReadError::InsufficientRemainingLen));
+        }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn read_insufficient_remaining_len_var_byte_int() {
+            let mut s = SliceReader::new(b"");
+            #[cfg(feature = "alloc")]
+            let mut b = AllocBuffer;
+            #[cfg(feature = "bump")]
+            let mut b = [0; 64];
+            #[cfg(feature = "bump")]
+            let mut b = BumpBuffer::new(&mut b);
+
+            let mut r = BodyReader::new(&mut s, &mut b, 0);
+            let e = assert_err!(VarByteInt::read(&mut r).await);
+            assert_eq!(e, ReadError::Read(BodyReadError::InsufficientRemainingLen));
+
+            let mut s = SliceReader::new(b"\x80");
+            #[cfg(feature = "alloc")]
+            let mut b = AllocBuffer;
+            #[cfg(feature = "bump")]
+            let mut b = [0; 64];
+            #[cfg(feature = "bump")]
+            let mut b = BumpBuffer::new(&mut b);
+
+            let mut r = BodyReader::new(&mut s, &mut b, 1);
+            let e = assert_err!(VarByteInt::read(&mut r).await);
             assert_eq!(e, ReadError::Read(BodyReadError::InsufficientRemainingLen));
         }
 

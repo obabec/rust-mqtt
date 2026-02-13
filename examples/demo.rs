@@ -50,7 +50,7 @@ async fn main() {
                 .password(MqttBinary::try_from("testPass").unwrap())
                 .will(
                     WillOptions::new(
-                        TopicName::new_checked(MqttString::try_from("i/am/dead").unwrap()).unwrap(),
+                        TopicName::new(MqttString::try_from("i/am/dead").unwrap()).unwrap(),
                         MqttBinary::try_from("Have a nice day!").unwrap(),
                     )
                     .exactly_once()
@@ -95,8 +95,7 @@ async fn main() {
         subscription_identifier,
     };
 
-    let topic =
-        TopicName::new_checked(MqttString::from_slice("rust-mqtt/is/great").unwrap()).unwrap();
+    let topic = TopicName::new(MqttString::from_str("rust-mqtt/is/great").unwrap()).unwrap();
 
     match client.subscribe(topic.clone().into(), sub_options).await {
         Ok(_) => info!("Sent Subscribe"),

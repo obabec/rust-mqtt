@@ -28,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add request/response pattern support
 - Add builder pattern to `ConnectOptions`, `DisconnectOptions`, `PublicationOptions`, `SubscriptionOptions` and `WillOptions`
 - Change the type of `WillOptions`'s `will_topic` and `Publish`'s `topic` from `MqttString` to `TopicName`
+- Improve constructor naming & safety in `types` module
+- Add null character invariant to `MqttString`
 
 ## 0.4.1 - 2026-01-06
 

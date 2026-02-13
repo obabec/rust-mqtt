@@ -59,7 +59,7 @@ async fn connect_no_password() {
 async fn connect_wrong_password() {
     let mut options = NO_CREDS_CONNECT_OPTIONS;
     options.user_name = Some(USERNAME);
-    options.password = Some(MqttBinary::new(Bytes::Borrowed(b"wrong password")).unwrap());
+    options.password = Some(MqttBinary::from_bytes(Bytes::Borrowed(b"wrong password")).unwrap());
 
     let r = connected_client(BROKER_ADDRESS, &options, None).await;
 

@@ -91,7 +91,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> 
 
         // Invariant: Max length = 5 < VarByteInt::MAX_ENCODABLE
         // subscription identifier: 5
-        VarByteInt::new(len as u32)
+        VarByteInt::new_unchecked(len as u32)
     }
 }
 
@@ -113,7 +113,7 @@ mod unit {
 
         topics
             .push(SubscriptionFilter::new(
-                TopicFilter::new_checked(MqttString::try_from("test/hello").unwrap()).unwrap(),
+                TopicFilter::new(MqttString::try_from("test/hello").unwrap()).unwrap(),
                 &SubscriptionOptions {
                     retain_handling: RetainHandling::AlwaysSend,
                     retain_as_published: false,
@@ -126,7 +126,7 @@ mod unit {
 
         topics
             .push(SubscriptionFilter::new(
-                TopicFilter::new_checked(MqttString::try_from("asdfjklo/#").unwrap()).unwrap(),
+                TopicFilter::new(MqttString::try_from("asdfjklo/#").unwrap()).unwrap(),
                 &SubscriptionOptions {
                     retain_handling: RetainHandling::NeverSend,
                     retain_as_published: true,
@@ -181,7 +181,7 @@ mod unit {
         let mut topics = Vec::new();
         topics
             .push(SubscriptionFilter::new(
-                TopicFilter::new_checked(MqttString::try_from("abc/+/y").unwrap()).unwrap(),
+                TopicFilter::new(MqttString::try_from("abc/+/y").unwrap()).unwrap(),
                 &SubscriptionOptions {
                     retain_handling: RetainHandling::SendIfNotSubscribedBefore,
                     retain_as_published: true,
@@ -192,12 +192,9 @@ mod unit {
             ))
             .unwrap();
 
-        let packet: SubscribePacket<'_, 10> = SubscribePacket::new(
-            23197,
-            Some(VarByteInt::try_from(87986078u32).unwrap()),
-            topics,
-        )
-        .unwrap();
+        let packet: SubscribePacket<'_, 10> =
+            SubscribePacket::new(23197, Some(VarByteInt::new(87986078u32).unwrap()), topics)
+                .unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [

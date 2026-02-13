@@ -331,7 +331,7 @@ mod unit {
                 FixedHeader::new(
                     PacketType::Unsubscribe,
                     0x00,
-                    VarByteInt::try_from(2_097_152u32).unwrap()
+                    VarByteInt::new(2_097_152u32).unwrap()
                 )
             );
         };
@@ -370,7 +370,7 @@ mod unit {
                 FixedHeader::new(
                     PacketType::Pingresp,
                     0x07,
-                    VarByteInt::try_from(VarByteInt::MAX_ENCODABLE).unwrap()
+                    VarByteInt::new(VarByteInt::MAX_ENCODABLE).unwrap()
                 )
             );
         };
@@ -419,7 +419,7 @@ mod unit {
                 FixedHeader::new(
                     PacketType::Pubrel,
                     0x08,
-                    VarByteInt::try_from(2_097_151u32).unwrap()
+                    VarByteInt::new(2_097_151u32).unwrap()
                 )
             );
         };

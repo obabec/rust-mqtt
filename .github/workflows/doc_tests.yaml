@@ -1,0 +1,15 @@
+on: [pull_request, workflow_dispatch]
+name: Doc Tests
+
+jobs:
+  doc_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install toolchain
+        run: rustup show
+
+      - name: Run doc tests with alloc feature
+        run: RUST_LOG=trace cargo test --doc --features "log" -- --show-output

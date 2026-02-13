@@ -27,9 +27,8 @@ pub type FailingClient<'a> = DefaultClient<'a, FromTokio<FailingTcp>>;
 pub const BROKER_ADDRESS: SocketAddr =
     SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1883));
 
-pub const USERNAME: MqttString<'static> = unsafe { MqttString::from_slice_unchecked("test") };
-pub const PASSWORD: MqttBinary<'static> =
-    unsafe { MqttBinary::from_slice_unchecked("testPass".as_bytes()) };
+pub const USERNAME: MqttString<'static> = MqttString::from_str_unchecked("test");
+pub const PASSWORD: MqttBinary<'static> = MqttBinary::from_slice_unchecked("testPass".as_bytes());
 
 pub const NO_SESSION_CONNECT_OPTIONS: &ConnectOptions<'static> = &ConnectOptions {
     clean_start: true,

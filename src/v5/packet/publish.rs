@@ -70,7 +70,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
         let topic_name = if topic_name.is_empty() {
             None
         } else {
-            Some(TopicName::new_checked(topic_name).ok_or(RxError::InvalidTopicName)?)
+            Some(TopicName::new(topic_name).ok_or(RxError::InvalidTopicName)?)
         };
 
         let identified_qos = match qos {
@@ -250,8 +250,8 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
 impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
     PublishPacket<'p, MAX_SUBSCRIPTION_IDENTIFIERS>
 {
-    // Safety: Empty string does not exceed MqttString::MAX_LENGTH
-    const EMPTY_TOPIC: MqttString<'static> = unsafe { MqttString::from_slice_unchecked("") };
+    // Invariant: Empty string does not exceed MqttString::MAX_LENGTH
+    const EMPTY_TOPIC: MqttString<'static> = MqttString::from_str_unchecked("");
 
     /// Creates a new packet with Quality of Service 0
     #[allow(clippy::too_many_arguments)]
@@ -323,7 +323,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
         // response topic: 65538
         // correlation data: 65538
         // content type: 65538
-        VarByteInt::new(len as u32)
+        VarByteInt::new_unchecked(len as u32)
     }
 }
 
@@ -352,7 +352,7 @@ mod unit {
             IdentifiedQoS::AtLeastOnce(5897),
             None,
             TopicReference::Name(
-                TopicName::new_checked(MqttString::try_from("test/topic").unwrap()).unwrap(),
+                TopicName::new(MqttString::try_from("test/topic").unwrap()).unwrap(),
             ),
             Bytes::from("hello".as_bytes()),
             None,
@@ -397,11 +397,8 @@ mod unit {
             Some(481123u32.into()),
             TopicReference::Alias(23408),
             Bytes::from("hello".as_bytes()),
-            Some(
-                TopicName::new_checked(MqttString::from_slice("uno, dos, tres, catorce").unwrap())
-                    .unwrap(),
-            ),
-            Some(MqttBinary::from_slice(&[0, 1, 2, 3, 4, 5, 6, 7]).unwrap()),
+            Some(TopicName::new(MqttString::from_str("uno, dos, tres, catorce").unwrap()).unwrap()),
+            Some(MqttBinary::from_slice_unchecked(&[0, 1, 2, 3, 4, 5, 6, 7])),
         )
         .unwrap();
 
@@ -457,7 +454,7 @@ mod unit {
         assert_eq!(
             packet.topic,
             TopicReference::Name(
-                TopicName::new_checked(MqttString::try_from("test/topic").unwrap()).unwrap()
+                TopicName::new(MqttString::try_from("test/topic").unwrap()).unwrap()
             )
         );
 
@@ -487,9 +484,7 @@ mod unit {
         assert!(packet.retain);
         assert_eq!(
             packet.topic,
-            TopicReference::Name(
-                TopicName::new_checked(MqttString::try_from("test").unwrap()).unwrap()
-            )
+            TopicReference::Name(TopicName::new(MqttString::try_from("test").unwrap()).unwrap())
         );
         assert!(packet.payload_format_indicator.is_none());
         assert!(packet.message_expiry_interval.is_none());
@@ -548,7 +543,7 @@ mod unit {
         assert_eq!(
             packet.topic,
             TopicReference::Mapping(
-                TopicName::new_checked(MqttString::try_from("test").unwrap()).unwrap(),
+                TopicName::new(MqttString::try_from("test").unwrap()).unwrap(),
                 10,
             )
         );
@@ -565,7 +560,7 @@ mod unit {
         assert_eq!(
             packet.response_topic,
             Some(ResponseTopic(
-                TopicName::new_checked(MqttString::try_from("response/topic").unwrap()).unwrap()
+                TopicName::new(MqttString::try_from("response/topic").unwrap()).unwrap()
             ))
         );
         assert_eq!(

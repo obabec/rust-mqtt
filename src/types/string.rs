@@ -5,12 +5,83 @@ use core::{
 
 use const_fn::const_fn;
 
-use crate::{
-    Bytes,
-    types::{MqttBinary, TooLargeToEncode},
-};
+use crate::types::{MqttBinary, TooLargeToEncode};
 
-/// Arbitrary UTF-8 encoded string with a length in bytes less than or equal to `Self::MAX_LENGTH`
+/// Error returned when creating `MqttString` failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MqttStringError {
+    /// The passed data is not valid UTF-8.
+    Utf8Error(Utf8Error),
+
+    /// The passed data contains at least one null character.
+    NullCharacter,
+
+    /// The passed data exceeds the max length of `MqttString::MAX_LENGTH`.
+    TooLargeToEncode,
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for MqttStringError {
+    fn format(&self, fmt: defmt::Formatter) {
+        match self {
+            Self::Utf8Error(e) => defmt::write!(
+                fmt,
+                "Utf8Error(Utf8Error {{ valid_up_to: {:?}, error_len: {:?} }})",
+                e.valid_up_to(),
+                e.error_len()
+            ),
+            Self::NullCharacter => defmt::write!(fmt, "NullCharacter"),
+            Self::TooLargeToEncode => defmt::write!(fmt, "TooLargeToEncode"),
+        }
+    }
+}
+impl From<Utf8Error> for MqttStringError {
+    fn from(e: Utf8Error) -> Self {
+        Self::Utf8Error(e)
+    }
+}
+impl From<TooLargeToEncode> for MqttStringError {
+    fn from(_: TooLargeToEncode) -> Self {
+        Self::TooLargeToEncode
+    }
+}
+
+/// Arbitrary UTF-8 encoded string with a length in bytes less than or equal to `MqttString::MAX_LENGTH`
+/// (`u16::MAX`) and no null characters.
+/// Exceeding this size ultimately leads to malformed packets.
+///
+/// # Examples
+///
+/// ```rust
+/// use rust_mqtt::types::{MqttBinary, MqttString, MqttStringError};
+///
+/// let bytes = [b'a'; MqttString::MAX_LENGTH];
+/// let too_long = [b'a'; MqttString::MAX_LENGTH + 1];
+/// let null_character = "hi\0there";
+///
+/// let slice = core::str::from_utf8(&bytes)?;
+/// let too_long = core::str::from_utf8(&too_long)?;
+///
+/// let b = MqttBinary::from_slice(&bytes)?;
+/// let s = MqttString::from_utf8_binary(b)?;
+/// assert_eq!(s.as_str(), slice);
+/// let b = MqttBinary::from_slice(null_character.as_bytes())?;
+/// assert_eq!(MqttString::from_utf8_binary(b).unwrap_err(), MqttStringError::NullCharacter);
+///
+/// let s = MqttString::from_str(slice)?;
+/// assert_eq!(s.as_str(), slice);
+/// assert_eq!(MqttString::from_str(too_long).unwrap_err(), MqttStringError::TooLargeToEncode);
+/// assert_eq!(MqttString::from_str(&null_character).unwrap_err(), MqttStringError::NullCharacter);
+///
+/// let s = MqttString::from_str_unchecked(slice);
+/// assert_eq!(s.as_str(), slice);
+///
+/// let b = MqttBinary::from_slice_unchecked(slice.as_bytes());
+/// let s = unsafe { MqttString::from_utf8_binary_unchecked(b) };
+/// assert_eq!(s.as_str(), slice);
+///
+/// # Ok::<(), MqttStringError>(())
+/// ```
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct MqttString<'s>(pub(crate) MqttBinary<'s>);
 
@@ -23,25 +94,22 @@ impl<'s> fmt::Debug for MqttString<'s> {
 #[cfg(feature = "defmt")]
 impl<'a> defmt::Format for MqttString<'a> {
     fn format(&self, fmt: defmt::Formatter) {
-        defmt::write!(fmt, "MqttString({:?}", self.as_ref());
+        defmt::write!(fmt, "MqttString({:?})", self.as_ref());
     }
 }
 
 impl<'s> TryFrom<MqttBinary<'s>> for MqttString<'s> {
-    type Error = Utf8Error;
+    type Error = MqttStringError;
 
     fn try_from(value: MqttBinary<'s>) -> Result<Self, Self::Error> {
-        from_utf8(value.0.as_ref())?;
-        Ok(Self(value))
+        Self::from_utf8_binary(value)
     }
 }
 impl<'s> TryFrom<&'s str> for MqttString<'s> {
-    type Error = TooLargeToEncode;
+    type Error = MqttStringError;
 
     fn try_from(value: &'s str) -> Result<Self, Self::Error> {
-        let binary = MqttBinary::try_from(value.as_bytes())?;
-
-        Ok(Self(binary))
+        Self::from_str(value)
     }
 }
 
@@ -56,45 +124,91 @@ impl<'s> MqttString<'s> {
     /// The maximum length of a string in bytes so that it can be encoded. This value is limited by the 2-byte length field.
     pub const MAX_LENGTH: usize = MqttBinary::MAX_LENGTH;
 
-    /// Creates an MQTT string and checks for the max length in bytes of `Self::MAX_LENGTH`.
-    ///
-    /// # Important
-    /// Does not check that the data is valid UTF-8!
+    /// Converts `MqttBinary` into `MqttString` by checking for null characters and valid UTF-8.
+    /// Valid length is guaranteed by `MqttBinary`'s invariant.
     #[const_fn(cfg(not(feature = "alloc")))]
-    pub const fn new(bytes: Bytes<'s>) -> Result<Self, TooLargeToEncode> {
-        match MqttBinary::new(bytes) {
-            Ok(b) => Ok(Self(b)),
-            Err(e) => Err(e),
+    pub const fn from_utf8_binary(b: MqttBinary<'s>) -> Result<Self, MqttStringError> {
+        let mut i = 0;
+        while i < b.as_bytes().len() {
+            if b.as_bytes()[i] == 0 {
+                return Err(MqttStringError::NullCharacter);
+            }
+            i += 1;
+        }
+
+        match from_utf8(b.as_bytes()) {
+            Ok(_) => Ok(Self(b)),
+            Err(e) => Err(MqttStringError::Utf8Error(e)),
         }
     }
 
-    /// Creates an MQTT string and checks for the max length in bytes of `Self::MAX_LENGTH`.
-    pub const fn from_slice(slice: &'s str) -> Result<Self, TooLargeToEncode> {
-        match slice.len() {
-            // Safety: The length of the slice parameter in bytes is less than or equal to `Self::MAX_LENGTH`.
-            ..=Self::MAX_LENGTH => Ok(Self(unsafe {
-                MqttBinary::from_slice_unchecked(slice.as_bytes())
-            })),
-            _ => Err(TooLargeToEncode),
+    /// Converts `MqttBinary` into `MqttString` without checking for null characters or valid UTF-8.
+    /// Valid length is guaranteed by `MqttBinary`'s invariant.
+    ///
+    /// # Safety
+    ///
+    /// The binary passed in must be valid UTF-8.
+    ///
+    /// # Invariants
+    ///
+    /// The binary data does not contain any null characters.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, this function will panic if the binary contains a null character or is not
+    /// valid UTF-8.
+    pub const unsafe fn from_utf8_binary_unchecked(b: MqttBinary<'s>) -> Self {
+        if cfg!(debug_assertions) {
+            let mut i = 0;
+            while i < b.as_bytes().len() {
+                debug_assert!(b.as_bytes()[i] != 0);
+                i += 1;
+            }
+        }
+        debug_assert!(from_utf8(b.as_bytes()).is_ok());
+
+        Self(b)
+    }
+
+    /// Converts a string slice into `MqttString` by checking for null characters and the max length
+    /// of `MqttString::MAX_LENGTH`.
+    pub const fn from_str(s: &'s str) -> Result<Self, MqttStringError> {
+        let mut i = 0;
+        while i < s.len() {
+            if s.as_bytes()[i] == 0 {
+                return Err(MqttStringError::NullCharacter);
+            }
+            i += 1;
+        }
+
+        match s.len() {
+            ..=Self::MAX_LENGTH => Ok(Self(MqttBinary::from_slice_unchecked(s.as_bytes()))),
+            _ => Err(MqttStringError::TooLargeToEncode),
         }
     }
 
-    /// Creates an MQTT string without checking for the max length in bytes of `Self::MAX_LENGTH`.
+    /// Converts a string slice into `MqttString` without checking for null characters or the max
+    /// length of `MqttString::MAX_LENGTH`.
     ///
-    /// # Safety
-    /// The length of the slice parameter in bytes is less than or equal to `Self::MAX_LENGTH`.
-    pub const unsafe fn new_unchecked(bytes: Bytes<'s>) -> Self {
-        // Safety: The length of the slice parameter in bytes is less than or equal to `Self::MAX_LENGTH`.
-        Self(unsafe { MqttBinary::new_unchecked(bytes) })
-    }
+    /// # Invariants
+    ///
+    /// The length of the string slice must be less than or equal to `MqttString::MAX_LENGTH`. The
+    /// string must not contain any null characters.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, this function will panic if the slice contains a null character or its length is greater
+    /// than `MqttString::MAX_LENGTH`.
+    pub const fn from_str_unchecked(s: &'s str) -> Self {
+        if cfg!(debug_assertions) {
+            let mut i = 0;
+            while i < s.len() {
+                debug_assert!(s.as_bytes()[i] != 0);
+                i += 1;
+            }
+        }
 
-    /// Creates an MQTT string without checking for the max length in bytes of `Self::MAX_LENGTH`.
-    ///
-    /// # Safety
-    /// The length of the slice parameter in bytes is less than or equal to `Self::MAX_LENGTH`.
-    pub const unsafe fn from_slice_unchecked(slice: &'s str) -> Self {
-        // Safety: The length of the slice parameter in bytes is less than or equal to `Self::MAX_LENGTH`.
-        Self(unsafe { MqttBinary::from_slice_unchecked(slice.as_bytes()) })
+        Self(MqttBinary::from_slice_unchecked(s.as_bytes()))
     }
 
     /// Returns the length of the underlying data in bytes.

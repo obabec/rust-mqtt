@@ -91,6 +91,6 @@ impl<'p> Will<'p> {
         // content type: 65538
         // response topic: 65538
         // correlation data: 65538
-        VarByteInt::new(will_properties_length as u32)
+        VarByteInt::new_unchecked(will_properties_length as u32)
     }
 }

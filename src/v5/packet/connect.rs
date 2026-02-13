@@ -68,7 +68,7 @@ impl<'p> TxPacket for ConnectPacket<'p> {
         // will: 2 * 65537 (will topic & will payload)
         // username: 65537
         // password: 65537
-        VarByteInt::new(total_length as u32)
+        VarByteInt::new_unchecked(total_length as u32)
     }
 
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
@@ -169,7 +169,7 @@ impl<'p> ConnectPacket<'p> {
         // request problem information: 2
         // authentication method: 65538
         // authentication data: 65538
-        VarByteInt::new(len as u32)
+        VarByteInt::new_unchecked(len as u32)
     }
 
     pub fn add_user_name(&mut self, user_name: MqttString<'p>) {
@@ -310,7 +310,7 @@ mod unit {
         packet.add_password(MqttBinary::try_from("security!".as_bytes()).unwrap());
         packet.add_will(
             Will {
-                will_topic: TopicName::new_checked(MqttString::try_from("dead").unwrap()).unwrap(),
+                will_topic: TopicName::new(MqttString::try_from("dead").unwrap()).unwrap(),
                 will_delay_interval: Some(WillDelayInterval(234589)),
                 payload_format_indicator: Some(PayloadFormatIndicator(true)),
                 message_expiry_interval: Some(MessageExpiryInterval(84807612)),

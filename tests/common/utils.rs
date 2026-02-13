@@ -10,7 +10,7 @@ use rust_mqtt::{
         event::{Event, Publish, Suback},
         options::{ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions},
     },
-    types::{IdentifiedQoS, MqttString, QoS, ReasonCode, TopicFilter, TopicName},
+    types::{IdentifiedQoS, MqttBinary, MqttString, QoS, ReasonCode, TopicFilter, TopicName},
 };
 use tokio::net::TcpStream;
 
@@ -33,9 +33,12 @@ fn unique_number() -> u64 {
 pub fn unique_topic() -> (TopicName<'static>, TopicFilter<'static>) {
     let s = format!("rust/mqtt/is-amazing/{}", unique_number());
     let b = s.into_bytes().into_boxed_slice();
-    let s = MqttString::new(Bytes::Owned(b)).unwrap();
+    let s = MqttBinary::from_bytes(Bytes::Owned(b))
+        .unwrap()
+        .try_into()
+        .unwrap();
 
-    let n = TopicName::new_checked(s).unwrap();
+    let n = TopicName::new(s).unwrap();
     let f = n.clone().into();
 
     (n, f)

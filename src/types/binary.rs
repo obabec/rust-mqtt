@@ -7,7 +7,34 @@ use crate::{
     types::{MqttString, TooLargeToEncode},
 };
 
-/// Arbitrary binary data with a length less than or equal to `Self::MAX_LENGTH`
+/// Arbitrary binary data with a length less than or equal to `MqttBinary::MAX_LENGTH` (`u16::MAX`).
+/// Exceeding this size ultimately leads to malformed packets.
+///
+/// # Examples
+///
+/// ```rust
+/// use rust_mqtt::Bytes;
+/// use rust_mqtt::types::{MqttBinary, MqttString, TooLargeToEncode};
+///
+/// let slice = [0x00; MqttBinary::MAX_LENGTH];
+/// let too_long = [0x00; MqttBinary::MAX_LENGTH + 1];
+///
+/// let b = MqttBinary::from_slice(&slice)?;
+/// assert_eq!(b.as_bytes(), &slice);
+/// assert!(MqttBinary::from_slice(&too_long).is_err());
+///
+/// let b = MqttBinary::from_bytes(Bytes::Borrowed(&slice))?;
+/// assert_eq!(b.as_bytes(), &slice);
+/// assert!(MqttBinary::from_bytes(Bytes::Borrowed(&too_long)).is_err());
+///
+/// let from_slice_unchecked = MqttBinary::from_slice_unchecked(&slice);
+/// assert_eq!(from_slice_unchecked.as_bytes(), &slice);
+///
+/// let from_bytes_unchecked = MqttBinary::from_bytes_unchecked(Bytes::Borrowed(&slice));
+/// assert_eq!(from_bytes_unchecked.as_bytes(), &slice);
+///
+/// # Ok::<(), TooLargeToEncode>(())
+/// ```
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct MqttBinary<'b>(pub(crate) Bytes<'b>);
 
@@ -20,7 +47,7 @@ impl<'b> fmt::Debug for MqttBinary<'b> {
 #[cfg(feature = "defmt")]
 impl<'a> defmt::Format for MqttBinary<'a> {
     fn format(&self, fmt: defmt::Formatter) {
-        defmt::write!(fmt, "MqttBinary({:?}", self.as_ref());
+        defmt::write!(fmt, "MqttBinary({:?})", self.as_ref());
     }
 }
 
@@ -54,16 +81,16 @@ impl<'b> MqttBinary<'b> {
     /// The maximum length of binary data so that it can be encoded. This value is limited by the 2-byte length field.
     pub const MAX_LENGTH: usize = u16::MAX as usize;
 
-    /// Creates MQTT binary data and checks for the max length in bytes of `Self::MAX_LENGTH`.
+    /// Converts `Bytes` into `MqttBinary` by checking for the max length of `MqttBinary::MAX_LENGTH`.
     #[const_fn(cfg(not(feature = "alloc")))]
-    pub const fn new(bytes: Bytes<'b>) -> Result<Self, TooLargeToEncode> {
+    pub const fn from_bytes(bytes: Bytes<'b>) -> Result<Self, TooLargeToEncode> {
         match bytes.len() {
             ..=Self::MAX_LENGTH => Ok(Self(bytes)),
             _ => Err(TooLargeToEncode),
         }
     }
 
-    /// Creates MQTT binary data and checks for the max length in bytes of `Self::MAX_LENGTH`.
+    /// Converts a slice into `MqttBinary` by cloning the reference and checking for the max length of `MqttBinary::MAX_LENGTH`.
     pub const fn from_slice(slice: &'b [u8]) -> Result<Self, TooLargeToEncode> {
         match slice.len() {
             ..=Self::MAX_LENGTH => Ok(Self(Bytes::Borrowed(slice))),
@@ -71,19 +98,39 @@ impl<'b> MqttBinary<'b> {
         }
     }
 
-    /// Creates MQTT binary data without checking for the max length in bytes of `Self::MAX_LENGTH`.
+    /// Converts `Bytes` into `MqttBinary` without checking for the max length of `MqttBinary::MAX_LENGTH`.
     ///
-    /// # Safety
-    /// The length of the slice parameter in bytes is less than or equal to `Self::MAX_LENGTH`.
-    pub const unsafe fn new_unchecked(bytes: Bytes<'b>) -> Self {
+    /// # Invariants
+    ///
+    /// The length of the slice parameter in bytes is less than or equal to `MqttBinary::MAX_LENGTH`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, this function will panic if the bytes' length is greater than `MqttBinary::MAX_LENGTH`.
+    pub const fn from_bytes_unchecked(bytes: Bytes<'b>) -> Self {
+        debug_assert!(
+            bytes.len() <= Self::MAX_LENGTH,
+            "the slice's length exceeds MAX_LENGTH"
+        );
+
         Self(bytes)
     }
 
-    /// Creates MQTT binary data without checking for the max length in bytes of `Self::MAX_LENGTH`.
+    /// Converts a slice into `MqttBinary` without checking for the max length of `MqttBinary::MAX_LENGTH`.
     ///
-    /// # Safety
-    /// The length of the slice parameter in bytes is less than or equal to `Self::MAX_LENGTH`.
-    pub const unsafe fn from_slice_unchecked(slice: &'b [u8]) -> Self {
+    /// # Invariants
+    ///
+    /// The length of the slice parameter in bytes is less than or equal to `MqttBinary::MAX_LENGTH`.
+    ///
+    /// # Panics
+    ///
+    /// In debug builds, this function will panic if the slice's length is greater than `MqttBinary::MAX_LENGTH`.
+    pub const fn from_slice_unchecked(slice: &'b [u8]) -> Self {
+        debug_assert!(
+            slice.len() <= Self::MAX_LENGTH,
+            "the slice's length exceeds MAX_LENGTH"
+        );
+
         Self(Bytes::Borrowed(slice))
     }
 

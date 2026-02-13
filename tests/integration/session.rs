@@ -13,7 +13,7 @@ use crate::common::{
 #[tokio::test]
 #[test_log::test]
 async fn session_continue_regular_disconnect() {
-    let id = MqttString::new("SESSION_CONTINUE_REGULAR_DISCONNECT_CLIENT".into()).unwrap();
+    let id = MqttString::from_str("SESSION_CONTINUE_REGULAR_DISCONNECT_CLIENT").unwrap();
 
     let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     connect_options.session_expiry_interval = SessionExpiryInterval::NeverEnd;
@@ -66,7 +66,7 @@ async fn session_continue_regular_disconnect() {
 #[tokio::test]
 #[test_log::test]
 async fn session_continue_connection_dropped() {
-    let id = MqttString::new("SESSION_CONTINUE_CONNECTION_DROPPED_CLIENT".into()).unwrap();
+    let id = MqttString::from_str("SESSION_CONTINUE_CONNECTION_DROPPED_CLIENT").unwrap();
 
     let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     connect_options.session_expiry_interval = SessionExpiryInterval::NeverEnd;
@@ -119,7 +119,7 @@ async fn session_continue_connection_dropped() {
 #[tokio::test]
 #[test_log::test]
 async fn session_discontinued_clean_start() {
-    let id = MqttString::new("SESSION_DISCONTINUED_CLEAN_START_CLIENT".into()).unwrap();
+    let id = MqttString::from_str("SESSION_DISCONTINUED_CLEAN_START_CLIENT").unwrap();
 
     let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     connect_options.session_expiry_interval = SessionExpiryInterval::NeverEnd;
@@ -156,7 +156,7 @@ async fn session_discontinued_clean_start() {
 #[tokio::test]
 #[test_log::test]
 async fn session_expired() {
-    let id = MqttString::new("SESSION_EXPIRED_CLIENT".into()).unwrap();
+    let id = MqttString::from_str("SESSION_EXPIRED_CLIENT").unwrap();
 
     let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(3);
@@ -202,7 +202,7 @@ async fn session_expired() {
 #[tokio::test]
 #[test_log::test]
 async fn session_shortened_and_expired() {
-    let id = MqttString::new("SESSION_SHORTENED_AND_EXPIRED_CLIENT".into()).unwrap();
+    let id = MqttString::from_str("SESSION_SHORTENED_AND_EXPIRED_CLIENT").unwrap();
 
     let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     connect_options.session_expiry_interval = SessionExpiryInterval::NeverEnd;
