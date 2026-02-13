@@ -24,13 +24,13 @@ compile_error!("Enable either one of `bump` or `alloc` features for testing.");
 
 mod bytes;
 mod fmt;
-mod header;
-mod io;
 mod packet;
 
 pub mod buffer;
 pub mod client;
 pub mod config;
+pub mod header;
+pub mod io;
 pub mod session;
 pub mod types;
 

@@ -1,3 +1,5 @@
+//! Contains types representing the MQTT fixed header.
+
 use crate::{
     eio::Write,
     fmt::unreachable,
@@ -8,6 +10,8 @@ use crate::{
     types::VarByteInt,
 };
 
+/// The fixed header of any MQTT Control Packet containing the packet type, flags
+/// and the remaining_length.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FixedHeader {
@@ -37,20 +41,25 @@ impl FixedHeader {
         }
     }
 
+    /// Returns the flags of the [`FixedHeader`]. These are the lower 4 bits of the first byte.
+    /// The type of the packet is masked away.
     pub fn flags(&self) -> u8 {
         self.type_and_flags & 0x0F
     }
 
+    /// Returns the [`PacketType`]
     pub fn packet_type(&self) -> Result<PacketType, Reserved> {
         PacketType::from_type_and_flags(self.type_and_flags)
     }
 }
 
-/// Returned if packet type is reserved
+/// Returned if [`PacketType`] is reserved.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Reserved;
 
+/// An MQTT Control Packet type.
+#[allow(missing_docs)]
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PacketType {
@@ -74,7 +83,7 @@ pub enum PacketType {
 }
 
 impl PacketType {
-    pub fn from_type_and_flags(type_and_flags: u8) -> Result<Self, Reserved> {
+    pub(crate) fn from_type_and_flags(type_and_flags: u8) -> Result<Self, Reserved> {
         match type_and_flags >> 4 {
             0 => Err(Reserved),
             1 => Ok(PacketType::Connect),

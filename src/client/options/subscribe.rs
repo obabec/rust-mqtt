@@ -38,7 +38,8 @@ impl Default for Options {
 }
 
 impl Options {
-    /// Creates options with values coherent to the `Default` implementations of the fields and `QoS::AtMostOnce`.
+    /// Creates options with values coherent to the [`Default`] implementations of the fields and
+    /// [`QoS::AtMostOnce`].
     pub const fn new() -> Self {
         Self {
             retain_handling: RetainHandling::AlwaysSend,

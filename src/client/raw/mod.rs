@@ -4,8 +4,8 @@ mod err;
 mod header;
 mod net;
 
-pub use err::Error as RawError;
-pub use net::Error as NetStateError;
+pub(crate) use err::Error as RawError;
+pub(crate) use net::Error as NetStateError;
 
 use crate::{
     buffer::BufferProvider,
@@ -13,7 +13,7 @@ use crate::{
     eio::{Error, ErrorKind},
     fmt::{debug_assert, unreachable},
     header::FixedHeader,
-    io::{err::WriteError, net::Transport, read::BodyReader},
+    io::{Transport, err::WriteError, read::BodyReader},
     packet::{RxError, RxPacket, TxError, TxPacket},
     types::ReasonCode,
     v5::packet::DisconnectPacket,

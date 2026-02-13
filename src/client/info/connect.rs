@@ -3,7 +3,8 @@ use crate::types::MqttString;
 /// Information taken from a connection handshake the client does not have to store
 /// for correct operational behaviour and does not store for optimization purposes.
 ///
-/// Does not include the reason code as it is always `Success` (0x00) if this is returned.
+/// Does not include the reason code as it is always [`crate::types::ReasonCode::Success`] (0x00)
+/// if this is returned.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Info<'i> {

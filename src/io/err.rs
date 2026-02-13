@@ -42,8 +42,8 @@ pub enum BodyReadError<E, B: fmt::Debug> {
 
     /// There is not enough `remaining length` to read a packet field
     ///
-    /// The difference to UnexpectedEOF is that this can be a boundary set by the programm.
-    /// UnexpectedEOF is caused by the underlying Read
+    /// The difference to [`BodyReadError::UnexpectedEOF`] is that this can be a boundary set by the programm.
+    /// [`BodyReadError::UnexpectedEOF`] is caused by the underlying Read.
     InsufficientRemainingLen,
 
     MalformedPacket,

@@ -7,10 +7,10 @@ use crate::{
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
-    /// Maximum concurrent QoS 1 & 2 publications that the server is willing to accept.
+    /// Maximum concurrent [`QoS`] 1 & 2 publications that the server is willing to accept.
     pub receive_maximum: ReceiveMaximum,
 
-    /// Maximum supported QoS by the server.
+    /// Maximum supported [`QoS`] by the server.
     pub maximum_qos: QoS,
 
     /// Retained messages are supported by the server.

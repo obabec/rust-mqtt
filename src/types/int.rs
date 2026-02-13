@@ -1,11 +1,13 @@
 use crate::types::TooLargeToEncode;
 
-/// MQTT's variable byte integer encoding. The value has to be less than `VarByteInt::MAX_ENCODABLE`
-/// (268_435_455). Exceeding this ultimately leads to panics or malformed packets.
+/// MQTT's variable byte integer encoding. The value has to be less than
+/// [`VarByteInt::MAX_ENCODABLE`] (268_435_455). Exceeding this ultimately leads to
+/// panics or malformed packets.
 ///
 /// Used for packet length and some properties.
 ///
-/// Use its `TryFrom<u32>`, `From<u16>` and `From<u8>` implementations to construct a value.
+/// Use its [`TryFrom`] ([`u32`]) and [`From`] ([`u16`], [`u8`]) implementations to
+/// construct a value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct VarByteInt(u32);
@@ -15,8 +17,9 @@ impl VarByteInt {
     /// <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901011>.
     pub const MAX_ENCODABLE: u32 = 268_435_455;
 
-    /// Creates a variable byte integer by checking for the maximum value of [`VarByteInt::MAX_ENCODABLE`].
-    /// For a version accepting `u16` and `u8`, use `From::from`.
+    /// Creates a variable byte integer by checking for the maximum value of
+    /// [`VarByteInt::MAX_ENCODABLE`].
+    /// For a version accepting [`u16`] and [`u8`], use [`From::from`].
     pub const fn new(value: u32) -> Option<Self> {
         if value > Self::MAX_ENCODABLE {
             None
@@ -26,15 +29,15 @@ impl VarByteInt {
     }
 
     /// Creates a variable byte integer without checking for the maximum value of
-    /// `VarByteInt::MAX_ENCODABLE`.
-    /// For a fallible version, use `VarByteInt::new`.
-    /// For an infallible version accepting `u16` and `u8`, use `From::from`.
+    /// [`VarByteInt::MAX_ENCODABLE`].
+    /// For a fallible version, use [`VarByteInt::new`].
+    /// For an infallible version accepting [`u16`] and [`u8`], use [`From::from`].
     ///
     /// # Invariants
     /// The value parameter must be less than or equal to [`VarByteInt::MAX_ENCODABLE`].
     ///
     /// # Panics
-    /// Panics in debug builds if `value` exceeds [`VarByteInt::MAX_ENCODABLE`]
+    /// Panics in debug builds if `value` exceeds [`VarByteInt::MAX_ENCODABLE`].
     pub const fn new_unchecked(value: u32) -> Self {
         debug_assert!(
             value <= Self::MAX_ENCODABLE,
@@ -49,7 +52,7 @@ impl VarByteInt {
         self.0
     }
 
-    /// Returns `Self::value() as usize`
+    /// Returns [`Self::value`] as [`usize`].
     pub const fn size(&self) -> usize {
         self.0 as usize
     }

@@ -5,7 +5,7 @@ use crate::bytes::Bytes;
 #[cfg(feature = "alloc")]
 pub use alloc::AllocBuffer;
 #[cfg(feature = "bump")]
-pub use bump::BumpBuffer;
+pub use bump::{BumpBuffer, InsufficientSpace};
 
 /// A trait to describe anything that can allocate memory.
 ///
@@ -15,8 +15,8 @@ pub use bump::BumpBuffer;
 /// The client does not store any references to memory returned by this provider.
 pub trait BufferProvider<'a> {
     /// The type returned from a successful buffer provision.
-    /// Must implement `AsMut<[u8]>` so that it can be borrowed mutably right after allocation for initialization
-    /// and `Into<Bytes<'a>>` for storing.
+    /// Must implement [`AsMut`] so that it can be borrowed mutably right after allocation for
+    /// initialization and [`Into`] for storing as [`Bytes`].
     type Buffer: AsMut<[u8]> + Into<Bytes<'a>>;
 
     /// The error type returned from a failed buffer provision.
@@ -32,6 +32,7 @@ mod bump {
 
     use crate::buffer::BufferProvider;
 
+    /// Error returned when the [`BumpBuffer`]'s underlying buffer does not have enough unallocated space.
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct InsufficientSpace;
@@ -50,7 +51,7 @@ mod bump {
         type ProvisionError = InsufficientSpace;
 
         /// Return the next `len` bytes from the buffer, advancing the internal
-        /// pointer. Returns `InsufficientSpace` if there isn't enough room.
+        /// pointer. Returns [`InsufficientSpace`] if there isn't enough room.
         fn provide_buffer(&mut self, len: usize) -> Result<Self::Buffer, Self::ProvisionError> {
             if self.remaining_len() < len {
                 Err(InsufficientSpace)
@@ -73,7 +74,7 @@ mod bump {
     }
 
     impl<'a> BumpBuffer<'a> {
-        /// Creates a new `BumpBuffer` with the provided slice as underlying buffer.
+        /// Creates a new [`BumpBuffer`] with the provided slice as underlying buffer.
         pub fn new(slice: &'a mut [u8]) -> Self {
             Self { slice, index: 0 }
         }
@@ -84,7 +85,7 @@ mod bump {
             self.slice.len() - self.index
         }
 
-        /// Invalidates all previous allocations by resetting the `BumpBuffer`'s index,
+        /// Invalidates all previous allocations by resetting the [`BumpBuffer`]'s index,
         /// allowing the underlying buffer to be reallocated.
         ///
         /// # Safety

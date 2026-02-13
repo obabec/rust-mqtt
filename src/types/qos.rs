@@ -54,8 +54,8 @@ pub enum IdentifiedQoS {
 }
 
 impl IdentifiedQoS {
-    /// Returns `Some(packet_identifer)` if IdentifiedQoS > 0 and therefore has to be
-    /// identified and `None` otherwise.
+    /// Returns [`Some`] if [`QoS`] > 0 and therefore has to be identified, and
+    /// [`None`] otherwise.
     #[inline]
     pub const fn packet_identifier(&self) -> Option<u16> {
         match self {

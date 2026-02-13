@@ -37,25 +37,26 @@ pub struct Options<'c> {
     /// is omitted on the network.
     pub is_payload_utf8: bool,
 
-    /// The message expiry interval in seconds of the will publication. If set to `None`, the message
+    /// The message expiry interval in seconds of the will publication. If set to [`None`], the message
     /// does not expire and the message expiry interval property is omitted on the network.
     pub message_expiry_interval: Option<u32>,
 
-    /// The content type property in the will publication. If set to `None`, the property is omitted
+    /// The content type property in the will publication. If set to [`None`], the property is omitted
     /// on the network.
     pub content_type: Option<MqttString<'c>>,
 
-    /// The response topic property in the will publication. If set to `None`, the property is omitted
+    /// The response topic property in the will publication. If set to [`None`], the property is omitted
     /// on the network.
     pub response_topic: Option<TopicName<'c>>,
 
-    /// The correlation data property in the will publication. If set to `None`, the property is omitted
+    /// The correlation data property in the will publication. If set to [`None`], the property is omitted
     /// on the network.
     pub correlation_data: Option<MqttBinary<'c>>,
 }
 
 impl<'c> Options<'c> {
-    /// Creates options with values coherent to the `Default` implementations of the fields and `QoS::AtMostOnce`.
+    /// Creates options with values coherent to the [`Default`] implementations of the fields and
+    /// [`QoS::AtMostOnce`].
     pub const fn new(topic: TopicName<'c>, payload: MqttBinary<'c>) -> Options<'c> {
         Options {
             will_qos: QoS::AtMostOnce,

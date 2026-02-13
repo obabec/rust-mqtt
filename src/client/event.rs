@@ -95,7 +95,7 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     Duplicate,
 }
 
-/// Content of `Event::Suback`.
+/// Content of [`Event::Suback`].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Suback {
@@ -105,7 +105,7 @@ pub struct Suback {
     pub reason_code: ReasonCode,
 }
 
-/// Content of `Event::Publish`.
+/// Content of [`Event::Publish`].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
@@ -151,8 +151,8 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     pub message: Bytes<'p>,
 }
 
-/// Content of `Event::PublishAcknowledged`, `Event::PublishReceived`, `Event::PublishReleased` and
-/// `Event::PublishComplete`.
+/// Content of [`Event::PublishAcknowledged`], [`Event::PublishReceived`],
+/// [`Event::PublishReleased`], and [`Event::PublishComplete`].
 ///
 /// The reason code is always successful.
 #[derive(Debug)]
@@ -164,7 +164,7 @@ pub struct Puback {
     pub reason_code: ReasonCode,
 }
 
-/// Content of `Event::PublishRejecetd`.
+/// Content of [`Event::PublishRejected`].
 ///
 /// The reason code is always erroneous.
 #[derive(Debug)]
