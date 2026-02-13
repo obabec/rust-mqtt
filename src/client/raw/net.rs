@@ -1,10 +1,10 @@
 use core::mem;
 
-use crate::{io::net::Transport, types::ReasonCode};
+use crate::{io::Transport, types::ReasonCode};
 
 /// Represents a network connection with different variants for handling failures in the connection gracefully.
 #[derive(Debug, Default)]
-pub enum NetState<N: Transport> {
+pub(crate) enum NetState<N: Transport> {
     /// The connection and dialogue with the server is ok
     Ok(N),
 

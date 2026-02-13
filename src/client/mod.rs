@@ -15,7 +15,7 @@ use crate::{
     config::{ClientConfig, MaximumPacketSize, ServerConfig, SessionExpiryInterval, SharedConfig},
     fmt::{debug, error, panic, unreachable, warn},
     header::{FixedHeader, PacketType},
-    io::net::Transport,
+    io::Transport,
     packet::{Packet, TxPacket},
     session::{CPublishFlightState, SPublishFlightState, Session},
     types::{
@@ -81,7 +81,7 @@ impl<
     /// Creates a new, disconnected MQTT client using a buffer provider to store
     /// dynamically sized fields of received packets.
     /// The session state is initialised as a new session. If you want to start the
-    /// client with an existing session, use `Client::with_session()`
+    /// client with an existing session, use [`Self::with_session`].
     pub fn new(buffer: &'c mut B) -> Self {
         Self {
             client_config: ClientConfig::default(),
@@ -146,7 +146,7 @@ impl<
         &self.session
     }
 
-    /// Returns a mutable reference to the supplied `BufferProvider` implementation.
+    /// Returns a mutable reference to the supplied [`BufferProvider`] implementation.
     ///
     /// This can for example be used to reset the underlying buffer if using `BumpBuffer`.
     #[inline]
@@ -185,16 +185,18 @@ impl<
     ///
     /// Only call this when
     /// - the client is newly constructed.
-    /// - a non-recoverable error has occured and Client::abort() has been called.
-    /// - Client::disconnect() has been called.
+    /// - a non-recoverable error has occured and [`Self::abort`] has been called.
+    /// - [`Self::disconnect`] has been called.
     ///
     /// The session expiry interval in ConnectOptions overrides the one in the session of the client.
     ///
-    /// Configuration that was negotiated with the server is stored in the `client_config`, `server_config`,
-    /// `shared_config` and `session` fields which have getters.
+    /// Configuration that was negotiated with the server is stored in the `client_config`,
+    /// `server_config`, `shared_config`, and `session` fields, which have getters
+    /// ([`Self::client_config`], [`Self::server_config`], [`Self::shared_config`],
+    /// [`Self::session`]).
     ///
     /// If the server does not have a session present, the client's session is cleared. In case you would want
-    /// to keep the session state, you can call `Client::session()` and clone the session before.
+    /// to keep the session state, you can call [`Self::session`] and clone the session before.
     ///
     /// # Returns:
     /// Information not being used currently by the client and therefore stored in its fields.
@@ -376,11 +378,11 @@ impl<
     /// Subscribes to a single topic with the given options.
     ///
     /// The client keeps track of the packet identifier sent in the SUBSCRIBE packet.
-    /// If no `Event::Suback` is received within a custom time,
+    /// If no [`Event::Suback`] is received within a custom time,
     /// this method can be used to send the SUBSCRIBE packet again.
     ///
     /// A subscription identifier should only be set if the server supports
-    /// subscription identifiers (Can be checked with `Client::server_config()`).
+    /// subscription identifiers (Can be checked with [`Self::server_config`]).
     /// The client does not double-check whether this feature is supported and will
     /// always include the subscription identifier argument if present.
     ///
@@ -422,7 +424,7 @@ impl<
     /// Unsubscribes from a single topic filter.
     ///
     /// The client keeps track of the packet identifier sent in the UNSUBSCRIBE packet.
-    /// If no `Event::Unsuback` is received within a custom time,
+    /// If no [`Event::Unsuback`] is received within a custom time,
     /// this method can be used to send the UNSUBSCRIBE packet again.
     ///
     /// # Returns:
@@ -727,7 +729,7 @@ impl<
         Ok(())
     }
 
-    /// Combines `Client::poll_header` and `Client::poll_body`.
+    /// Combines [`Self::poll_header`] and [`Self::poll_body`].
     ///
     /// Polls the network for a full packet. Not cancel-safe.
     ///
@@ -736,7 +738,7 @@ impl<
     /// - The client did not return a non-recoverable Error before
     ///
     /// # Returns:
-    /// - MQTT Events. Their further meaning is documented in `Event`
+    /// - MQTT Events. Their further meaning is documented in [`Event`].
     pub async fn poll(&mut self) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c>> {
         let header = self.poll_header().await?;
         self.poll_body(header).await
@@ -751,7 +753,8 @@ impl<
     /// - The client did not return a non-recoverable Error before
     ///
     /// # Returns:
-    /// - The received fixed header with a valid packet type. It can be used to call `poll_body`
+    /// - The received fixed header with a valid packet type. It can be used to call
+    ///   [`Self::poll_body`].
     pub async fn poll_header(&mut self) -> Result<FixedHeader, MqttError<'c>> {
         let header = self.raw.recv_header().await?;
 
@@ -774,8 +777,8 @@ impl<
     /// - The client did not return a non-recoverable Error before
     ///
     /// # Returns:
-    /// - MQTT Events for regular communication. Their further meaning is documented in `Event`.
-    /// - `MqttError::Disconnect` when receiving a DISCONNECT packet.
+    /// - MQTT Events for regular communication. Their further meaning is documented in [`Event`].
+    /// - [`MqttError::Disconnect`] when receiving a DISCONNECT packet.
     pub async fn poll_body(
         &mut self,
         header: FixedHeader,

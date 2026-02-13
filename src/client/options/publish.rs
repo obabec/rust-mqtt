@@ -14,7 +14,7 @@ pub struct Options<'p> {
 
     /// The message expiry interval in seconds of this application message. After this
     /// interval has passed, the server cannot publish this message onward to subscribers.
-    /// If set to `None`, the message does not expire and the message expiry interval
+    /// If set to [`None`], the message does not expire and the message expiry interval
     /// property is omitted on the network.
     pub message_expiry_interval: Option<u32>,
 
@@ -38,7 +38,8 @@ pub struct Options<'p> {
 }
 
 impl<'p> Options<'p> {
-    /// Creates options with values coherent to the `Default` implementations of the fields and `QoS::AtMostOnce`.
+    /// Creates options with values coherent to the [`Default`] implementations of the fields and
+    /// [`QoS::AtMostOnce`].
     pub const fn new(topic: TopicReference<'p>) -> Options<'p> {
         Options {
             retain: false,
@@ -122,7 +123,7 @@ impl<'t> TopicReference<'t> {
         }
     }
 
-    /// Delegates to `Bytes::as_borrowed()`.
+    /// Delegates to [`crate::Bytes::as_borrowed`].
     pub fn as_borrowed(&'t self) -> Self {
         match self {
             Self::Name(topic_name) => Self::Name(topic_name.as_borrowed()),

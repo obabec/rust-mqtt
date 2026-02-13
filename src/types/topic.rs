@@ -79,7 +79,7 @@ impl<'t> TopicName<'t> {
         Self(string)
     }
 
-    /// Delegates to `Bytes::as_borrowed()`.
+    /// Delegates to [`crate::Bytes::as_borrowed`].
     #[inline]
     pub const fn as_borrowed(&'t self) -> Self {
         Self(self.0.as_borrowed())
@@ -190,7 +190,7 @@ impl<'t> TopicFilter<'t> {
         Self(string)
     }
 
-    /// Delegates to `Bytes::as_borrowed()`.
+    /// Delegates to [`crate::Bytes::as_borrowed`].
     #[inline]
     pub const fn as_borrowed(&'t self) -> Self {
         Self(self.0.as_borrowed())

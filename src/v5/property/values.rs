@@ -12,8 +12,9 @@ use crate::{
 
 /// Implements a newtype with the given identifier and wrapped type.
 ///
-/// * Implements `Writable`: Identifier and content are written
-/// * Implements `Readable`: Only content is read. In the case of the newtype having a lifetime `'a`, the `Readable` implementation is trait bounded by `Store<'a>`
+/// * Implements [`Writable`]: Identifier and content are written
+/// * Implements [`Readable`]: Only content is read. In the case of the newtype having a lifetime
+///   `'a`, the [`Readable`] implementation is trait bounded by [`Store<'a>`]
 macro_rules! property {
     ($name:ident, $ty:ty) => {
         #[derive(Debug, PartialEq, Clone, Copy)]

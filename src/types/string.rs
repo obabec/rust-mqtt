@@ -7,7 +7,7 @@ use const_fn::const_fn;
 
 use crate::types::{MqttBinary, TooLargeToEncode};
 
-/// Error returned when creating `MqttString` failed.
+/// Error returned when creating [`MqttString`] failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MqttStringError {
     /// The passed data is not valid UTF-8.
@@ -16,7 +16,7 @@ pub enum MqttStringError {
     /// The passed data contains at least one null character.
     NullCharacter,
 
-    /// The passed data exceeds the max length of `MqttString::MAX_LENGTH`.
+    /// The passed data exceeds the max length of [`MqttString::MAX_LENGTH`].
     TooLargeToEncode,
 }
 
@@ -46,8 +46,8 @@ impl From<TooLargeToEncode> for MqttStringError {
     }
 }
 
-/// Arbitrary UTF-8 encoded string with a length in bytes less than or equal to `MqttString::MAX_LENGTH`
-/// (`u16::MAX`) and no null characters.
+/// Arbitrary UTF-8 encoded string with a length in bytes less than or equal to
+/// [`MqttString::MAX_LENGTH`] ([`u16::MAX`]) and no null characters.
 /// Exceeding this size ultimately leads to malformed packets.
 ///
 /// # Examples
@@ -121,11 +121,12 @@ impl<'s> AsRef<str> for MqttString<'s> {
 }
 
 impl<'s> MqttString<'s> {
-    /// The maximum length of a string in bytes so that it can be encoded. This value is limited by the 2-byte length field.
+    /// The maximum length of a string in bytes so that it can be encoded.
+    /// This value is limited by the 2-byte length field.
     pub const MAX_LENGTH: usize = MqttBinary::MAX_LENGTH;
 
-    /// Converts `MqttBinary` into `MqttString` by checking for null characters and valid UTF-8.
-    /// Valid length is guaranteed by `MqttBinary`'s invariant.
+    /// Converts [`MqttBinary`] into [`MqttString`] by checking for null characters and valid UTF-8.
+    /// Valid length is guaranteed by [`MqttBinary`]'s invariant.
     #[const_fn(cfg(not(feature = "alloc")))]
     pub const fn from_utf8_binary(b: MqttBinary<'s>) -> Result<Self, MqttStringError> {
         let mut i = 0;
@@ -142,8 +143,8 @@ impl<'s> MqttString<'s> {
         }
     }
 
-    /// Converts `MqttBinary` into `MqttString` without checking for null characters or valid UTF-8.
-    /// Valid length is guaranteed by `MqttBinary`'s invariant.
+    /// Converts [`MqttBinary`] into [`MqttString`] without checking for null characters or valid UTF-8.
+    /// Valid length is guaranteed by [`MqttBinary`]'s invariant.
     ///
     /// # Safety
     ///
@@ -170,8 +171,8 @@ impl<'s> MqttString<'s> {
         Self(b)
     }
 
-    /// Converts a string slice into `MqttString` by checking for null characters and the max length
-    /// of `MqttString::MAX_LENGTH`.
+    /// Converts a string slice into [`MqttString`] by checking for null characters and the max
+    /// length of [`MqttString::MAX_LENGTH`].
     pub const fn from_str(s: &'s str) -> Result<Self, MqttStringError> {
         let mut i = 0;
         while i < s.len() {
@@ -187,18 +188,18 @@ impl<'s> MqttString<'s> {
         }
     }
 
-    /// Converts a string slice into `MqttString` without checking for null characters or the max
-    /// length of `MqttString::MAX_LENGTH`.
+    /// Converts a string slice into [`MqttString`] without checking for null characters or the max
+    /// length of [`MqttString::MAX_LENGTH`].
     ///
     /// # Invariants
     ///
-    /// The length of the string slice must be less than or equal to `MqttString::MAX_LENGTH`. The
+    /// The length of the string slice must be less than or equal to [`MqttString::MAX_LENGTH`]. The
     /// string must not contain any null characters.
     ///
     /// # Panics
     ///
     /// In debug builds, this function will panic if the slice contains a null character or its length is greater
-    /// than `MqttString::MAX_LENGTH`.
+    /// than [`MqttString::MAX_LENGTH`].
     pub const fn from_str_unchecked(s: &'s str) -> Self {
         if cfg!(debug_assertions) {
             let mut i = 0;
@@ -230,7 +231,7 @@ impl<'s> MqttString<'s> {
         unsafe { from_utf8_unchecked(self.0.as_bytes()) }
     }
 
-    /// Delegates to `Bytes::as_borrowed()`.
+    /// Delegates to [`crate::Bytes::as_borrowed`].
     #[inline]
     pub const fn as_borrowed(&'s self) -> Self {
         Self(self.0.as_borrowed())

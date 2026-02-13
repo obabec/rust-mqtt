@@ -43,10 +43,6 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> TxPacket for SubscribePacket<'p, MAX_TO
 }
 
 impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> {
-    /// Creates a new packet with no subscription identifier
-    ///
-    /// It is up to the caller to verify that the topic filters are short enough
-    /// so that the packets complete length doesn't exceed `VarByteInt::MAX_ENCODABLE`.
     pub fn new(
         packet_identifier: u16,
         subscription_identifier: Option<VarByteInt>,

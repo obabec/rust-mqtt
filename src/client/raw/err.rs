@@ -5,20 +5,16 @@ use crate::{
     types::ReasonCode,
 };
 
-/// The main error returned by `Raw`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error<B> {
-    /// A packet was too long to encode its length with the variable byte integer
-    PacketTooLong,
-
+pub(crate) enum Error<B> {
     /// The underlying Read/Write method returned an error.
     Network(ErrorKind),
 
     /// The network is in a faulty state.
     Disconnected,
 
-    /// A buffer provision by the `BufferProvider` failed.
+    /// A buffer provision by the [`crate::buffer::BufferProvider`] failed.
     Alloc(B),
 
     /// A generic constant such as `MAX_PROPERTIES` is too small.
