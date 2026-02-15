@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add null character invariant to `MqttString`
 - Add `FixedHeader` and `PacketType` to public API
 - Remove `Raw`-related types from public API
+- Fix client panics when server sends SUBACK/UNSUBACK packets with no reason codes
+- Remove `Error::ReceiveBuffer` as it is superseeded by `Error::Server` in SUBACK/UNSUBACK handling
 
 ## 0.4.1 - 2026-01-06
 
