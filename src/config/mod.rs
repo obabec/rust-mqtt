@@ -54,7 +54,8 @@ pub enum MaximumPacketSize {
     Unlimited,
 
     /// There is a limit on how large packets can be. The packet size is the value of its remaining length
-    /// plus the size of the fixed header.
+    /// plus the size of the fixed header. A value less than 2 does not make sense because every MQTT packet
+    /// contains a fixed header of at least 2 bytes.
     Limit(u32),
 }
 
