@@ -55,6 +55,76 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 
 ## Usage
 
+### Illustrative API example
+
+Showing explicit session recovery and Quality of Service 2 retransmission after a network failure. The precise network and executor setup is omitted for brevity.
+
+```rust
+async fn main() {
+    let mut buffer = AllocBuffer;
+    let mut client = Client::new(&mut buffer);
+
+    let transport = ...;    // Any Read/Write implementation (TCP, TLS, ...)
+
+    let connect_options = ConnectOptions::new()
+        .clean_start()
+        .session_expiry_interval(SessionExpiryInterval::NeverEnd)
+        .user_name(MqttString::from_str("user").unwrap())
+        .password(MqttBinary::from_slice("pass").unwrap());
+
+    client.connect(
+        transport,
+        &connect_options,
+        Some(MqttString::from_str("rust-mqtt-demo").unwrap()),
+    ).await.unwrap();
+
+    let topic = TopicName::new(MqttString::from_str("demo/topic").unwrap()).unwrap();
+
+    client.subscribe(
+        topic.as_borrowed().into(),
+        SubscriptionOptions::new().exactly_once(),
+    ).await.unwrap();
+
+    let packet_identifier = client.publish(
+        &PublicationOptions::new(topic.as_borrowed().into()).exactly_once(),
+        "Hello World!".into(),
+    ).await.unwrap();
+
+    while let Ok(event) = client.poll().await {
+        if let Event::PublishComplete(_) = event {
+            // Publish succeeded, we can disconnect
+            client.disconnect(&DisconnectOptions::new()).await.unwrap();
+            return;
+        }
+    }
+
+    // An error has occured (e.g. network failure)
+    client.abort().await;
+
+    let transport = ...;    // Open a fresh connection
+
+    client.connect(
+        transport,
+        &connect_options,
+        Some(MqttString::from_str("rust-mqtt-demo").unwrap()),
+    ).await.unwrap();
+
+
+    // Recover the in-flight Quality of Service 2 publish.
+    // Depending on which packet may have been lost, do one of:
+    
+    // - Republish if PUBLISH / PUBREC may have been lost
+    client.republish(
+        packet_identifier,
+        &PublicationOptions::new(topic.into()).exactly_once(),
+        "Hello World!".into(),
+    ).await.unwrap();
+
+    // - Re-release if PUBREL / PUBCOMP may have been lost
+    client.rerelease().await.unwrap();
+}
+```
+
 ### Examples
 
 - 'demo' is a showcase of rust-mqtt's features over TCP. Note that the example usage is very strict and not really a good way of using the client.
