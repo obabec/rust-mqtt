@@ -11,7 +11,11 @@
 [license]: https://img.shields.io/crates/l/rust-mqtt.svg
 [MIT]: https://github.com/obabec/rust-mqtt#license
 
-rust-mqtt is an MQTT client primarily for no_std environments. The library provides an async API depending on [embedded_io_async](https://docs.rs/embedded-io-async/latest/embedded_io_async/)'s traits. As of now, only [MQTT version 5.0](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html) is supported.
+`rust-mqtt` provides a MQTT client primarily for no_std environments. The library provides an async API depending on [embedded_io_async](https://docs.rs/embedded-io-async/latest/embedded_io_async/)'s traits. As of now, only [MQTT version 5.0](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html) is supported.
+
+The design goal is a strict yet flexible and explicit API that leverages Rust's type system to enforce the MQTT specification while exposing all protocol features transparently. Session state, configuration, and Quality of Service message delivery and retry behaviour remain fully under user control, giving complete freedom over protocol usage. Protocol-related errors are prevented by the client API and are modeled in a way that enables maximum recoverability. By avoiding opinionated design choices and making no assumptions about the runtime environment, `rust-mqtt` remains lightweight while providing a powerful MQTT client foundation.
+
+`rust-mqtt` does not implement opinionated connection management — automatic reconnects, keepalive loops, retry policies, or background tasks are intentionally left to the user. Instead, the crate is designed as a composable protocol layer, suitable for either higher-level clients, tooling or resource-constrained embedded applications.
 
 ## Library state
 
@@ -36,9 +40,9 @@ rust-mqtt is an MQTT client primarily for no_std environments. The library provi
 
 ### Extension plans (more or less by priority)
 
-- Receive the 'remaining length' (variable header & payload) of an mqtt packet using a buffer instead of calling `Read::read` very frequently.
-- MQTT version 3
-- Sync implementation.
+- Read complete packets with cancel-safe implementation
+- MQTT version 3.1.1
+- Sync implementation
 
 ### Feature flags
 
