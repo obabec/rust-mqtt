@@ -82,9 +82,9 @@ async fn maximum_packet_size_barely_exceeded() {
     let topic_filter = TopicFilter::from(topic_name.clone());
 
     let msg = [0u8; PAYLOAD_SIZE].as_slice();
-    
+
     let mut tx =
-    assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
     let mut rx = assert_ok!(connected_client(BROKER_ADDRESS, &rx_connect_options, None).await);
 
     let publisher = async {
@@ -135,9 +135,9 @@ async fn maximum_packet_size_decently_exceeded() {
     let topic_filter = TopicFilter::from(topic_name.clone());
 
     let msg = [0u8; PAYLOAD_SIZE].as_slice();
-    
+
     let mut tx =
-    assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
     let mut rx = assert_ok!(connected_client(BROKER_ADDRESS, &rx_connect_options, None).await);
 
     let publisher = async {
