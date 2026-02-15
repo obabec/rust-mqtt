@@ -131,7 +131,7 @@ async fn maximum_packet_size_decently_exceeded() {
         .clone()
         .maximum_packet_size(MAX_PACKET_SIZE);
 
-    let topic_name = TopicName::new(MqttString::from_str("b").unwrap()).unwrap();
+    let topic_name = TopicName::new(MqttString::from_str("c").unwrap()).unwrap();
     let topic_filter = TopicFilter::from(topic_name.clone());
 
     let msg = [0u8; PAYLOAD_SIZE].as_slice();
@@ -186,7 +186,7 @@ async fn maximum_packet_size_at_varbyteint_boundary_not_exceeded() {
         .clone()
         .maximum_packet_size(MAX_PACKET_SIZE);
 
-    let topic_name = TopicName::new(MqttString::from_str("c").unwrap()).unwrap();
+    let topic_name = TopicName::new(MqttString::from_str("d").unwrap()).unwrap();
     let topic_filter = TopicFilter::from(topic_name.clone());
 
     let msg = [0u8; PAYLOAD_SIZE].as_slice();
@@ -233,7 +233,7 @@ async fn maximum_packet_size_at_varbyteint_boundary_exceeded() {
         .clone()
         .maximum_packet_size(MAX_PACKET_SIZE);
 
-    let topic_name = TopicName::new(MqttString::from_str("d").unwrap()).unwrap();
+    let topic_name = TopicName::new(MqttString::from_str("e").unwrap()).unwrap();
     let topic_filter = TopicFilter::from(topic_name.clone());
 
     let msg = [0u8; PAYLOAD_SIZE].as_slice();
