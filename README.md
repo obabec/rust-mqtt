@@ -59,7 +59,7 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 
 Showing explicit session recovery and Quality of Service 2 retransmission after a network failure. The precise network and executor setup is omitted for brevity.
 
-```rust
+```rust,ignore
 async fn main() {
     let mut buffer = AllocBuffer;
     let mut client = Client::new(&mut buffer);
