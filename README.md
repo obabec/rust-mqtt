@@ -131,3 +131,16 @@ from [Drogue IoT](https://github.com/drogue-iot).
 ## Contact
 
 For any information, open an issue if your matter could be helpful or interesting for others or should be documented. Otherwise contact us on email <julian.jg.graf@gmail.com>, <ond.babec@gmail.com>.
+
+## License
+
+<sup>
+Licensed under <a href="LICENSE">MIT license</a>.
+</sup>
+
+<br>
+
+<sub>
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in rust-mqtt by you shall be licensed as above, without any additional terms or conditions.
+</sub>
