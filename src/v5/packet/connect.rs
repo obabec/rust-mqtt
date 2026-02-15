@@ -118,6 +118,7 @@ impl<'p> ConnectPacket<'p> {
         client_identifier: MqttString<'p>,
         clean_start: bool,
         keep_alive: KeepAlive,
+        maximum_packet_size: MaximumPacketSize,
         session_expiry_interval: SessionExpiryInterval,
         receive_maximum: u16,
         request_response_information: bool,
@@ -129,7 +130,7 @@ impl<'p> ConnectPacket<'p> {
             keep_alive,
             session_expiry_interval,
             receive_maximum: ReceiveMaximum(receive_maximum),
-            maximum_packet_size: MaximumPacketSize::default(),
+            maximum_packet_size,
             topic_alias_maximum: None,
             request_response_information: request_response_information
                 .then_some(true)
@@ -189,7 +190,7 @@ impl<'p> ConnectPacket<'p> {
 #[cfg(test)]
 mod unit {
     use crate::{
-        config::{KeepAlive, SessionExpiryInterval},
+        config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
         test::tx::encode,
         types::{MqttBinary, MqttString, QoS, TopicName, Will},
         v5::{
@@ -207,6 +208,7 @@ mod unit {
             MqttString::try_from("a").unwrap(),
             true,
             KeepAlive::Seconds(7439),
+            MaximumPacketSize::Unlimited,
             SessionExpiryInterval::EndOnDisconnect,
             u16::MAX,
             false,
@@ -235,11 +237,59 @@ mod unit {
 
     #[tokio::test]
     #[test_log::test]
+    async fn encode_properties() {
+        let packet = ConnectPacket::new(
+            MqttString::try_from("a").unwrap(),
+            false,
+            KeepAlive::Infinite,
+            MaximumPacketSize::Limit(2309845),
+            SessionExpiryInterval::Seconds(8136391),
+            63543,
+            true,
+        );
+
+        #[rustfmt::skip]
+        encode!(packet, [
+            0x10,       //
+            0x1D,       // remaining length
+            0x00,       // ---
+            0x04,       //
+            b'M',       //
+            b'Q',       //
+            b'T',       //
+            b'T',       // ---
+            0x05,       // Protocol version
+            0b00000000, // Connect flags
+            0x00,       // Keep alive MSB
+            0x00,       // Keep alive LSB
+            0x0F,       // Property length
+
+            0x11,       // Session expiry interval
+            0x00, 0x7C, 0x26, 0xC7,
+
+            0x21,       // Receive maximum
+            0xF8, 0x37,
+
+            0x27,       // Maximum packet size
+            0x00, 0x23, 0x3E, 0xD5,
+
+            0x19,       // Request response information
+            0x01,
+
+            0x00,       // Client identifier len MSB
+            0x01,       // Client identifier len LSB
+            b'a',       // Client identifier
+        ]);
+    }
+
+    #[tokio::test]
+    #[test_log::test]
     async fn encode_payload() {
         let mut packet = ConnectPacket::new(
             MqttString::try_from("giuqen").unwrap(),
             false,
             KeepAlive::Seconds(6789),
+            MaximumPacketSize::Unlimited,
             SessionExpiryInterval::EndOnDisconnect,
             u16::MAX,
             false,
@@ -301,6 +351,7 @@ mod unit {
             MqttString::try_from("cba").unwrap(),
             false,
             KeepAlive::Seconds(6789),
+            MaximumPacketSize::Unlimited,
             SessionExpiryInterval::Seconds(893475),
             u16::MAX,
             true,

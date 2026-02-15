@@ -241,6 +241,7 @@ impl<
                 packet_client_identifier,
                 options.clean_start,
                 options.keep_alive,
+                options.maximum_packet_size,
                 options.session_expiry_interval,
                 RECEIVE_MAXIMUM as u16,
                 options.request_response_information,

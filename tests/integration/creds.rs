@@ -1,21 +1,12 @@
 use rust_mqtt::{
     Bytes,
     client::{MqttError, options::ConnectOptions},
-    config::{KeepAlive, SessionExpiryInterval},
     types::MqttBinary,
 };
 
 use crate::common::{BROKER_ADDRESS, USERNAME, utils::connected_client};
 
-const NO_CREDS_CONNECT_OPTIONS: ConnectOptions = ConnectOptions {
-    clean_start: true,
-    keep_alive: KeepAlive::Infinite,
-    session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
-    request_response_information: false,
-    user_name: None,
-    password: None,
-    will: None,
-};
+const NO_CREDS_CONNECT_OPTIONS: ConnectOptions = ConnectOptions::new().clean_start();
 
 #[tokio::test]
 #[test_log::test]

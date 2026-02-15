@@ -53,7 +53,8 @@ pub enum MaximumPacketSize {
     #[default]
     Unlimited,
 
-    /// There is a limit on how large packets can be.
+    /// There is a limit on how large packets can be. The packet size is the value of its remaining length
+    /// plus the size of the fixed header.
     Limit(u32),
 }
 
