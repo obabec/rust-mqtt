@@ -17,9 +17,6 @@ pub(crate) enum Error<B> {
     /// A buffer provision by the [`crate::buffer::BufferProvider`] failed.
     Alloc(B),
 
-    /// A generic constant such as `MAX_PROPERTIES` is too small.
-    ConstSpace,
-
     /// Malformed packet or Protocol Error.
     Server,
 }
@@ -39,10 +36,6 @@ impl<E: eio::Error, B> From<RxError<E, B>> for (Error<B>, Option<ReasonCode>) {
             RxError::Read(e) => (Error::Network(e.kind()), None),
             RxError::Buffer(b) => (
                 Error::Alloc(b),
-                Some(ReasonCode::ImplementationSpecificError),
-            ),
-            RxError::InsufficientConstSpace => (
-                Error::ConstSpace,
                 Some(ReasonCode::ImplementationSpecificError),
             ),
             RxError::UnexpectedEOF => (Error::Network(ErrorKind::NotConnected), None),

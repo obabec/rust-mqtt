@@ -800,6 +800,9 @@ impl<
             }
             PacketType::Suback => {
                 debug!("receiving SUBACK packet");
+                // We only send SUBSCRIBE packets with exactly 1 topic
+                // -> Packets with more than 1 reason code are currently rejected by the RxPacket::receive implementation
+                //    with RxError::Protocol error. This is correct as long as we only send SUBSCRIBE packets with 1 topic.
                 let suback = self.raw.recv_body::<SubackPacket<'_, 1>>(&header).await?;
                 let pid = suback.packet_identifier;
 
@@ -807,7 +810,9 @@ impl<
                     // We only send SUBSCRIBE packets with exactly 1 topic
                     if suback.reason_codes.len() != 1 {
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
+                        return Err(MqttError::Server);
                     }
+
                     let r = suback.reason_codes.first().unwrap();
 
                     Event::Suback(Suback {
@@ -821,6 +826,9 @@ impl<
             }
             PacketType::Unsuback => {
                 debug!("receiving UNSUBACK packet");
+                // We only send UNSUBSCRIBE packets with exactly 1 topic
+                // -> Packets with more than 1 reason code are currently rejected by the RxPacket::receive implementation
+                //    with RxError::Protocol error. This is correct as long as we only send UNSUBSCRIBE packets with 1 topic.
                 let unsuback = self.raw.recv_body::<UnsubackPacket<'_, 1>>(&header).await?;
                 let pid = unsuback.packet_identifier;
 
@@ -828,6 +836,7 @@ impl<
                     // We only send UNSUBSCRIBE packets with exactly 1 topic
                     if unsuback.reason_codes.len() != 1 {
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
+                        return Err(MqttError::Server);
                     }
 
                     let r = unsuback.reason_codes.first().unwrap();

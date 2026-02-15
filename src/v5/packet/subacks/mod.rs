@@ -129,9 +129,14 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
                 error!("invalid reason code: {:?}", reason_code);
                 return Err(RxError::ProtocolError);
             }
+
+            // This currently doesn't return a const space related error as we only send SUBSCRIBE packets with a single
+            // reason code and therefore expect the server to send ACKs with one reason code as well.
+            // This is not really the correct error in the decoding sense but it's ok and more efficient for now and allows
+            // us to get rid of the public error counterpart.
             reason_codes
                 .push(reason_code)
-                .map_err(|_| RxError::InsufficientConstSpace)?;
+                .map_err(|_| RxError::ProtocolError)?;
         }
 
         let packet = Self {
