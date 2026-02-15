@@ -111,17 +111,19 @@ async fn main() {
 
 
     // Recover the in-flight Quality of Service 2 publish.
-    // Depending on which packet may have been lost, do one of:
-    
-    // - Republish if PUBLISH / PUBREC may have been lost
-    client.republish(
-        packet_identifier,
-        &PublicationOptions::new(topic.into()).exactly_once(),
-        "Hello World!".into(),
-    ).await.unwrap();
 
-    // - Re-release if PUBREL / PUBCOMP may have been lost
-    client.rerelease().await.unwrap();
+    match client.session().cpublish_flight_state(packet_identifier) {
+        // - Republish if PUBLISH / PUBREC may have been lost
+        Some(CPublishFlightState::AwaitingPubrec) => client.republish(
+            packet_identifier,
+            &PublicationOptions::new(topic.into()).exactly_once(),
+            "Hello World!".into(),
+        ).await.unwrap(),
+        // - Re-release if PUBREL / PUBCOMP may have been lost
+        Some(CPublishFlightState::AwaitingPubcomp) => client.rerelease().await.unwrap(),
+        // - Flight state already completed
+        _ => {}
+    }
 }
 ```
 
