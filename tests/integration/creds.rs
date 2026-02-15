@@ -28,8 +28,7 @@ async fn connect_no_creds() {
 #[tokio::test]
 #[test_log::test]
 async fn connect_no_password() {
-    let mut options = NO_CREDS_CONNECT_OPTIONS;
-    options.user_name = Some(USERNAME);
+    let options = NO_CREDS_CONNECT_OPTIONS.user_name(USERNAME);
 
     let r = connected_client(BROKER_ADDRESS, &options, None).await;
 
@@ -48,9 +47,9 @@ async fn connect_no_password() {
 #[tokio::test]
 #[test_log::test]
 async fn connect_wrong_password() {
-    let mut options = NO_CREDS_CONNECT_OPTIONS;
-    options.user_name = Some(USERNAME);
-    options.password = Some(MqttBinary::from_bytes(Bytes::Borrowed(b"wrong password")).unwrap());
+    let options = NO_CREDS_CONNECT_OPTIONS
+        .user_name(USERNAME)
+        .password(MqttBinary::from_bytes(Bytes::Borrowed(b"wrong password")).unwrap());
 
     let r = connected_client(BROKER_ADDRESS, &options, None).await;
 
