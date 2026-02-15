@@ -44,7 +44,7 @@ pub use err::Error as MqttError;
 
 /// An MQTT client.
 ///
-/// Configuration via const paramenters:
+/// Configuration via const parameters:
 /// - `MAX_SUBSCRIBES`: The maximum amount of in-flight/unacknowledged SUBSCRIBE packets (one per call to [`Self::subscribe`]).
 /// - `RECEIVE_MAXIMUM`: MQTT's control flow mechanism. The maximum amount of incoming [`QoS::AtLeastOnce`] and
 ///   [`QoS::ExactlyOnce`] publications (accumulated).
