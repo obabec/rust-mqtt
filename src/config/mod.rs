@@ -25,7 +25,7 @@ pub enum KeepAlive {
 impl KeepAlive {
     pub(crate) fn as_u16(&self) -> u16 {
         match self {
-            KeepAlive::Infinite => u16::MAX,
+            KeepAlive::Infinite => 0,
             KeepAlive::Seconds(s) => *s,
         }
     }
