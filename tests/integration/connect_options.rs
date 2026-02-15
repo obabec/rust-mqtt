@@ -63,7 +63,7 @@ async fn maximum_packet_size_not_exceeded() {
     join!(receiver, publisher);
 }
 
-#[ignore = "ok with hive, doesn't work with mosquitto"]
+#[ignore = "enable this once mosquitto v2.1.3 is used, see https://github.com/eclipse-mosquitto/mosquitto/issues/3503"]
 #[tokio::test]
 #[test_log::test]
 async fn maximum_packet_size_barely_exceeded() {
