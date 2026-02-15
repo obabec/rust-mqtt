@@ -29,11 +29,6 @@ pub enum Error<'e> {
     /// Unrecoverable error. [`crate::client::Client::abort`] should be called.
     Server,
 
-    /// A buffer or generic constant provided by the user was too small to correctly receive a packet.
-    ///
-    /// Unrecoverable error. [`crate::client::Client::abort`] should be called.
-    ReceiveBuffer,
-
     /// A buffer provision by the [`crate::buffer::BufferProvider`] failed. Therefore a packet
     /// could not be received correctly.
     ///
@@ -162,7 +157,6 @@ impl<'e, B> From<RawError<B>> for Error<'e> {
             RawError::Disconnected => Self::RecoveryRequired,
             RawError::Network(e) => Self::Network(e),
             RawError::Alloc(_) => Self::Alloc,
-            RawError::ConstSpace => Self::ReceiveBuffer,
             RawError::Server => Self::Server,
         }
     }

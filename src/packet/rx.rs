@@ -26,9 +26,6 @@ pub enum RxError<E, B> {
     Read(E),
     Buffer(B),
 
-    /// Constant space somewhere is not enough, e.g. `Vec<ReasonCode, MAX_TOPIC_FILTERS>` in SUBACK
-    InsufficientConstSpace,
-
     UnexpectedEOF,
 
     MalformedPacket,
