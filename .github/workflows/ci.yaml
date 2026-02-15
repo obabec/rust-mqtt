@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  clippy:
+    uses: ./.github/workflows/clippy.yaml
+  doc_tests:
+    uses: ./.github/workflows/doc_tests.yaml
+  fmt:
+    uses: ./.github/workflows/fmt.yaml
+  integration_tests:
+    uses: ./.github/workflows/integration_tests.yaml
+  msrv:
+    uses: ./.github/workflows/msrv.yaml
+  unit_tests:
+    uses: ./.github/workflows/unit_tests.yaml

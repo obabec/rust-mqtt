@@ -1,6 +1,21 @@
-# rust-mqtt
+# rust-mqtt &emsp; [![build]][actions] [![docs]][docs.rs] [![crates]][crates.io] [![msrv]][rust 1.87] [![license]][MIT]
 
-rust-mqtt is an MQTT client primarily for no_std environments. The library provides an async API depending on [embedded_io_async](https://docs.rs/embedded-io-async/latest/embedded_io_async/)'s traits. As of now, only [MQTT version 5.0](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html) is supported.
+[build]: https://img.shields.io/github/actions/workflow/status/obabec/rust-mqtt/ci.yaml?branch=main&label=ci
+[actions]: https://github.com/obabec/rust-mqtt/actions?query=branch%3Amain
+[docs]: https://docs.rs/rust-mqtt/badge.svg
+[docs.rs]: https://docs.rs/rust-mqtt
+[crates]: https://img.shields.io/crates/v/rust-mqtt.svg
+[crates.io]: https://crates.io/crates/rust-mqtt
+[msrv]: https://img.shields.io/crates/msrv/rust-mqtt.svg?color=lightgray
+[rust 1.87]: https://blog.rust-lang.org/2025/05/15/Rust-1.87.0/
+[license]: https://img.shields.io/crates/l/rust-mqtt.svg
+[MIT]: https://github.com/obabec/rust-mqtt#license
+
+`rust-mqtt` provides a MQTT client primarily for no_std environments. The library provides an async API depending on [embedded_io_async](https://docs.rs/embedded-io-async/latest/embedded_io_async/)'s traits. As of now, only [MQTT version 5.0](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html) is supported.
+
+The design goal is a strict yet flexible and explicit API that leverages Rust's type system to enforce the MQTT specification while exposing all protocol features transparently. Session state, configuration, and Quality of Service message delivery and retry behaviour remain fully under user control, giving complete freedom over protocol usage. Protocol-related errors are prevented by the client API and are modeled in a way that enables maximum recoverability. By avoiding opinionated design choices and making no assumptions about the runtime environment, `rust-mqtt` remains lightweight while providing a powerful MQTT client foundation.
+
+`rust-mqtt` does not implement opinionated connection management — automatic reconnects, keepalive loops, retry policies, or background tasks are intentionally left to the user. Instead, the crate is designed as a composable protocol layer, suitable for either higher-level clients, tooling or resource-constrained embedded applications.
 
 ## Library state
 
@@ -25,9 +40,9 @@ rust-mqtt is an MQTT client primarily for no_std environments. The library provi
 
 ### Extension plans (more or less by priority)
 
-- Receive the 'remaining length' (variable header & payload) of an mqtt packet using a buffer instead of calling `Read::read` very frequently.
-- MQTT version 3
-- Sync implementation.
+- Read complete packets with cancel-safe implementation
+- MQTT version 3.1.1
+- Sync implementation
 
 ### Feature flags
 
@@ -39,6 +54,78 @@ rust-mqtt is an MQTT client primarily for no_std environments. The library provi
 - `v5`: Enables MQTT version 5.0
 
 ## Usage
+
+### Illustrative API example
+
+Showing explicit session recovery and Quality of Service 2 retransmission after a network failure. The precise network and executor setup is omitted for brevity.
+
+```rust,ignore
+async fn main() {
+    let mut buffer = AllocBuffer;
+    let mut client = Client::new(&mut buffer);
+
+    let transport = ...;    // Any Read/Write implementation (TCP, TLS, ...)
+
+    let connect_options = ConnectOptions::new()
+        .clean_start()
+        .session_expiry_interval(SessionExpiryInterval::NeverEnd)
+        .user_name(MqttString::from_str("user").unwrap())
+        .password(MqttBinary::from_slice("pass").unwrap());
+
+    client.connect(
+        transport,
+        &connect_options,
+        Some(MqttString::from_str("rust-mqtt-demo").unwrap()),
+    ).await.unwrap();
+
+    let topic = TopicName::new(MqttString::from_str("demo/topic").unwrap()).unwrap();
+
+    client.subscribe(
+        topic.as_borrowed().into(),
+        SubscriptionOptions::new().exactly_once(),
+    ).await.unwrap();
+
+    let packet_identifier = client.publish(
+        &PublicationOptions::new(topic.as_borrowed().into()).exactly_once(),
+        "Hello World!".into(),
+    ).await.unwrap();
+
+    while let Ok(event) = client.poll().await {
+        if let Event::PublishComplete(_) = event {
+            // Publish succeeded, we can disconnect
+            client.disconnect(&DisconnectOptions::new()).await.unwrap();
+            return;
+        }
+    }
+
+    // An error has occured (e.g. network failure)
+    client.abort().await;
+
+    let transport = ...;    // Open a fresh connection
+
+    client.connect(
+        transport,
+        &connect_options,
+        Some(MqttString::from_str("rust-mqtt-demo").unwrap()),
+    ).await.unwrap();
+
+
+    // Recover the in-flight Quality of Service 2 publish.
+
+    match client.session().cpublish_flight_state(packet_identifier) {
+        // - Republish if PUBLISH / PUBREC may have been lost
+        Some(CPublishFlightState::AwaitingPubrec) => client.republish(
+            packet_identifier,
+            &PublicationOptions::new(topic.into()).exactly_once(),
+            "Hello World!".into(),
+        ).await.unwrap(),
+        // - Re-release if PUBREL / PUBCOMP may have been lost
+        Some(CPublishFlightState::AwaitingPubcomp) => client.rerelease().await.unwrap(),
+        // - Flight state already completed
+        _ => {}
+    }
+}
+```
 
 ### Examples
 
@@ -116,3 +203,16 @@ from [Drogue IoT](https://github.com/drogue-iot).
 ## Contact
 
 For any information, open an issue if your matter could be helpful or interesting for others or should be documented. Otherwise contact us on email <julian.jg.graf@gmail.com>, <ond.babec@gmail.com>.
+
+## License
+
+<sup>
+Licensed under <a href="LICENSE">MIT license</a>.
+</sup>
+
+<br>
+
+<sub>
+Unless you explicitly state otherwise, any contribution intentionally submitted
+for inclusion in rust-mqtt by you shall be licensed as above, without any additional terms or conditions.
+</sub>

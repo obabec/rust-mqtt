@@ -43,6 +43,15 @@ pub mod raw;
 pub use err::Error as MqttError;
 
 /// An MQTT client.
+///
+/// Configuration via const parameters:
+/// - `MAX_SUBSCRIBES`: The maximum amount of in-flight/unacknowledged SUBSCRIBE packets (one per call to [`Self::subscribe`]).
+/// - `RECEIVE_MAXIMUM`: MQTT's control flow mechanism. The maximum amount of incoming [`QoS::AtLeastOnce`] and
+///   [`QoS::ExactlyOnce`] publications (accumulated).
+/// - `SEND_MAXIMUM`: The maximum amount of outgoing [`QoS::AtLeastOnce`] and [`QoS::ExactlyOnce`] publications. The server
+///   can further limit this with its receive maximum. The client will use the minimum of this value and [`Self::server_config`].
+/// - `MAX_SUBSCRIPTION_IDENTIFIERS`: The maximum amount of subscription identifier properties the client can receive within a
+///   single PUBLISH packet. If a packet with more subscription identifiers is received, the later identifers will be discarded.
 #[derive(Debug)]
 pub struct Client<
     'c,

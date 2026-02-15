@@ -18,7 +18,7 @@ use rust_mqtt::{
         },
     },
     config::{KeepAlive, SessionExpiryInterval},
-    types::{MqttBinary, MqttString, QoS, TopicName, VarByteInt},
+    types::{MqttBinary, MqttString, TopicName, VarByteInt},
 };
 use tokio::{net::TcpStream, select, time::sleep};
 
@@ -81,19 +81,14 @@ async fn main() {
         client.buffer().reset()
     };
 
-    let subscription_identifier = if client.server_config().subscription_identifiers_supported {
-        Some(VarByteInt::from(42u16))
-    } else {
-        None
-    };
+    let mut sub_options = SubscriptionOptions::new()
+        .retain_handling(RetainHandling::SendIfNotSubscribedBefore)
+        .retain_as_published()
+        .exactly_once();
 
-    let sub_options = SubscriptionOptions {
-        retain_handling: RetainHandling::SendIfNotSubscribedBefore,
-        retain_as_published: true,
-        no_local: false,
-        qos: QoS::ExactlyOnce,
-        subscription_identifier,
-    };
+    if client.server_config().subscription_identifiers_supported {
+        sub_options.subscription_identifier = Some(VarByteInt::from(42u16))
+    }
 
     let topic = TopicName::new(MqttString::from_str("rust-mqtt/is/great").unwrap()).unwrap();
 
@@ -323,13 +318,7 @@ async fn main() {
         }
     }
 
-    match client
-        .disconnect(&DisconnectOptions {
-            publish_will: false,
-            session_expiry_interval: None,
-        })
-        .await
-    {
+    match client.disconnect(&DisconnectOptions::new()).await {
         Ok(_) => info!("Disconnected from server"),
         Err(e) => {
             error!("Failed to disconnect from server: {:?}", e);
