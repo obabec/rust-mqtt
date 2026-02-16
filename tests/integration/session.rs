@@ -15,8 +15,9 @@ use crate::common::{
 async fn session_continue_regular_disconnect() {
     let id = MqttString::from_str("SESSION_CONTINUE_REGULAR_DISCONNECT_CLIENT").unwrap();
 
-    let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    connect_options.session_expiry_interval = SessionExpiryInterval::NeverEnd;
+    let connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::NeverEnd);
 
     let mut c = assert_ok!(
         connected_client(BROKER_ADDRESS, &connect_options, Some(id.as_borrowed())).await
@@ -26,8 +27,9 @@ async fn session_continue_regular_disconnect() {
 
     disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
 
-    let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(3);
+    let mut connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::Seconds(3));
     connect_options.clean_start = false;
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -58,8 +60,8 @@ async fn session_continue_regular_disconnect() {
 
     assert!(info.session_present);
 
-    let mut dc_options = *DEFAULT_DC_OPTIONS;
-    dc_options.session_expiry_interval = Some(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options =
+        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 }
 
@@ -68,8 +70,9 @@ async fn session_continue_regular_disconnect() {
 async fn session_continue_connection_dropped() {
     let id = MqttString::from_str("SESSION_CONTINUE_CONNECTION_DROPPED_CLIENT").unwrap();
 
-    let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    connect_options.session_expiry_interval = SessionExpiryInterval::NeverEnd;
+    let connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::NeverEnd);
 
     let c = assert_ok!(
         connected_client(BROKER_ADDRESS, &connect_options, Some(id.as_borrowed())).await
@@ -80,8 +83,9 @@ async fn session_continue_connection_dropped() {
     let session = c.session().clone();
     drop(c);
 
-    let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(3);
+    let mut connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::Seconds(3));
     connect_options.clean_start = false;
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -111,8 +115,8 @@ async fn session_continue_connection_dropped() {
     ));
     assert!(info.session_present);
 
-    let mut dc_options = *DEFAULT_DC_OPTIONS;
-    dc_options.session_expiry_interval = Some(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options =
+        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 }
 
@@ -121,8 +125,9 @@ async fn session_continue_connection_dropped() {
 async fn session_discontinued_clean_start() {
     let id = MqttString::from_str("SESSION_DISCONTINUED_CLEAN_START_CLIENT").unwrap();
 
-    let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    connect_options.session_expiry_interval = SessionExpiryInterval::NeverEnd;
+    let connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::NeverEnd);
 
     let mut c = assert_ok!(
         connected_client(BROKER_ADDRESS, &connect_options, Some(id.as_borrowed())).await
@@ -148,8 +153,8 @@ async fn session_discontinued_clean_start() {
     ));
     assert!(!info.session_present);
 
-    let mut dc_options = *DEFAULT_DC_OPTIONS;
-    dc_options.session_expiry_interval = Some(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options =
+        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 }
 
@@ -158,8 +163,9 @@ async fn session_discontinued_clean_start() {
 async fn session_expired() {
     let id = MqttString::from_str("SESSION_EXPIRED_CLIENT").unwrap();
 
-    let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(3);
+    let mut connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::Seconds(3));
 
     let mut c = assert_ok!(
         connected_client(BROKER_ADDRESS, &connect_options, Some(id.as_borrowed())).await
@@ -194,8 +200,8 @@ async fn session_expired() {
     ));
     assert!(!info.session_present);
 
-    let mut dc_options = *DEFAULT_DC_OPTIONS;
-    dc_options.session_expiry_interval = Some(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options =
+        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 }
 
@@ -204,8 +210,9 @@ async fn session_expired() {
 async fn session_shortened_and_expired() {
     let id = MqttString::from_str("SESSION_SHORTENED_AND_EXPIRED_CLIENT").unwrap();
 
-    let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    connect_options.session_expiry_interval = SessionExpiryInterval::NeverEnd;
+    let connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::NeverEnd);
 
     let mut c = assert_ok!(
         connected_client(BROKER_ADDRESS, &connect_options, Some(id.as_borrowed())).await
@@ -219,8 +226,9 @@ async fn session_shortened_and_expired() {
     sleep(Duration::from_secs(5)).await;
 
     // Try to continue the previous session
-    let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(10);
+    let mut connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::Seconds(10));
     connect_options.clean_start = false;
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -230,8 +238,8 @@ async fn session_shortened_and_expired() {
     );
     assert!(!info.session_present);
 
-    let mut dc_options = *DEFAULT_DC_OPTIONS;
-    dc_options.session_expiry_interval = Some(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options =
+        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 
     // Session ends right away, try to continue it directly
@@ -244,7 +252,7 @@ async fn session_shortened_and_expired() {
     );
     assert!(!info.session_present);
 
-    let mut dc_options = *DEFAULT_DC_OPTIONS;
-    dc_options.session_expiry_interval = Some(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options =
+        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 }
