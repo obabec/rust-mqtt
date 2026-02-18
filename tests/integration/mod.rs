@@ -6,3 +6,4 @@ mod pub_sub;
 mod request_response;
 mod session;
 mod sub_options;
+mod will;

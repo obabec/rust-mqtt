@@ -49,7 +49,4 @@ pub const DEFAULT_QOS0_SUB_OPTIONS: SubscriptionOptions = SubscriptionOptions {
     subscription_identifier: None,
 };
 
-pub const DEFAULT_DC_OPTIONS: &DisconnectOptions = &DisconnectOptions {
-    publish_will: true,
-    session_expiry_interval: None,
-};
+pub const DEFAULT_DC_OPTIONS: &DisconnectOptions = &DisconnectOptions::new().publish_will();
