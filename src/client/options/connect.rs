@@ -2,7 +2,7 @@ use const_fn::const_fn;
 
 use crate::{
     client::options::WillOptions,
-    config::{KeepAlive, SessionExpiryInterval},
+    config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
     types::{MqttBinary, MqttString},
 };
 
@@ -18,6 +18,9 @@ pub struct Options<'c> {
 
     /// The setting of the session expiry interval the server wishes. Can be set to a different value by the server.
     pub session_expiry_interval: SessionExpiryInterval,
+
+    /// The maximum packet size that the client is willing to accept
+    pub maximum_packet_size: MaximumPacketSize,
 
     /// When set to true, the broker may return response information used to construct response topics.
     pub request_response_information: bool,
@@ -44,6 +47,7 @@ impl<'c> Options<'c> {
         Self {
             clean_start: false,
             keep_alive: KeepAlive::Infinite,
+            maximum_packet_size: MaximumPacketSize::Unlimited,
             session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
             request_response_information: false,
             user_name: None,
@@ -60,6 +64,11 @@ impl<'c> Options<'c> {
     /// Sets the desired keep alive of the connection.
     pub const fn keep_alive(mut self, keep_alive: KeepAlive) -> Self {
         self.keep_alive = keep_alive;
+        self
+    }
+    /// Sets the maximum packet size.
+    pub const fn maximum_packet_size(mut self, maximum_packet_size: u32) -> Self {
+        self.maximum_packet_size = MaximumPacketSize::Limit(maximum_packet_size);
         self
     }
     /// Sets the desired session expiry interval of the connection.

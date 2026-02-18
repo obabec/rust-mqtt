@@ -20,7 +20,7 @@ use crate::{
     session::{CPublishFlightState, SPublishFlightState, Session},
     types::{
         IdentifiedQoS, MqttBinary, MqttString, QoS, ReasonCode, SubscriptionFilter, TopicFilter,
-        TopicName,
+        TopicName, VarByteInt,
     },
     v5::{
         packet::{
@@ -231,6 +231,35 @@ impl<
         // which session expiry interval can be sent in DISCONNECT packet.
         self.client_config.session_expiry_interval = options.session_expiry_interval;
 
+        // Empirical maximum packet size mapping
+        // -------------------------------------------------------------------------------------------------------
+        //         remaining length              | fixed header length |              max packet size
+        //                               0..=127 |                   2 |                                   2..=129
+        //                          128..=16_383 |                   3 |                              131..=16_386
+        //                    16_384..=2_097_151 |                   4 |                        16_388..=2_097_155
+        // 2_097_152..=VarByteInt::MAX_ENCODABLE |                   5 | 2_097_157..=(VarByteInt::MAX_ENCODABLE+5)
+
+        const MAX_POSSIBLE_PACKET_SIZE: u32 = VarByteInt::MAX_ENCODABLE + 5;
+
+        self.client_config.maximum_accepted_remaining_length = match options.maximum_packet_size {
+            MaximumPacketSize::Unlimited => u32::MAX,
+            MaximumPacketSize::Limit(l) => match l {
+                0..=1 => panic!(
+                    "Every MQTT packet is at least 2 bytes long, a smaller maximum packet size makes no sense"
+                ),
+                2..=129 => l - 2,
+                130..=16_386 => l - 3,
+                16_387..=2_097_155 => l - 4,
+                2_097_156..MAX_POSSIBLE_PACKET_SIZE => l - 5,
+                MAX_POSSIBLE_PACKET_SIZE.. => VarByteInt::MAX_ENCODABLE,
+            },
+        };
+
+        debug!(
+            "maximum accepted remaining length set to {:?}",
+            self.client_config.maximum_accepted_remaining_length
+        );
+
         {
             let packet_client_identifier = client_identifier
                 .as_ref()
@@ -241,6 +270,7 @@ impl<
                 packet_client_identifier,
                 options.clean_start,
                 options.keep_alive,
+                options.maximum_packet_size,
                 options.session_expiry_interval,
                 RECEIVE_MAXIMUM as u16,
                 options.request_response_information,
@@ -774,6 +804,15 @@ impl<
                 self.raw.close_with(Some(ReasonCode::MalformedPacket));
                 return Err(MqttError::Server);
             }
+        }
+
+        if header.remaining_len.value() > self.client_config.maximum_accepted_remaining_length {
+            error!(
+                "received a packet exceeding maximum packet size, remaining length={:?}",
+                header.remaining_len.value()
+            );
+            self.raw.close_with(Some(ReasonCode::PacketTooLarge));
+            return Err(MqttError::Server);
         }
 
         Ok(header)

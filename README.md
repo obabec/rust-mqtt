@@ -15,7 +15,7 @@
 
 The design goal is a strict yet flexible and explicit API that leverages Rust's type system to enforce the MQTT specification while exposing all protocol features transparently. Session state, configuration, and Quality of Service message delivery and retry behaviour remain fully under user control, giving complete freedom over protocol usage. Protocol-related errors are prevented by the client API and are modeled in a way that enables maximum recoverability. By avoiding opinionated design choices and making no assumptions about the runtime environment, `rust-mqtt` remains lightweight while providing a powerful MQTT client foundation.
 
-`rust-mqtt` does not implement opinionated connection management — automatic reconnects, keepalive loops, retry policies, or background tasks are intentionally left to the user. Instead, the crate is designed as a composable protocol layer, suitable for either higher-level clients, tooling or resource-constrained embedded applications.
+`rust-mqtt` does not implement opinionated connection management — automatic reconnects, keepalive loops, retry policies, or background tasks are intentionally left to the user. Instead, the crate provides cancel-safe protocol primitives, suitable for higher-level clients, tooling, and resource-constrained embedded applications. In the future, the client will be extended with additional I/O traits such as `ReadReady` to further composability.
 
 ## Library state
 
@@ -26,7 +26,7 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 - Flow control
 - Configuration & session tracking
 - Session recovery
-- Serverside maximum packet size
+- Client- & serverside maximum packet size
 - Subscription identifiers
 - Message expiry interval
 - Topic alias

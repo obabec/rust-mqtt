@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove `Raw`-related types from public API
 - Fix client panics when server sends SUBACK/UNSUBACK packets with no reason codes
 - Remove `Error::ReceiveBuffer` as it is superseeded by `Error::Server` in SUBACK/UNSUBACK handling
+- Fix incorrect serialisation of `KeepAlive::Infinite` as the maximum keep alive value of 65535 seconds
+- Add support for client maximum packet size
 
 ## 0.4.1 - 2026-01-06
 

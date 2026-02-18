@@ -1,3 +1,4 @@
+mod connect_options;
 mod creds;
 mod message_retry;
 mod pub_properties;

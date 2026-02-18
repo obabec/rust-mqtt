@@ -25,7 +25,7 @@ pub enum KeepAlive {
 impl KeepAlive {
     pub(crate) fn as_u16(&self) -> u16 {
         match self {
-            KeepAlive::Infinite => u16::MAX,
+            KeepAlive::Infinite => 0,
             KeepAlive::Seconds(s) => *s,
         }
     }
@@ -53,7 +53,9 @@ pub enum MaximumPacketSize {
     #[default]
     Unlimited,
 
-    /// There is a limit on how large packets can be.
+    /// There is a limit on how large packets can be. The packet size is the value of its remaining length
+    /// plus the size of the fixed header. A value less than 2 does not make sense because every MQTT packet
+    /// contains a fixed header of at least 2 bytes.
     Limit(u32),
 }
 

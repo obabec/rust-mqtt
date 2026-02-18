@@ -1,21 +1,12 @@
 use rust_mqtt::{
     Bytes,
     client::{MqttError, options::ConnectOptions},
-    config::{KeepAlive, SessionExpiryInterval},
     types::MqttBinary,
 };
 
 use crate::common::{BROKER_ADDRESS, USERNAME, utils::connected_client};
 
-const NO_CREDS_CONNECT_OPTIONS: ConnectOptions = ConnectOptions {
-    clean_start: true,
-    keep_alive: KeepAlive::Infinite,
-    session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
-    request_response_information: false,
-    user_name: None,
-    password: None,
-    will: None,
-};
+const NO_CREDS_CONNECT_OPTIONS: ConnectOptions = ConnectOptions::new().clean_start();
 
 #[tokio::test]
 #[test_log::test]
@@ -37,8 +28,7 @@ async fn connect_no_creds() {
 #[tokio::test]
 #[test_log::test]
 async fn connect_no_password() {
-    let mut options = NO_CREDS_CONNECT_OPTIONS;
-    options.user_name = Some(USERNAME);
+    let options = NO_CREDS_CONNECT_OPTIONS.user_name(USERNAME);
 
     let r = connected_client(BROKER_ADDRESS, &options, None).await;
 
@@ -57,9 +47,9 @@ async fn connect_no_password() {
 #[tokio::test]
 #[test_log::test]
 async fn connect_wrong_password() {
-    let mut options = NO_CREDS_CONNECT_OPTIONS;
-    options.user_name = Some(USERNAME);
-    options.password = Some(MqttBinary::from_bytes(Bytes::Borrowed(b"wrong password")).unwrap());
+    let options = NO_CREDS_CONNECT_OPTIONS
+        .user_name(USERNAME)
+        .password(MqttBinary::from_bytes(Bytes::Borrowed(b"wrong password")).unwrap());
 
     let r = connected_client(BROKER_ADDRESS, &options, None).await;
 
