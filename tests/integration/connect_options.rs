@@ -1,8 +1,14 @@
 use std::time::Duration;
 
 use rust_mqtt::{
-    client::options::{PublicationOptions, TopicReference},
-    types::{MqttString, TopicFilter, TopicName},
+    Bytes,
+    client::{
+        MqttError,
+        event::Event,
+        options::{PublicationOptions, SubscriptionOptions, TopicReference, WillOptions},
+    },
+    config::{KeepAlive, SessionExpiryInterval},
+    types::{MqttBinary, MqttString, ReasonCode, TopicFilter, TopicName},
 };
 use tokio::{
     join,
@@ -13,7 +19,7 @@ use tokio_test::assert_err;
 use crate::common::{
     BROKER_ADDRESS, DEFAULT_DC_OPTIONS, DEFAULT_QOS0_SUB_OPTIONS, NO_SESSION_CONNECT_OPTIONS,
     assert::{assert_ok, assert_published, assert_recv, assert_recv_excl, assert_subscribe},
-    utils::{connected_client, disconnect},
+    utils::{connected_client, disconnect, unique_topic},
 };
 
 #[tokio::test]
@@ -270,4 +276,278 @@ async fn maximum_packet_size_at_varbyteint_boundary_exceeded() {
     };
 
     join!(receiver, publisher);
+}
+
+// Keep alive timing test rules:
+// - The server MUST NOT disconnect us before the keep alive interval has elapsed without a message
+//   -> It can disconnect us earlier, so we can only reliably test with intervals < 1x keep alive
+// - The server MUST disconnect us if it has not received any packet within 1.5x the keep alive interval
+//   -> Some brokers behave not as strict, so we give it 2x the keep alive interval
+
+#[tokio::test]
+#[test_log::test]
+async fn keep_alive_infinite() {
+    let mut c =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    assert_eq!(c.shared_config().keep_alive, KeepAlive::Infinite);
+
+    assert_err!(
+        timeout(Duration::from_secs(10), c.poll_header()).await,
+        "expected to stay connected"
+    );
+
+    disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn keep_alive_via_ping() {
+    let mut c = assert_ok!(
+        connected_client(
+            BROKER_ADDRESS,
+            &NO_SESSION_CONNECT_OPTIONS
+                .clone()
+                .keep_alive(KeepAlive::Seconds(1)),
+            None
+        )
+        .await
+    );
+    assert_eq!(c.shared_config().keep_alive, KeepAlive::Seconds(1));
+
+    for _ in 0..10 {
+        sleep(Duration::from_millis(950)).await;
+        assert_ok!(c.ping().await);
+        let event = assert_ok!(c.poll().await);
+        assert!(matches!(event, Event::Pingresp));
+    }
+
+    disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn keep_alive_via_outgoing_publish() {
+    let topic_name = unique_topic().0;
+    let publish_options = PublicationOptions::new(TopicReference::Name(topic_name));
+
+    let mut c = assert_ok!(
+        connected_client(
+            BROKER_ADDRESS,
+            &NO_SESSION_CONNECT_OPTIONS
+                .clone()
+                .keep_alive(KeepAlive::Seconds(1)),
+            None
+        )
+        .await
+    );
+    assert_eq!(c.shared_config().keep_alive, KeepAlive::Seconds(1));
+
+    for _ in 0..10 {
+        sleep(Duration::from_millis(950)).await;
+        assert_ok!(c.publish(&publish_options, Bytes::from("")).await);
+    }
+
+    disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn keep_alive_via_incoming_qos1() {
+    let (topic_name, topic_filter) = unique_topic();
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    let mut rx = assert_ok!(
+        connected_client(
+            BROKER_ADDRESS,
+            &NO_SESSION_CONNECT_OPTIONS
+                .clone()
+                .keep_alive(KeepAlive::Seconds(2)),
+            None
+        )
+        .await
+    );
+    assert_eq!(rx.shared_config().keep_alive, KeepAlive::Seconds(2));
+
+    let publisher = async {
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).at_least_once();
+
+        for _ in 0..10 {
+            sleep(Duration::from_secs(1)).await;
+            assert_published!(tx, pub_options, Bytes::from(""));
+        }
+
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS.at_least_once(), topic_filter);
+
+        for _ in 0..10 {
+            assert_recv_excl!(rx, topic_name);
+        }
+
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn keep_alive_via_subscribe() {
+    let topic_filter = unique_topic().1;
+    let subscribe_options = SubscriptionOptions::new();
+
+    let mut c = assert_ok!(
+        connected_client(
+            BROKER_ADDRESS,
+            &NO_SESSION_CONNECT_OPTIONS
+                .clone()
+                .keep_alive(KeepAlive::Seconds(1)),
+            None
+        )
+        .await
+    );
+    assert_eq!(c.shared_config().keep_alive, KeepAlive::Seconds(1));
+
+    for _ in 0..10 {
+        sleep(Duration::from_millis(950)).await;
+        assert_ok!(
+            c.subscribe(topic_filter.as_borrowed(), subscribe_options)
+                .await
+        );
+        let event = assert_ok!(c.poll().await);
+        assert!(matches!(event, Event::Suback(_)));
+    }
+
+    disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn keep_alive_not_kept_alive_idle_network() {
+    let mut c = assert_ok!(
+        connected_client(
+            BROKER_ADDRESS,
+            &NO_SESSION_CONNECT_OPTIONS
+                .clone()
+                .keep_alive(KeepAlive::Seconds(6)),
+            None
+        )
+        .await
+    );
+    assert_eq!(c.shared_config().keep_alive, KeepAlive::Seconds(6));
+
+    assert_err!(
+        timeout(Duration::from_millis(5950), c.poll_header()).await,
+        "expected to stay connected"
+    );
+
+    let e = assert_err!(assert_ok!(
+        timeout(Duration::from_millis(6100), c.poll()).await,
+        "expected to be disconnected"
+    ));
+
+    assert!(matches!(
+        e,
+        MqttError::Disconnect {
+            reason: ReasonCode::KeepAliveTimeout,
+            reason_string: _,
+        } | MqttError::Network(_)
+    ));
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn keep_alive_not_kept_alive_incoming_qos0() {
+    let (topic_name, topic_filter) = unique_topic();
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    let mut rx = assert_ok!(
+        connected_client(
+            BROKER_ADDRESS,
+            &NO_SESSION_CONNECT_OPTIONS
+                .clone()
+                .keep_alive(KeepAlive::Seconds(2)),
+            None
+        )
+        .await
+    );
+    assert_eq!(rx.shared_config().keep_alive, KeepAlive::Seconds(2));
+
+    let publisher = async {
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).at_least_once();
+
+        for _ in 0..10 {
+            sleep(Duration::from_secs(1)).await;
+            assert_published!(tx, pub_options, Bytes::from(""));
+        }
+
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter);
+
+        assert_ok!(
+            timeout(Duration::from_secs(4), async {
+                loop {
+                    if let Err(MqttError::Network(_)) = rx.poll().await {
+                        break;
+                    }
+                }
+            })
+            .await,
+            "expected to be disconnected"
+        );
+    };
+
+    join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn keep_alive_not_kept_alive_will_timing() {
+    let (topic_name, topic_filter) = unique_topic();
+    let will = WillOptions::new(topic_name.clone(), MqttBinary::from_slice(b"").unwrap())
+        .delay_interval(3);
+    let connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .will(will)
+        .keep_alive(KeepAlive::Seconds(3))
+        .session_expiry_interval(SessionExpiryInterval::NeverEnd);
+
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter);
+
+    let mut tx = assert_ok!(connected_client(BROKER_ADDRESS, &connect_options, None).await);
+
+    assert_eq!(tx.shared_config().keep_alive, KeepAlive::Seconds(3));
+
+    assert_err!(
+        timeout(Duration::from_millis(5950), rx.poll_header()).await,
+        "expected to receive nothing"
+    );
+
+    assert_ok!(
+        timeout(Duration::from_millis(3100), async {
+            assert_recv_excl!(rx, topic_name);
+        })
+        .await,
+        "expected to receive the will message"
+    );
+
+    let e = assert_err!(tx.poll().await);
+    assert!(matches!(
+        e,
+        MqttError::Disconnect {
+            reason: ReasonCode::KeepAliveTimeout,
+            reason_string: _,
+        } | MqttError::Network(_)
+    ));
+
+    disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
 }
