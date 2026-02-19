@@ -330,7 +330,7 @@ impl<
             shared_subscription_available,
             server_keep_alive,
             response_information,
-            server_reference: _,
+            server_reference,
             authentication_method: _,
             authentication_data: _,
         } = self.raw.recv_body(&header).await?;
@@ -389,6 +389,7 @@ impl<
                 session_present,
                 client_identifier,
                 response_information: response_information.map(Property::into_inner),
+                server_reference: server_reference.map(Property::into_inner),
             })
         } else {
             debug!("CONNACK packet indicates rejection");
@@ -398,6 +399,7 @@ impl<
             Err(MqttError::Disconnect {
                 reason: reason_code,
                 reason_string: reason_string.map(Property::into_inner),
+                server_reference: server_reference.map(Property::into_inner),
             })
         }
     }
@@ -1208,6 +1210,7 @@ impl<
                 return Err(MqttError::Disconnect {
                     reason: disconnect.reason_code,
                     reason_string: disconnect.reason_string.map(Property::into_inner),
+                    server_reference: disconnect.server_reference.map(Property::into_inner),
                 });
             }
             t @ (PacketType::Connect

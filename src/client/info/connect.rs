@@ -18,4 +18,7 @@ pub struct Info<'i> {
 
     /// Response information used to create response topics.
     pub response_information: Option<MqttString<'i>>,
+
+    /// Another server which can be used.
+    pub server_reference: Option<MqttString<'i>>,
 }

@@ -783,7 +783,8 @@ async fn will_existing_session_taken_over_with_session_expiry() {
             e,
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
-                reason_string: _
+                reason_string: _,
+                server_reference: _,
             }
         ));
     };
@@ -848,7 +849,8 @@ async fn will_existing_session_taken_over_with_will_delay() {
             e,
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
-                reason_string: _
+                reason_string: _,
+                server_reference: _,
             }
         ));
     };
@@ -909,7 +911,8 @@ async fn will_existing_session_taken_over_with_clean_start() {
             e,
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
-                reason_string: _
+                reason_string: _,
+                server_reference: _,
             }
         ));
     };
@@ -971,7 +974,8 @@ async fn no_will_existing_session_taken_over() {
             e,
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
-                reason_string: _
+                reason_string: _,
+                server_reference: _,
             }
         ));
     };
