@@ -538,16 +538,22 @@ impl<
 
         let packet: PublishPacket<'_, 0> = PublishPacket::new(
             false,
-            options.retain,
             identified_qos,
-            options.message_expiry_interval.map(Into::into),
+            options.retain,
             options.topic.as_borrowed(),
-            message,
+            options.payload_format_indicator.map(Into::into),
+            options.message_expiry_interval.map(Into::into),
             options.response_topic.as_ref().map(TopicName::as_borrowed),
             options
                 .correlation_data
                 .as_ref()
                 .map(MqttBinary::as_borrowed),
+            options
+                .content_type
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
+            message,
         )?;
 
         match self.server_config.maximum_packet_size {
@@ -650,16 +656,22 @@ impl<
 
         let packet: PublishPacket<'_, 0> = PublishPacket::new(
             true,
-            options.retain,
             identified_qos,
-            options.message_expiry_interval.map(Into::into),
+            options.retain,
             options.topic.as_borrowed(),
-            message,
+            options.payload_format_indicator.map(Into::into),
+            options.message_expiry_interval.map(Into::into),
             options.response_topic.as_ref().map(TopicName::as_borrowed),
             options
                 .correlation_data
                 .as_ref()
                 .map(MqttBinary::as_borrowed),
+            options
+                .content_type
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
+            message,
         )?;
 
         match self.server_config.maximum_packet_size {

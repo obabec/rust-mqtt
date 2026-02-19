@@ -1,16 +1,31 @@
 use const_fn::const_fn;
 
-use crate::types::{MqttBinary, QoS, TopicName};
+use crate::types::{MqttBinary, MqttString, QoS, TopicName};
 
 /// Options for a publication.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Options<'p> {
+    /// The quality of service that the message is published with to the server.
+    /// The quality of service level used by the server to send this publication
+    /// to subscribed clients is the minimum of this value and the quality of service
+    /// value of the receiving client's subscription.
+    pub qos: QoS,
+
     /// Depicts the value of the retain flag in the PUBLISH packet.
     /// If set to 1, the server should retain the message on this topic.
     /// Retained messages with quality of service 0 can be discarded
     /// at any time by the server.
     pub retain: bool,
+
+    /// The topic that the message is published on. The topic can be referenced over
+    /// an existing topic alias mapping or by specifying the topic name and optionally
+    /// mapping a topic alias to it.
+    pub topic: TopicReference<'p>,
+
+    /// Indicates whether the message is valid UTF-8. If [`None`], there is no statement
+    /// about the UTF-8 character of the message.
+    pub payload_format_indicator: Option<bool>,
 
     /// The message expiry interval in seconds of this application message. After this
     /// interval has passed, the server cannot publish this message onward to subscribers.
@@ -18,23 +33,15 @@ pub struct Options<'p> {
     /// property is omitted on the network.
     pub message_expiry_interval: Option<u32>,
 
-    /// The topic that the message is published on. The topic can be referenced over
-    /// an existing topic alias mapping or by specifying the topic name and optionally
-    /// mapping a topic alias to it.
-    pub topic: TopicReference<'p>,
-
-    /// The quality of service that the message is published with to the server.
-    /// The quality of service level used by the server to send this publication
-    /// to subscribed clients is the minimum of this value and the quality of service
-    /// value of the receiving client's subscription.
-    pub qos: QoS,
-
     /// The topic on which the receiver should publish the response.
     pub response_topic: Option<TopicName<'p>>,
 
     /// Arbitrary binary data which the receiver should attach in the response to associate
     /// their response with this request.
     pub correlation_data: Option<MqttBinary<'p>>,
+
+    /// The custom content type of the message.
+    pub content_type: Option<MqttString<'p>>,
 }
 
 impl<'p> Options<'p> {
@@ -42,12 +49,14 @@ impl<'p> Options<'p> {
     /// [`QoS::AtMostOnce`].
     pub const fn new(topic: TopicReference<'p>) -> Options<'p> {
         Options {
-            retain: false,
-            message_expiry_interval: None,
-            topic,
             qos: QoS::AtMostOnce,
+            retain: false,
+            topic,
+            payload_format_indicator: None,
+            message_expiry_interval: None,
             response_topic: None,
             correlation_data: None,
+            content_type: None,
         }
     }
 
@@ -69,6 +78,11 @@ impl<'p> Options<'p> {
         self.retain = true;
         self
     }
+    /// Sets the payload format indicator property.
+    pub const fn payload_format_indicator(mut self, is_payload_utf8: bool) -> Self {
+        self.payload_format_indicator = Some(is_payload_utf8);
+        self
+    }
     /// Sets the message expiry interval in seconds.
     pub const fn message_expiry_interval(mut self, seconds: u32) -> Self {
         self.message_expiry_interval = Some(seconds);
@@ -84,6 +98,12 @@ impl<'p> Options<'p> {
     #[const_fn(cfg(not(feature = "alloc")))]
     pub const fn correlation_data(mut self, data: MqttBinary<'p>) -> Self {
         self.correlation_data = Some(data);
+        self
+    }
+    /// Sets the content type property.
+    #[const_fn(cfg(not(feature = "alloc")))]
+    pub const fn content_type(mut self, content_type: MqttString<'p>) -> Self {
+        self.content_type = Some(content_type);
         self
     }
 }
