@@ -34,7 +34,7 @@ async fn maximum_packet_size_not_exceeded() {
 
     let rx_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .maximum_packet_size(MAX_PACKET_SIZE);
+        .maximum_packet_size(NonZero::new(MAX_PACKET_SIZE).unwrap());
 
     let topic_name = TopicName::new(MqttString::from_str("a").unwrap()).unwrap();
     let topic_filter = TopicFilter::from(topic_name.clone());
@@ -82,7 +82,7 @@ async fn maximum_packet_size_barely_exceeded() {
 
     let rx_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .maximum_packet_size(MAX_PACKET_SIZE);
+        .maximum_packet_size(NonZero::new(MAX_PACKET_SIZE).unwrap());
 
     let topic_name = TopicName::new(MqttString::from_str("b").unwrap()).unwrap();
     let topic_filter = TopicFilter::from(topic_name.clone());
@@ -135,7 +135,7 @@ async fn maximum_packet_size_decently_exceeded() {
 
     let rx_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .maximum_packet_size(MAX_PACKET_SIZE);
+        .maximum_packet_size(NonZero::new(MAX_PACKET_SIZE).unwrap());
 
     let topic_name = TopicName::new(MqttString::from_str("c").unwrap()).unwrap();
     let topic_filter = TopicFilter::from(topic_name.clone());
@@ -190,7 +190,7 @@ async fn maximum_packet_size_at_varbyteint_boundary_not_exceeded() {
 
     let rx_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .maximum_packet_size(MAX_PACKET_SIZE);
+        .maximum_packet_size(NonZero::new(MAX_PACKET_SIZE).unwrap());
 
     let topic_name = TopicName::new(MqttString::from_str("d").unwrap()).unwrap();
     let topic_filter = TopicFilter::from(topic_name.clone());
@@ -237,7 +237,7 @@ async fn maximum_packet_size_at_varbyteint_boundary_exceeded() {
 
     let rx_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .maximum_packet_size(MAX_PACKET_SIZE);
+        .maximum_packet_size(NonZero::new(MAX_PACKET_SIZE).unwrap());
 
     let topic_name = TopicName::new(MqttString::from_str("e").unwrap()).unwrap();
     let topic_filter = TopicFilter::from(topic_name.clone());

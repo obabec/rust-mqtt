@@ -237,11 +237,9 @@ impl<R: Read> Readable<R> for MaximumPacketSize {
     async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
         let max = u32::read(read).await?;
 
-        if max > 0 {
-            Ok(Self::Limit(max))
-        } else {
-            Err(ReadError::ProtocolError)
-        }
+        NonZero::new(max)
+            .map(Self::Limit)
+            .ok_or(ReadError::ProtocolError)
     }
 }
 impl Writable for MaximumPacketSize {
@@ -255,7 +253,7 @@ impl Writable for MaximumPacketSize {
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
         if let Self::Limit(l) = self {
             Self::TYPE.write(write).await?;
-            l.write(write).await?;
+            l.get().write(write).await?;
         }
 
         Ok(())

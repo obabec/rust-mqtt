@@ -243,14 +243,15 @@ impl<
 
         self.client_config.maximum_accepted_remaining_length = match options.maximum_packet_size {
             MaximumPacketSize::Unlimited => u32::MAX,
-            MaximumPacketSize::Limit(l) => match l {
-                0..=1 => panic!(
+            MaximumPacketSize::Limit(l) => match l.get() {
+                0 => unreachable!("NonZero invariant"),
+                1 => panic!(
                     "Every MQTT packet is at least 2 bytes long, a smaller maximum packet size makes no sense"
                 ),
-                2..=129 => l - 2,
-                130..=16_386 => l - 3,
-                16_387..=2_097_155 => l - 4,
-                2_097_156..MAX_POSSIBLE_PACKET_SIZE => l - 5,
+                2..=129 => l.get() - 2,
+                130..=16_386 => l.get() - 3,
+                16_387..=2_097_155 => l.get() - 4,
+                2_097_156..MAX_POSSIBLE_PACKET_SIZE => l.get() - 5,
                 MAX_POSSIBLE_PACKET_SIZE.. => VarByteInt::MAX_ENCODABLE,
             },
         };
@@ -446,11 +447,8 @@ impl<
         let _ = subscribe_filters.push(subscribe_filter);
         let packet = SubscribePacket::new(pid, options.subscription_identifier, subscribe_filters)?;
 
-        match self.server_config.maximum_packet_size {
-            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
-                return Err(MqttError::ServerMaximumPacketSizeExceeded);
-            }
-            _ => {}
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
         debug!("sending SUBSCRIBE packet");
@@ -484,11 +482,8 @@ impl<
         let _ = topic_filters.push(topic_filter);
         let packet = UnsubscribePacket::new(pid, topic_filters)?;
 
-        match self.server_config.maximum_packet_size {
-            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
-                return Err(MqttError::ServerMaximumPacketSizeExceeded);
-            }
-            _ => {}
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
         debug!("sending UNSUBSCRIBE packet");
@@ -556,11 +551,8 @@ impl<
             message,
         )?;
 
-        match self.server_config.maximum_packet_size {
-            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
-                return Err(MqttError::ServerMaximumPacketSizeExceeded);
-            }
-            _ => {}
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
         // Treat the packet as sent before successfully sending. In case of a network error,
@@ -674,11 +666,8 @@ impl<
             message,
         )?;
 
-        match self.server_config.maximum_packet_size {
-            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
-                return Err(MqttError::ServerMaximumPacketSizeExceeded);
-            }
-            _ => {}
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
         // We only republish a message if its quality of service and flight state is correct.

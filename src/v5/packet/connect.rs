@@ -244,7 +244,7 @@ mod unit {
             MqttString::try_from("a").unwrap(),
             false,
             KeepAlive::Infinite,
-            MaximumPacketSize::Limit(2309845),
+            MaximumPacketSize::Limit(NonZero::new(2309845).unwrap()),
             SessionExpiryInterval::Seconds(8136391),
             63543,
             true,

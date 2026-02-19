@@ -301,7 +301,7 @@ mod unit {
         assert_eq!(packet.retain_available, Some(RetainAvailable(true)));
         assert_eq!(
             packet.maximum_packet_size,
-            Some(MaximumPacketSize::Limit(1048576))
+            Some(MaximumPacketSize::Limit(NonZero::new(1048576).unwrap()))
         );
         assert_eq!(
             packet.assigned_client_identifier,
