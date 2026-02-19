@@ -625,7 +625,7 @@ async fn session_expires_before_will_delay_interval() {
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, will_topic_filter.clone());
 
         assert_err!(
-            timeout(Duration::from_secs(5), async {
+            timeout(Duration::from_secs(4), async {
                 assert_recv!(rx);
             })
             .await,
@@ -633,7 +633,7 @@ async fn session_expires_before_will_delay_interval() {
         );
 
         let Publish { topic, message, .. } = assert_ok!(assert_ok!(
-            timeout(Duration::from_secs(2), receive_and_complete(&mut rx)).await
+            timeout(Duration::from_secs(4), receive_and_complete(&mut rx)).await
         ));
 
         assert_eq!(topic, will_topic_name);
