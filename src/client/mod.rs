@@ -1,5 +1,7 @@
 //! Implements full client functionality with session and configuration handling and Quality of Service flows.
 
+use core::num::NonZero;
+
 use crate::{
     buffer::BufferProvider,
     bytes::Bytes,
@@ -47,7 +49,7 @@ pub use err::Error as MqttError;
 /// Configuration via const parameters:
 /// - `MAX_SUBSCRIBES`: The maximum amount of in-flight/unacknowledged SUBSCRIBE packets (one per call to [`Self::subscribe`]).
 /// - `RECEIVE_MAXIMUM`: MQTT's control flow mechanism. The maximum amount of incoming [`QoS::AtLeastOnce`] and
-///   [`QoS::ExactlyOnce`] publications (accumulated).
+///   [`QoS::ExactlyOnce`] publications (accumulated). Must not be 0 and must not be greater than 65535.
 /// - `SEND_MAXIMUM`: The maximum amount of outgoing [`QoS::AtLeastOnce`] and [`QoS::ExactlyOnce`] publications. The server
 ///   can further limit this with its receive maximum. The client will use the minimum of this value and [`Self::server_config`].
 /// - `MAX_SUBSCRIPTION_IDENTIFIERS`: The maximum amount of subscription identifier properties the client can receive within a
@@ -92,6 +94,15 @@ impl<
     /// The session state is initialised as a new session. If you want to start the
     /// client with an existing session, use [`Self::with_session`].
     pub fn new(buffer: &'c mut B) -> Self {
+        assert!(
+            RECEIVE_MAXIMUM <= 65535,
+            "RECEIVE_MAXIMUM must be less than or equal to 65535"
+        );
+        assert!(
+            RECEIVE_MAXIMUM > 0,
+            "RECEIVE_MAXIMUM must be greater than 0"
+        );
+
         Self {
             client_config: ClientConfig::default(),
             shared_config: SharedConfig::default(),
@@ -121,7 +132,7 @@ impl<
     /// Returns the amount of publications the client is allowed to make according to the server's
     /// receive maximum. Does not account local space for storing publication state.
     fn remaining_send_quota(&self) -> u16 {
-        self.server_config.receive_maximum.into_inner() - self.session.in_flight_cpublishes()
+        self.server_config.receive_maximum.into_inner().get() - self.session.in_flight_cpublishes()
     }
 
     fn is_packet_identifier_used(&self, packet_identifier: u16) -> bool {
@@ -273,7 +284,8 @@ impl<
                 options.keep_alive,
                 options.maximum_packet_size,
                 options.session_expiry_interval,
-                RECEIVE_MAXIMUM as u16,
+                // Safety: `Self::new` panics if `RECEIVE_MAXIMUM` is 0 making this code unreachable.
+                unsafe { NonZero::new_unchecked(RECEIVE_MAXIMUM as u16) },
                 options.request_response_information,
             );
 

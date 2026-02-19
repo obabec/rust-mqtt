@@ -296,7 +296,10 @@ mod unit {
             packet.session_expiry_interval,
             Some(SessionExpiryInterval::Seconds(1410754593))
         );
-        assert_eq!(packet.receive_maximum, Some(ReceiveMaximum(4761)));
+        assert_eq!(
+            packet.receive_maximum,
+            Some(ReceiveMaximum(NonZero::new(4761).unwrap()))
+        );
         assert_eq!(packet.maximum_qos, Some(MaximumQoS(QoS::AtLeastOnce)));
         assert_eq!(packet.retain_available, Some(RetainAvailable(true)));
         assert_eq!(

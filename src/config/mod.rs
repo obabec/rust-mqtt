@@ -75,4 +75,4 @@ impl MaximumPacketSize {
 /// Default is 65536 / [`u16::MAX`] and is used when no receive maximum is present. Can't be zero.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct ReceiveMaximum(pub(crate) u16);
+pub struct ReceiveMaximum(pub NonZero<u16>);

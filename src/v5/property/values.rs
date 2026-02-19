@@ -262,7 +262,7 @@ impl Writable for MaximumPacketSize {
 
 impl Property for ReceiveMaximum {
     const TYPE: PropertyType = PropertyType::ReceiveMaximum;
-    type Inner = u16;
+    type Inner = NonZero<u16>;
 
     fn into_inner(self) -> Self::Inner {
         self.0
@@ -272,25 +272,21 @@ impl<R: Read> Readable<R> for ReceiveMaximum {
     async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
         let max = u16::read(read).await?;
 
-        if max > 0 {
-            Ok(Self(max))
-        } else {
-            Err(ReadError::ProtocolError)
-        }
+        NonZero::new(max).map(Self).ok_or(ReadError::ProtocolError)
     }
 }
 impl Writable for ReceiveMaximum {
     fn written_len(&self) -> usize {
-        match self.0 {
+        match self.0.get() {
             u16::MAX => 0,
             _ => Self::TYPE.written_len() + wlen!(u16),
         }
     }
 
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
-        if self.0 < u16::MAX {
+        if self.0.get() < u16::MAX {
             Self::TYPE.write(write).await?;
-            self.0.write(write).await?;
+            self.0.get().write(write).await?;
         }
 
         Ok(())
