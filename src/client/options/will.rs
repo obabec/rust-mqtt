@@ -2,7 +2,7 @@ use const_fn::const_fn;
 
 use crate::{
     types::{MqttBinary, MqttString, QoS, TopicName, Will},
-    v5::property::{PayloadFormatIndicator, WillDelayInterval},
+    v5::property::WillDelayInterval,
 };
 
 /// Options for configuring the client's will or last will in a session.
@@ -23,9 +23,6 @@ pub struct Options<'c> {
     /// The topic of the will publication.
     pub will_topic: TopicName<'c>,
 
-    /// The payload of the will publication.
-    pub will_payload: MqttBinary<'c>,
-
     // Will properties starting here
     /// The interval in seconds that passes after a disconnection before the server publishes the will.
     /// The session of the client does not necessarily have to end for this scenario to happen.
@@ -33,9 +30,10 @@ pub struct Options<'c> {
     /// If the value of the will delay interval is 0, the property is omitted on the network.
     pub will_delay_interval: u32,
 
-    /// The payload format indicator property in the will publication. If set to false, the property
-    /// is omitted on the network.
-    pub is_payload_utf8: bool,
+    /// The payload format indicator property in the will publication. If present, this indicates
+    /// whether the will payload is valid UTF-8. If set to [`None`], the property is omitted on the
+    /// network.
+    pub payload_format_indicator: Option<bool>,
 
     /// The message expiry interval in seconds of the will publication. If set to [`None`], the message
     /// does not expire and the message expiry interval property is omitted on the network.
@@ -52,23 +50,26 @@ pub struct Options<'c> {
     /// The correlation data property in the will publication. If set to [`None`], the property is omitted
     /// on the network.
     pub correlation_data: Option<MqttBinary<'c>>,
+
+    /// The payload of the will publication.
+    pub will_message: MqttBinary<'c>,
 }
 
 impl<'c> Options<'c> {
     /// Creates options with values coherent to the [`Default`] implementations of the fields and
     /// [`QoS::AtMostOnce`].
-    pub const fn new(topic: TopicName<'c>, payload: MqttBinary<'c>) -> Options<'c> {
+    pub const fn new(topic: TopicName<'c>, message: MqttBinary<'c>) -> Options<'c> {
         Options {
             will_qos: QoS::AtMostOnce,
             will_retain: false,
             will_topic: topic,
-            will_payload: payload,
             will_delay_interval: 0,
-            is_payload_utf8: false,
+            payload_format_indicator: None,
             message_expiry_interval: None,
             content_type: None,
             response_topic: None,
             correlation_data: None,
+            will_message: message,
         }
     }
 
@@ -97,8 +98,8 @@ impl<'c> Options<'c> {
     }
     /// Sets the payload format indicator property to true thus marking the payload of the will message.
     /// as valid UTF-8.
-    pub const fn mark_payload_utf8(mut self) -> Self {
-        self.is_payload_utf8 = true;
+    pub const fn payload_format_indicator(mut self, is_payload_utf8: bool) -> Self {
+        self.payload_format_indicator = Some(is_payload_utf8);
         self
     }
     /// Sets the message expiry interval in seconds of the will message.
@@ -106,7 +107,7 @@ impl<'c> Options<'c> {
         self.message_expiry_interval = Some(message_expiry_interval);
         self
     }
-    /// Sets a custom content type of the will message's payload.
+    /// Sets a custom content type of the will message.
     #[const_fn(cfg(not(feature = "alloc")))]
     pub const fn content_type(mut self, content_type: MqttString<'c>) -> Self {
         self.content_type = Some(content_type);
@@ -134,10 +135,7 @@ impl<'c> Options<'c> {
                 0 => None,
                 i => Some(WillDelayInterval(i)),
             },
-            payload_format_indicator: match self.is_payload_utf8 {
-                false => None,
-                true => Some(PayloadFormatIndicator(true)),
-            },
+            payload_format_indicator: self.payload_format_indicator.map(Into::into),
             message_expiry_interval: self.message_expiry_interval.map(Into::into),
             content_type: self
                 .content_type
@@ -154,7 +152,7 @@ impl<'c> Options<'c> {
                 .as_ref()
                 .map(MqttBinary::as_borrowed)
                 .map(Into::into),
-            will_payload: self.will_payload.as_borrowed(),
+            will_message: self.will_message.as_borrowed(),
         }
     }
 }

@@ -56,7 +56,7 @@ async fn main() {
                     .exactly_once()
                     .retain()
                     .delay_interval(1)
-                    .mark_payload_utf8()
+                    .payload_format_indicator(true)
                     .content_type(MqttString::try_from("txt").unwrap()),
                 ),
             Some(MqttString::try_from("rust-mqtt-demo-client").unwrap()),

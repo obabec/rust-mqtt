@@ -330,7 +330,7 @@ impl<
             shared_subscription_available,
             server_keep_alive,
             response_information,
-            server_reference: _,
+            server_reference,
             authentication_method: _,
             authentication_data: _,
         } = self.raw.recv_body(&header).await?;
@@ -389,6 +389,7 @@ impl<
                 session_present,
                 client_identifier,
                 response_information: response_information.map(Property::into_inner),
+                server_reference: server_reference.map(Property::into_inner),
             })
         } else {
             debug!("CONNACK packet indicates rejection");
@@ -398,6 +399,7 @@ impl<
             Err(MqttError::Disconnect {
                 reason: reason_code,
                 reason_string: reason_string.map(Property::into_inner),
+                server_reference: server_reference.map(Property::into_inner),
             })
         }
     }
@@ -536,16 +538,22 @@ impl<
 
         let packet: PublishPacket<'_, 0> = PublishPacket::new(
             false,
-            options.retain,
             identified_qos,
-            options.message_expiry_interval.map(Into::into),
+            options.retain,
             options.topic.as_borrowed(),
-            message,
+            options.payload_format_indicator.map(Into::into),
+            options.message_expiry_interval.map(Into::into),
             options.response_topic.as_ref().map(TopicName::as_borrowed),
             options
                 .correlation_data
                 .as_ref()
                 .map(MqttBinary::as_borrowed),
+            options
+                .content_type
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
+            message,
         )?;
 
         match self.server_config.maximum_packet_size {
@@ -648,16 +656,22 @@ impl<
 
         let packet: PublishPacket<'_, 0> = PublishPacket::new(
             true,
-            options.retain,
             identified_qos,
-            options.message_expiry_interval.map(Into::into),
+            options.retain,
             options.topic.as_borrowed(),
-            message,
+            options.payload_format_indicator.map(Into::into),
+            options.message_expiry_interval.map(Into::into),
             options.response_topic.as_ref().map(TopicName::as_borrowed),
             options
                 .correlation_data
                 .as_ref()
                 .map(MqttBinary::as_borrowed),
+            options
+                .content_type
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
+            message,
         )?;
 
         match self.server_config.maximum_packet_size {
@@ -903,20 +917,24 @@ impl<
                 };
 
                 let publish = Publish {
-                    identified_qos: publish.identified_qos,
                     dup: publish.dup,
+                    identified_qos: publish.identified_qos,
                     retain: publish.retain,
+                    topic,
+                    payload_format_indicator: publish
+                        .payload_format_indicator
+                        .map(Property::into_inner),
                     message_expiry_interval: publish
                         .message_expiry_interval
                         .map(Property::into_inner),
+                    response_topic: publish.response_topic.map(Property::into_inner),
+                    correlation_data: publish.correlation_data.map(Property::into_inner),
                     subscription_identifiers: publish
                         .subscription_identifiers
                         .into_iter()
                         .map(Property::into_inner)
                         .collect(),
-                    response_topic: publish.response_topic.map(Property::into_inner),
-                    correlation_data: publish.correlation_data.map(Property::into_inner),
-                    topic,
+                    content_type: publish.content_type.map(Property::into_inner),
                     message: publish.message,
                 };
 
@@ -1208,6 +1226,7 @@ impl<
                 return Err(MqttError::Disconnect {
                     reason: disconnect.reason_code,
                     reason_string: disconnect.reason_string.map(Property::into_inner),
+                    server_reference: disconnect.server_reference.map(Property::into_inner),
                 });
             }
             t @ (PacketType::Connect

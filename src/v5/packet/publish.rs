@@ -187,7 +187,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
 
         trace!("reading message ({} bytes)", message_len);
 
-        let payload = r.read_and_store(r.remaining_len()).await?;
+        let message = r.read_and_store(r.remaining_len()).await?;
 
         Ok(PublishPacket {
             dup,
@@ -200,7 +200,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
             correlation_data,
             subscription_identifiers,
             content_type,
-            message: payload,
+            message,
         })
     }
 }
@@ -257,25 +257,27 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         dup: bool,
-        retain: bool,
         identified_qos: IdentifiedQoS,
-        message_expiry_interval: Option<MessageExpiryInterval>,
+        retain: bool,
         topic: TopicReference<'p>,
-        message: Bytes<'p>,
+        payload_format_indicator: Option<PayloadFormatIndicator>,
+        message_expiry_interval: Option<MessageExpiryInterval>,
         response_topic: Option<TopicName<'p>>,
         correlation_data: Option<MqttBinary<'p>>,
+        content_type: Option<ContentType<'p>>,
+        message: Bytes<'p>,
     ) -> Result<Self, TooLargeToEncode> {
         let p = Self {
             dup,
             identified_qos,
             retain,
             topic,
-            payload_format_indicator: None,
+            payload_format_indicator,
             message_expiry_interval,
             response_topic: response_topic.map(Into::into),
             correlation_data: correlation_data.map(Into::into),
             subscription_identifiers: Vec::new(),
-            content_type: None,
+            content_type,
             message,
         };
 
@@ -348,15 +350,17 @@ mod unit {
     async fn encode_simple() {
         let packet: PublishPacket<'_, 0> = PublishPacket::new(
             false,
-            false,
             IdentifiedQoS::AtLeastOnce(5897),
-            None,
+            false,
             TopicReference::Name(
                 TopicName::new(MqttString::try_from("test/topic").unwrap()).unwrap(),
             ),
+            None,
+            None,
+            None,
+            None,
+            None,
             Bytes::from("hello".as_bytes()),
-            None,
-            None,
         )
         .unwrap();
 
@@ -392,25 +396,34 @@ mod unit {
     async fn encode_properties() {
         let packet: PublishPacket<'_, 0> = PublishPacket::new(
             true,
-            true,
             IdentifiedQoS::ExactlyOnce(9624),
-            Some(481123u32.into()),
+            true,
             TopicReference::Alias(23408),
-            Bytes::from("hello".as_bytes()),
+            Some(false.into()),
+            Some(481123u32.into()),
             Some(TopicName::new(MqttString::from_str("uno, dos, tres, catorce").unwrap()).unwrap()),
             Some(MqttBinary::from_slice_unchecked(&[0, 1, 2, 3, 4, 5, 6, 7])),
+            Some(
+                MqttString::from_str("application/javascript")
+                    .unwrap()
+                    .into(),
+            ),
+            Bytes::from("hello".as_bytes()),
         )
         .unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [
             0x3D,
-            0x37,
+            0x52,
             0x00, // Topic Name
             0x00, // Topic Name
             0x25, // Packet identifier
             0x98, // Packet identifier
-            0x2D, // Property length
+            0x48, // Property length
+
+            0x01, // Payload format indicator
+            0x00, // Payload format indicator
             0x02, // Message expiry interval
             0x00, //
             0x07, //
@@ -427,6 +440,10 @@ mod unit {
             0x09, // Correlation Data
             0x00, 0x08,
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+
+            0x03, // Content type
+            0x00, 0x16,
+            b'a', b'p', b'p', b'l', b'i', b'c', b'a', b't', b'i', b'o', b'n', b'/', b'j', b'a', b'v', b'a', b's', b'c', b'r', b'i', b'p', b't', 
 
             b'h', // Payload
             b'e', //

@@ -995,8 +995,8 @@ async fn incoming_qos1_write_fail_retry() {
 
                     match rx.poll().await {
                         Ok(Event::Publish(Publish {
-                            identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
                             dup: false,
+                            identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
                             message,
                             ..
                         })) if &*message == msg.as_slice() => {}
@@ -1023,8 +1023,8 @@ async fn incoming_qos1_write_fail_retry() {
 
                 match assert_ok!(rx.poll().await) {
                     Event::Publish(Publish {
-                        identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
                         dup: true,
+                        identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
                         message,
                         ..
                     }) if &*message == msg.as_slice() => {}
@@ -1108,8 +1108,8 @@ async fn incoming_qos1_read_fail_retry() {
 
                     match rx.poll().await {
                         Ok(Event::Publish(Publish {
-                            identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
                             dup: false,
+                            identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
                             message,
                             ..
                         })) if &*message == msg.as_slice() => {}
@@ -1219,8 +1219,8 @@ async fn incoming_qos2_write_fail_retry() {
 
                     let pid = match rx.poll().await {
                         Ok(Event::Publish(Publish {
-                            identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
                             dup: false,
+                            identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
                             message,
                             ..
                         })) if &*message == msg.as_slice() => pid,
@@ -1357,8 +1357,8 @@ async fn incoming_qos2_read_fail_retry() {
 
                     let pid = match rx.poll().await {
                         Ok(Event::Publish(Publish {
-                            identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
                             dup: false,
+                            identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
                             message,
                             ..
                         })) if &*message == msg.as_slice() => pid,

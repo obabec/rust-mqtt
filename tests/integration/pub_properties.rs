@@ -5,7 +5,7 @@ use rust_mqtt::{
         event::Publish,
         options::{PublicationOptions, TopicReference},
     },
-    types::QoS,
+    types::{MqttString, QoS},
 };
 use tokio::{
     join,
@@ -149,7 +149,7 @@ async fn message_expiry_interval_completely_expired() {
 #[test_log::test]
 async fn topic_alias_basic() {
     let (topic_name, topic_filter) = unique_topic();
-    let msg = "It's working as designed, will update the requirements accordingly.";
+    let msg = "There are two ways to write error-free programs. Only the third one works.";
 
     let mut rx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
@@ -255,4 +255,94 @@ async fn topic_alias_remap() {
     };
 
     join!(receiver1, receiver2, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn payload_format_indicator() {
+    let (topic_name, topic_filter) = unique_topic();
+    let msg = "Should array indices start at 0 or 1? My compromise of 0.5 was rejected without, I thought, proper consideration.";
+
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        sleep(Duration::from_secs(1)).await;
+
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()));
+        assert_published!(tx, pub_options, msg.into());
+        let pub_options = pub_options.payload_format_indicator(false);
+        assert_published!(tx, pub_options, msg.into());
+        let pub_options = pub_options.payload_format_indicator(true);
+        assert_published!(tx, pub_options, msg.into());
+
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter.clone());
+
+        let Publish {
+            payload_format_indicator,
+            ..
+        } = assert_recv_excl!(rx, topic_name);
+        assert_eq!(payload_format_indicator, None);
+
+        let Publish {
+            payload_format_indicator,
+            ..
+        } = assert_recv_excl!(rx, topic_name);
+        assert_eq!(payload_format_indicator, Some(false));
+
+        let Publish {
+            payload_format_indicator,
+            ..
+        } = assert_recv_excl!(rx, topic_name);
+        assert_eq!(payload_format_indicator, Some(true));
+
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn content_type() {
+    let publish_content_type = MqttString::from_str("application/octet-stream").unwrap();
+    let (topic_name, topic_filter) = unique_topic();
+    let msg = "The good thing about reinventing the wheel is that you can get a round one.";
+
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        sleep(Duration::from_secs(1)).await;
+
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()));
+        assert_published!(tx, pub_options, msg.into());
+
+        let pub_options = pub_options.content_type(publish_content_type.as_borrowed());
+        assert_published!(tx, pub_options, msg.into());
+
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter.clone());
+
+        let Publish { content_type, .. } = assert_recv_excl!(rx, topic_name);
+        assert_eq!(content_type, None);
+
+        let Publish { content_type, .. } = assert_recv_excl!(rx, topic_name);
+        assert_eq!(content_type, Some(publish_content_type.as_borrowed()));
+
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
 }

@@ -33,8 +33,8 @@ pub const PASSWORD: MqttBinary<'static> = MqttBinary::from_slice_unchecked("test
 pub const NO_SESSION_CONNECT_OPTIONS: &ConnectOptions<'static> = &ConnectOptions {
     clean_start: true,
     keep_alive: KeepAlive::Infinite,
-    session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
     maximum_packet_size: MaximumPacketSize::Unlimited,
+    session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
     request_response_information: false,
     user_name: Some(USERNAME),
     password: Some(PASSWORD),

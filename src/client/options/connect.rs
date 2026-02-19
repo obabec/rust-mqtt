@@ -47,8 +47,8 @@ impl<'c> Options<'c> {
         Self {
             clean_start: false,
             keep_alive: KeepAlive::Infinite,
-            maximum_packet_size: MaximumPacketSize::Unlimited,
             session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
+            maximum_packet_size: MaximumPacketSize::Unlimited,
             request_response_information: false,
             user_name: None,
             password: None,
@@ -66,14 +66,14 @@ impl<'c> Options<'c> {
         self.keep_alive = keep_alive;
         self
     }
-    /// Sets the maximum packet size.
-    pub const fn maximum_packet_size(mut self, maximum_packet_size: u32) -> Self {
-        self.maximum_packet_size = MaximumPacketSize::Limit(maximum_packet_size);
-        self
-    }
     /// Sets the desired session expiry interval of the connection.
     pub const fn session_expiry_interval(mut self, interval: SessionExpiryInterval) -> Self {
         self.session_expiry_interval = interval;
+        self
+    }
+    /// Sets the maximum packet size.
+    pub const fn maximum_packet_size(mut self, maximum_packet_size: u32) -> Self {
+        self.maximum_packet_size = MaximumPacketSize::Limit(maximum_packet_size);
         self
     }
     /// Sets the request response information property to true prompting the server to return

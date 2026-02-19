@@ -49,9 +49,14 @@ pub enum Error<'e> {
         /// The [`ReasonCode`] of the causing CONNACK or DISCONNECT packet. If the disconnection is caused
         /// by a CONNACK packet, the reason code ss always erroneous.
         reason: ReasonCode,
+
         /// The reason string property of the causing CONNACK or DISCONNECT packet if the server included
         /// a reason string.
         reason_string: Option<MqttString<'e>>,
+
+        /// The server reference property of the causing CONNACK or DISCONNCET packet if the server included
+        /// a server reference. Identifies another server which can be used.
+        server_reference: Option<MqttString<'e>>,
     },
 
     /// Another unrecoverable error has been returned earlier. The underlying connection is in a state,

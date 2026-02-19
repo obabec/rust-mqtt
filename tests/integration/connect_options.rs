@@ -454,6 +454,7 @@ async fn keep_alive_not_kept_alive_idle_network() {
         MqttError::Disconnect {
             reason: ReasonCode::KeepAliveTimeout,
             reason_string: _,
+            server_reference: _,
         } | MqttError::Network(_)
     ));
 }
@@ -546,6 +547,7 @@ async fn keep_alive_not_kept_alive_will_timing() {
         MqttError::Disconnect {
             reason: ReasonCode::KeepAliveTimeout,
             reason_string: _,
+            server_reference: _,
         } | MqttError::Network(_)
     ));
 
