@@ -48,24 +48,28 @@ async fn network_failure() {
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, will_topic_filter);
 
         let Publish {
-            identified_qos,
             dup,
+            identified_qos,
             retain,
+            topic: _,
+            payload_format_indicator,
             message_expiry_interval,
-            subscription_identifiers,
             response_topic,
             correlation_data,
-            topic: _,
+            subscription_identifiers,
+            content_type,
             message,
         } = assert_recv_excl!(rx, will_topic_name);
 
-        assert_eq!(identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!dup);
+        assert_eq!(identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!retain);
+        assert_eq!(payload_format_indicator, None);
         assert_eq!(message_expiry_interval, None);
-        assert!(subscription_identifiers.is_empty());
         assert_eq!(response_topic, None);
         assert_eq!(correlation_data, None);
+        assert!(subscription_identifiers.is_empty());
+        assert_eq!(content_type, None);
         assert_eq!(&*message, will_msg.as_bytes());
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
@@ -100,24 +104,28 @@ async fn disconnect_with_will_message() {
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, will_topic_filter);
 
         let Publish {
-            identified_qos,
             dup,
+            identified_qos,
             retain,
+            topic: _,
+            payload_format_indicator,
             message_expiry_interval,
-            subscription_identifiers,
             response_topic,
             correlation_data,
-            topic: _,
+            subscription_identifiers,
+            content_type,
             message,
         } = assert_recv_excl!(rx, will_topic_name);
 
-        assert_eq!(identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!dup);
+        assert_eq!(identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!retain);
+        assert_eq!(payload_format_indicator, None);
         assert_eq!(message_expiry_interval, None);
-        assert!(subscription_identifiers.is_empty());
         assert_eq!(response_topic, None);
         assert_eq!(correlation_data, None);
+        assert!(subscription_identifiers.is_empty());
+        assert_eq!(content_type, None);
         assert_eq!(&*message, will_msg.as_bytes());
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
@@ -268,24 +276,28 @@ async fn properties() {
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, will_topic_filter);
 
         let Publish {
-            identified_qos,
             dup,
+            identified_qos,
             retain,
+            topic: _,
+            payload_format_indicator,
             message_expiry_interval,
-            subscription_identifiers,
             response_topic,
             correlation_data,
-            topic: _,
+            subscription_identifiers,
+            content_type,
             message,
         } = assert_recv_excl!(rx, will_topic_name);
 
-        assert_eq!(identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!dup);
+        assert_eq!(identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!retain);
-        assert_eq!(message_expiry_interval, None);
-        assert!(subscription_identifiers.is_empty());
+        assert_eq!(payload_format_indicator, Some(true));
+        assert_eq!(message_expiry_interval, Some(1234));
         assert_eq!(response_topic, Some(will_response_topic));
         assert_eq!(correlation_data, Some(will_correlation_data));
+        assert!(subscription_identifiers.is_empty());
+        assert_eq!(content_type, Some(will_content_type));
         assert_eq!(&*message, will_msg.as_bytes());
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
@@ -570,7 +582,7 @@ async fn session_expires_right_after_disconnect() {
     let receiver = async {
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, will_topic_filter.clone());
 
-        let Publish { message, topic, .. } = assert_ok!(assert_ok!(
+        let Publish { topic, message, .. } = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(2), receive_and_complete(&mut rx)).await
         ));
 
@@ -620,7 +632,7 @@ async fn session_expires_before_will_delay_interval() {
             "Expected to receive nothing"
         );
 
-        let Publish { message, topic, .. } = assert_ok!(assert_ok!(
+        let Publish { topic, message, .. } = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(2), receive_and_complete(&mut rx)).await
         ));
 

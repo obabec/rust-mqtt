@@ -4,7 +4,7 @@ use heapless::Vec;
 
 use crate::{
     bytes::Bytes,
-    types::{IdentifiedQoS, MqttBinary, ReasonCode, TopicName, VarByteInt},
+    types::{IdentifiedQoS, MqttBinary, MqttString, ReasonCode, TopicName, VarByteInt},
 };
 
 /// Events emitted by the client when receiving an MQTT packet.
@@ -109,6 +109,10 @@ pub struct Suback {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
+    /// The DUP flag in the PUBLISH packet. If set to false, it indicates that this is the first occasion
+    /// the server has attempted to send this publication.
+    pub dup: bool,
+
     /// The quality of service the server determined to use for this publication. It is the minimum of
     /// the matching subscription with the highest quality of service level and the quality of service of
     /// the publishing client's publication.
@@ -117,23 +121,23 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// PUBLISH packet.
     pub identified_qos: IdentifiedQoS,
 
-    /// The DUP flag in the PUBLISH packet. If set to false, it indicates that this is the first occasion
-    /// the server has attempted to send this publication.
-    pub dup: bool,
-
     /// The retain flag in the PUBLISH packet. If set to true, it indicates that the publication is the
     /// result of a retained message. If set to false, this publication having been retained depends on
     /// the retain as published flag of the matching subscription.
     pub retain: bool,
 
+    /// The exact topic of this publication.
+    pub topic: TopicName<'p>,
+
+    /// If present, indicates whether the payload is UTF-8. This value is set by the publisher and is
+    /// NOT verified by the client library.
+    /// This is equal to the payload format indicator property of the PUBLISH packet.
+    pub payload_format_indicator: Option<bool>,
+
     /// The message expiry interval in seconds.
     /// This is calculated by subtracting the elapsed time since the publish from the message expiry
     /// interval in original publication.
     pub message_expiry_interval: Option<u32>,
-
-    /// The subscription identifiers in the PUBLISH packet. If the vector is full, this list might not
-    /// be exhaustive.
-    pub subscription_identifiers: Vec<VarByteInt, MAX_SUBSCRIPTION_IDENTIFIERS>,
 
     /// Identifies an incoming publication as a request and specifies the topic which the response should
     /// be published on.
@@ -144,8 +148,12 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// link back to the original request.
     pub correlation_data: Option<MqttBinary<'p>>,
 
-    /// The exact topic of this publication.
-    pub topic: TopicName<'p>,
+    /// The subscription identifiers in the PUBLISH packet. If the vector is full, this list might not
+    /// be exhaustive.
+    pub subscription_identifiers: Vec<VarByteInt, MAX_SUBSCRIPTION_IDENTIFIERS>,
+
+    /// The content type property of the PUBLISH packet
+    pub content_type: Option<MqttString<'p>>,
 
     /// The application message of this publication.
     pub message: Bytes<'p>,

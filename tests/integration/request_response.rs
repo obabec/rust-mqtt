@@ -43,9 +43,9 @@ async fn simple_request_response() {
         assert_published!(requester, pub_options, request_msg.into());
 
         let Publish {
+            topic,
             response_topic,
             correlation_data,
-            topic,
             message,
             ..
         } = assert_ok!(assert_ok!(
@@ -64,9 +64,9 @@ async fn simple_request_response() {
         assert_subscribe!(responder, DEFAULT_QOS0_SUB_OPTIONS, topic_filter);
 
         let Publish {
+            topic,
             response_topic,
             correlation_data,
-            topic,
             message,
             ..
         } = assert_recv_excl!(responder, topic_name);
@@ -115,9 +115,9 @@ async fn simple_correlation_data() {
         assert_published!(requester, pub_options, request_msg.into());
 
         let Publish {
+            topic,
             response_topic,
             correlation_data,
-            topic,
             message,
             ..
         } = assert_ok!(assert_ok!(
@@ -137,9 +137,9 @@ async fn simple_correlation_data() {
         assert_subscribe!(responder, DEFAULT_QOS0_SUB_OPTIONS, topic_filter);
 
         let Publish {
+            topic,
             response_topic,
             correlation_data,
-            topic,
             message,
             ..
         } = assert_recv_excl!(responder, topic_name);
@@ -199,9 +199,9 @@ async fn multiple_correlation_data() {
         let mut expected = correlations.clone();
         for _ in 0..expected.len() {
             let Publish {
+                topic,
                 response_topic,
                 correlation_data,
-                topic,
                 message,
                 ..
             } = assert_ok!(assert_ok!(
@@ -229,9 +229,9 @@ async fn multiple_correlation_data() {
 
         for _ in 0..correlations.len() {
             let Publish {
+                topic,
                 response_topic,
                 correlation_data,
-                topic,
                 ..
             } = assert_recv_excl!(responder, topic_name);
 

@@ -905,20 +905,24 @@ impl<
                 };
 
                 let publish = Publish {
-                    identified_qos: publish.identified_qos,
                     dup: publish.dup,
+                    identified_qos: publish.identified_qos,
                     retain: publish.retain,
+                    topic,
+                    payload_format_indicator: publish
+                        .payload_format_indicator
+                        .map(Property::into_inner),
                     message_expiry_interval: publish
                         .message_expiry_interval
                         .map(Property::into_inner),
+                    response_topic: publish.response_topic.map(Property::into_inner),
+                    correlation_data: publish.correlation_data.map(Property::into_inner),
                     subscription_identifiers: publish
                         .subscription_identifiers
                         .into_iter()
                         .map(Property::into_inner)
                         .collect(),
-                    response_topic: publish.response_topic.map(Property::into_inner),
-                    correlation_data: publish.correlation_data.map(Property::into_inner),
-                    topic,
+                    content_type: publish.content_type.map(Property::into_inner),
                     message: publish.message,
                 };
 
