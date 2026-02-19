@@ -249,7 +249,8 @@ async fn properties() {
     )
     .content_type(will_content_type.clone())
     .correlation_data(will_correlation_data.clone())
-    .mark_payload_utf8()
+    .payload_format_indicator(true)
+    .message_expiry_interval(1234)
     .response_topic(will_response_topic.clone());
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS.clone().will(will);

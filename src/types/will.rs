@@ -22,7 +22,7 @@ pub struct Will<'w> {
     pub response_topic: Option<ResponseTopic<'w>>,
     pub correlation_data: Option<CorrelationData<'w>>,
 
-    pub will_payload: MqttBinary<'w>,
+    pub will_message: MqttBinary<'w>,
 }
 
 impl<'w> From<WillOptions<'w>> for Will<'w> {
@@ -33,15 +33,12 @@ impl<'w> From<WillOptions<'w>> for Will<'w> {
                 0 => None,
                 i => Some(WillDelayInterval(i)),
             },
-            payload_format_indicator: match options.is_payload_utf8 {
-                false => None,
-                true => Some(PayloadFormatIndicator(true)),
-            },
+            payload_format_indicator: options.payload_format_indicator.map(Into::into),
             message_expiry_interval: options.message_expiry_interval.map(Into::into),
             content_type: options.content_type.map(Into::into),
             response_topic: options.response_topic.map(Into::into),
             correlation_data: options.correlation_data.map(Into::into),
-            will_payload: options.will_payload,
+            will_message: options.will_message,
         }
     }
 }
@@ -53,7 +50,7 @@ impl<'p> Writable for Will<'p> {
         will_properties_length.written_len()
             + will_properties_length.size()
             + self.will_topic.written_len()
-            + self.will_payload.written_len()
+            + self.will_message.written_len()
     }
 
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
@@ -69,7 +66,7 @@ impl<'p> Writable for Will<'p> {
         self.correlation_data.write(write).await?;
 
         self.will_topic.write(write).await?;
-        self.will_payload.write(write).await?;
+        self.will_message.write(write).await?;
 
         Ok(())
     }

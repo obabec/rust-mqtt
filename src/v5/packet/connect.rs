@@ -368,7 +368,7 @@ mod unit {
                 content_type: Some(ContentType(MqttString::try_from("text/plain").unwrap())),
                 response_topic: None,
                 correlation_data: None,
-                will_payload: MqttBinary::try_from([12, 8, 98].as_slice()).unwrap(),
+                will_message: MqttBinary::try_from([12, 8, 98].as_slice()).unwrap(),
             },
             QoS::ExactlyOnce,
             true,
