@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<hivemq xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+    <listeners>
+        <tcp-listener>
+            <port>1883</port>
+            <bind-address>0.0.0.0</bind-address>
+        </tcp-listener>
+    </listeners>
+
+    <restrictions>
+        <max-client-id-length>65535</max-client-id-length>
+        <max-topic-length>65535</max-topic-length>
+        <max-connections>-1</max-connections>
+        <incoming-bandwidth-throttling>0</incoming-bandwidth-throttling>
+        <no-connect-idle-timeout>10000</no-connect-idle-timeout>
+    </restrictions>
+
+    <mqtt>
+        <packets>
+            <max-packet-size>2000000</max-packet-size>
+        </packets>
+    </mqtt>
+</hivemq>

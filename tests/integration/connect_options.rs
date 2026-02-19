@@ -7,7 +7,7 @@ use rust_mqtt::{
         event::Event,
         options::{PublicationOptions, SubscriptionOptions, TopicReference, WillOptions},
     },
-    config::{KeepAlive, SessionExpiryInterval},
+    config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
     types::{MqttBinary, MqttString, ReasonCode, TopicFilter, TopicName},
 };
 use tokio::{
@@ -19,7 +19,8 @@ use tokio_test::assert_err;
 use crate::common::{
     BROKER_ADDRESS, DEFAULT_DC_OPTIONS, DEFAULT_QOS0_SUB_OPTIONS, NO_SESSION_CONNECT_OPTIONS,
     assert::{assert_ok, assert_published, assert_recv, assert_recv_excl, assert_subscribe},
-    utils::{connected_client, disconnect, unique_topic},
+    fmt::warn_inspect,
+    utils::{connected_client, disconnect, tcp_connection, unique_topic},
 };
 
 #[tokio::test]
@@ -276,6 +277,128 @@ async fn maximum_packet_size_at_varbyteint_boundary_exceeded() {
     };
 
     join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn server_maximum_packet_size_not_exceeded_by_publishes() {
+    // fixed header, topic name, packet identifier, property length
+    const OVERHEAD: u32 = 4 + 3 + 2 + 1;
+
+    const SERVER_MAX_PACKET_SIZE: u32 = 2_000_000;
+
+    const PAYLOAD_SIZE: u32 = SERVER_MAX_PACKET_SIZE - OVERHEAD;
+
+    let id = MqttString::from_str("SERVER_MAXIMUM_PACKET_SIZE_NOT_EXCEEDED_BY_PUBLISHES").unwrap();
+
+    let mut connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::NeverEnd);
+
+    let mut c = assert_ok!(
+        connected_client(BROKER_ADDRESS, &connect_options, Some(id.as_borrowed())).await
+    );
+
+    let topic_name = TopicName::new(MqttString::from_str("f").unwrap()).unwrap();
+
+    assert_eq!(
+        c.server_config().maximum_packet_size,
+        MaximumPacketSize::Limit(NonZero::new(SERVER_MAX_PACKET_SIZE).unwrap())
+    );
+
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic_name)).at_least_once();
+
+    let msg = vec![0; PAYLOAD_SIZE as usize].into_boxed_slice();
+
+    let packet_identifier = assert_ok!(c.publish(&pub_options, msg.as_ref().into()).await);
+
+    assert_ok!(c.disconnect(DEFAULT_DC_OPTIONS).await);
+
+    connect_options.clean_start = false;
+    connect_options.session_expiry_interval = SessionExpiryInterval::EndOnDisconnect;
+
+    let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+
+    let info = assert_ok!(warn_inspect!(
+        c.connect(tcp, &connect_options, Some(id.as_borrowed()))
+            .await,
+        "Client::connect() failed"
+    ));
+    assert!(info.session_present);
+
+    assert_ok!(
+        c.republish(packet_identifier, &pub_options, msg.into())
+            .await
+    );
+
+    let e = assert_ok!(c.poll().await);
+    assert!(matches!(e, Event::PublishAcknowledged(_)));
+
+    // Assert we aren't disconnected
+    assert_err!(timeout(Duration::from_secs(1), c.poll_header()).await);
+
+    disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn server_maximum_packet_size_exceeded_by_publishes() {
+    // fixed header, topic name, packet identifier, property length
+    const OVERHEAD: u32 = 4 + 3 + 2 + 1;
+
+    const SERVER_MAX_PACKET_SIZE: u32 = 2_000_000;
+
+    const PAYLOAD_SIZE: u32 = SERVER_MAX_PACKET_SIZE - OVERHEAD + 1;
+
+    let id = MqttString::from_str("SERVER_MAXIMUM_PACKET_SIZE_EXCEEDED_BY_PUBLISHES").unwrap();
+
+    let mut connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::NeverEnd);
+
+    let mut c = assert_ok!(
+        connected_client(BROKER_ADDRESS, &connect_options, Some(id.as_borrowed())).await
+    );
+
+    let topic_name = TopicName::new(MqttString::from_str("g").unwrap()).unwrap();
+
+    assert_eq!(
+        c.server_config().maximum_packet_size,
+        MaximumPacketSize::Limit(NonZero::new(SERVER_MAX_PACKET_SIZE).unwrap())
+    );
+
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic_name)).at_least_once();
+
+    let msg = vec![0; PAYLOAD_SIZE as usize].into_boxed_slice();
+
+    let e = assert_err!(c.publish(&pub_options, msg.as_ref().into()).await);
+    assert_eq!(e, MqttError::ServerMaximumPacketSizeExceeded);
+
+    let packet_identifier = assert_ok!(c.publish(&pub_options, "".into()).await);
+    assert_ok!(c.disconnect(DEFAULT_DC_OPTIONS).await);
+
+    connect_options.clean_start = false;
+    connect_options.session_expiry_interval = SessionExpiryInterval::EndOnDisconnect;
+
+    let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+
+    let info = assert_ok!(warn_inspect!(
+        c.connect(tcp, &connect_options, Some(id.as_borrowed()))
+            .await,
+        "Client::connect() failed"
+    ));
+    assert!(info.session_present);
+
+    let e = assert_err!(
+        c.republish(packet_identifier, &pub_options, msg.as_ref().into())
+            .await
+    );
+    assert_eq!(e, MqttError::ServerMaximumPacketSizeExceeded);
+
+    // Assert we aren't disconnected
+    assert_err!(timeout(Duration::from_secs(1), c.poll_header()).await);
+
+    disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
 }
 
 // Keep alive timing test rules:

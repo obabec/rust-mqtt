@@ -218,7 +218,7 @@ pub async fn publish_and_complete<'c>(
 ) -> Result<u16, MqttError<'c>> {
     let pid = warn_inspect!(
         client.publish(options, message).await,
-        "Client::poll() failed"
+        "Client::publish() failed"
     )?;
 
     match options.qos {
