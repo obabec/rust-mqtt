@@ -33,9 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `FixedHeader` and `PacketType` to public API
 - Remove `Raw`-related types from public API
 - Fix client panics when server sends SUBACK/UNSUBACK packets with no reason codes
-- Remove `Error::ReceiveBuffer` as it is superseeded by `Error::Server` in SUBACK/UNSUBACK handling
+- Remove `Error::ReceiveBuffer` as it is superseded by `Error::Server` in SUBACK/UNSUBACK handling
 - Fix incorrect serialisation of `KeepAlive::Infinite` as the maximum keep alive value of 65535 seconds
 - Add support for client maximum packet size
+- Add server reference property
+- Rename `will_payload` to `will_message` in `WillOptions`
+- Expose payload format indicator in `WillOptions` directly instead of boolean marker `is_payload_utf8`
+- Add payload format indicator & content type properties to incoming & outgoing publishes
 
 ## 0.4.1 - 2026-01-06
 
