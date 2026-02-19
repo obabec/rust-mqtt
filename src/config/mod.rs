@@ -4,6 +4,8 @@ mod client;
 mod server;
 mod shared;
 
+use core::num::NonZero;
+
 pub use client::Config as ClientConfig;
 pub use server::Config as ServerConfig;
 pub use shared::Config as SharedConfig;
@@ -19,14 +21,14 @@ pub enum KeepAlive {
     /// The maximum time interval in seconds allowed to pass between 2 MQTT packets.
     ///
     /// Must be greater than 0.
-    Seconds(u16),
+    Seconds(NonZero<u16>),
 }
 
 impl KeepAlive {
     pub(crate) fn as_u16(&self) -> u16 {
         match self {
             KeepAlive::Infinite => 0,
-            KeepAlive::Seconds(s) => *s,
+            KeepAlive::Seconds(s) => s.get(),
         }
     }
 }

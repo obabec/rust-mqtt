@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZero, time::Duration};
 
 use rust_mqtt::{
     Bytes,
@@ -307,12 +307,15 @@ async fn keep_alive_via_ping() {
             BROKER_ADDRESS,
             &NO_SESSION_CONNECT_OPTIONS
                 .clone()
-                .keep_alive(KeepAlive::Seconds(1)),
+                .keep_alive(KeepAlive::Seconds(NonZero::new(1).unwrap())),
             None
         )
         .await
     );
-    assert_eq!(c.shared_config().keep_alive, KeepAlive::Seconds(1));
+    assert_eq!(
+        c.shared_config().keep_alive,
+        KeepAlive::Seconds(NonZero::new(1).unwrap())
+    );
 
     for _ in 0..10 {
         sleep(Duration::from_millis(950)).await;
@@ -335,12 +338,15 @@ async fn keep_alive_via_outgoing_publish() {
             BROKER_ADDRESS,
             &NO_SESSION_CONNECT_OPTIONS
                 .clone()
-                .keep_alive(KeepAlive::Seconds(1)),
+                .keep_alive(KeepAlive::Seconds(NonZero::new(1).unwrap())),
             None
         )
         .await
     );
-    assert_eq!(c.shared_config().keep_alive, KeepAlive::Seconds(1));
+    assert_eq!(
+        c.shared_config().keep_alive,
+        KeepAlive::Seconds(NonZero::new(1).unwrap())
+    );
 
     for _ in 0..10 {
         sleep(Duration::from_millis(950)).await;
@@ -361,12 +367,15 @@ async fn keep_alive_via_incoming_qos1() {
             BROKER_ADDRESS,
             &NO_SESSION_CONNECT_OPTIONS
                 .clone()
-                .keep_alive(KeepAlive::Seconds(2)),
+                .keep_alive(KeepAlive::Seconds(NonZero::new(2).unwrap())),
             None
         )
         .await
     );
-    assert_eq!(rx.shared_config().keep_alive, KeepAlive::Seconds(2));
+    assert_eq!(
+        rx.shared_config().keep_alive,
+        KeepAlive::Seconds(NonZero::new(2).unwrap())
+    );
 
     let publisher = async {
         let pub_options =
@@ -404,12 +413,15 @@ async fn keep_alive_via_subscribe() {
             BROKER_ADDRESS,
             &NO_SESSION_CONNECT_OPTIONS
                 .clone()
-                .keep_alive(KeepAlive::Seconds(1)),
+                .keep_alive(KeepAlive::Seconds(NonZero::new(1).unwrap())),
             None
         )
         .await
     );
-    assert_eq!(c.shared_config().keep_alive, KeepAlive::Seconds(1));
+    assert_eq!(
+        c.shared_config().keep_alive,
+        KeepAlive::Seconds(NonZero::new(1).unwrap())
+    );
 
     for _ in 0..10 {
         sleep(Duration::from_millis(950)).await;
@@ -432,12 +444,15 @@ async fn keep_alive_not_kept_alive_idle_network() {
             BROKER_ADDRESS,
             &NO_SESSION_CONNECT_OPTIONS
                 .clone()
-                .keep_alive(KeepAlive::Seconds(6)),
+                .keep_alive(KeepAlive::Seconds(NonZero::new(6).unwrap())),
             None
         )
         .await
     );
-    assert_eq!(c.shared_config().keep_alive, KeepAlive::Seconds(6));
+    assert_eq!(
+        c.shared_config().keep_alive,
+        KeepAlive::Seconds(NonZero::new(6).unwrap())
+    );
 
     assert_err!(
         timeout(Duration::from_millis(5950), c.poll_header()).await,
@@ -470,12 +485,15 @@ async fn keep_alive_not_kept_alive_incoming_qos0() {
             BROKER_ADDRESS,
             &NO_SESSION_CONNECT_OPTIONS
                 .clone()
-                .keep_alive(KeepAlive::Seconds(2)),
+                .keep_alive(KeepAlive::Seconds(NonZero::new(2).unwrap())),
             None
         )
         .await
     );
-    assert_eq!(rx.shared_config().keep_alive, KeepAlive::Seconds(2));
+    assert_eq!(
+        rx.shared_config().keep_alive,
+        KeepAlive::Seconds(NonZero::new(2).unwrap())
+    );
 
     let publisher = async {
         let pub_options =
@@ -517,7 +535,7 @@ async fn keep_alive_not_kept_alive_will_timing() {
     let connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
         .will(will)
-        .keep_alive(KeepAlive::Seconds(3))
+        .keep_alive(KeepAlive::Seconds(NonZero::new(3).unwrap()))
         .session_expiry_interval(SessionExpiryInterval::NeverEnd);
 
     let mut rx =
@@ -526,7 +544,10 @@ async fn keep_alive_not_kept_alive_will_timing() {
 
     let mut tx = assert_ok!(connected_client(BROKER_ADDRESS, &connect_options, None).await);
 
-    assert_eq!(tx.shared_config().keep_alive, KeepAlive::Seconds(3));
+    assert_eq!(
+        tx.shared_config().keep_alive,
+        KeepAlive::Seconds(NonZero::new(3).unwrap())
+    );
 
     assert_err!(
         timeout(Duration::from_millis(5950), rx.poll_header()).await,

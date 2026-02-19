@@ -1,5 +1,6 @@
 use std::{
     net::{Ipv4Addr, SocketAddr},
+    num::NonZero,
     time::Duration,
 };
 
@@ -45,7 +46,7 @@ async fn main() {
             &ConnectOptions::new()
                 .clean_start()
                 .session_expiry_interval(SessionExpiryInterval::Seconds(5))
-                .keep_alive(KeepAlive::Seconds(5))
+                .keep_alive(KeepAlive::Seconds(NonZero::new(5).unwrap()))
                 .user_name(MqttString::try_from("test").unwrap())
                 .password(MqttBinary::try_from("testPass").unwrap())
                 .will(

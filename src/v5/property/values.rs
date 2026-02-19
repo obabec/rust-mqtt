@@ -1,3 +1,5 @@
+use core::num::NonZero;
+
 use crate::{
     config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
     eio::{Read, Write},
@@ -138,10 +140,11 @@ impl<R: Read> Readable<R> for ServerKeepAlive {
     async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
         let value = u16::read(read).await?;
 
-        Ok(Self(match value {
-            0 => KeepAlive::Infinite,
-            s => KeepAlive::Seconds(s),
-        }))
+        Ok(Self(
+            NonZero::new(value)
+                .map(KeepAlive::Seconds)
+                .unwrap_or(KeepAlive::Infinite),
+        ))
     }
 }
 
@@ -156,7 +159,7 @@ impl Writable for ServerKeepAlive {
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
         let value = match self.0 {
             KeepAlive::Infinite => 0,
-            KeepAlive::Seconds(s) => s,
+            KeepAlive::Seconds(s) => s.get(),
         };
 
         if value != 0 {

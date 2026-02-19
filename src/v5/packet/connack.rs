@@ -178,6 +178,8 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
 
 #[cfg(test)]
 mod unit {
+    use core::num::NonZero;
+
     use crate::{
         config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
         test::rx::decode,
@@ -326,7 +328,9 @@ mod unit {
         );
         assert_eq!(
             packet.server_keep_alive,
-            Some(ServerKeepAlive(KeepAlive::Seconds(60)))
+            Some(ServerKeepAlive(KeepAlive::Seconds(
+                NonZero::new(60).unwrap()
+            )))
         );
         assert_eq!(
             packet.response_information,
