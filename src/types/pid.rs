@@ -1,3 +1,4 @@
+use core::fmt;
 use core::num::NonZero;
 
 use crate::eio::{Read, Write};
@@ -7,8 +8,7 @@ use crate::io::read::Readable;
 use crate::io::write::{Writable, wlen};
 
 /// A simple wrapper around [`NonZero`]<[`u16`]>.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct PacketIdentifier(NonZero<u16>);
 
 impl PacketIdentifier {
@@ -31,6 +31,24 @@ impl PacketIdentifier {
 
     pub(crate) const fn get_u16(self) -> u16 {
         self.get().get()
+    }
+}
+
+impl fmt::Debug for PacketIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.get().fmt(f)
+    }
+}
+impl fmt::Display for PacketIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for PacketIdentifier {
+    fn format(&self, fmt: defmt::Formatter) {
+        self.get().format(fmt)
     }
 }
 
