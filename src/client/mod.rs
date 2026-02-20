@@ -1,5 +1,7 @@
 //! Implements full client functionality with session and configuration handling and Quality of Service flows.
 
+use core::num::NonZero;
+
 use crate::{
     buffer::BufferProvider,
     bytes::Bytes,
@@ -19,8 +21,8 @@ use crate::{
     packet::{Packet, TxPacket},
     session::{CPublishFlightState, SPublishFlightState, Session},
     types::{
-        IdentifiedQoS, MqttBinary, MqttString, QoS, ReasonCode, SubscriptionFilter, TopicFilter,
-        TopicName, VarByteInt,
+        IdentifiedQoS, MqttBinary, MqttString, PacketIdentifier, QoS, ReasonCode,
+        SubscriptionFilter, TopicFilter, TopicName, VarByteInt,
     },
     v5::{
         packet::{
@@ -47,7 +49,7 @@ pub use err::Error as MqttError;
 /// Configuration via const parameters:
 /// - `MAX_SUBSCRIBES`: The maximum amount of in-flight/unacknowledged SUBSCRIBE packets (one per call to [`Self::subscribe`]).
 /// - `RECEIVE_MAXIMUM`: MQTT's control flow mechanism. The maximum amount of incoming [`QoS::AtLeastOnce`] and
-///   [`QoS::ExactlyOnce`] publications (accumulated).
+///   [`QoS::ExactlyOnce`] publications (accumulated). Must not be 0 and must not be greater than 65535.
 /// - `SEND_MAXIMUM`: The maximum amount of outgoing [`QoS::AtLeastOnce`] and [`QoS::ExactlyOnce`] publications. The server
 ///   can further limit this with its receive maximum. The client will use the minimum of this value and [`Self::server_config`].
 /// - `MAX_SUBSCRIPTION_IDENTIFIERS`: The maximum amount of subscription identifier properties the client can receive within a
@@ -69,12 +71,12 @@ pub struct Client<
 
     raw: Raw<'c, N, B>,
 
-    packet_identifier_counter: u16,
+    packet_identifier_counter: PacketIdentifier,
 
     /// sent SUBSCRIBE packets
-    pending_suback: Vec<u16, MAX_SUBSCRIBES>,
+    pending_suback: Vec<PacketIdentifier, MAX_SUBSCRIBES>,
     /// sent UNSUBSCRIBE packets
-    pending_unsuback: Vec<u16, MAX_SUBSCRIBES>,
+    pending_unsuback: Vec<PacketIdentifier, MAX_SUBSCRIBES>,
 }
 
 impl<
@@ -92,6 +94,15 @@ impl<
     /// The session state is initialised as a new session. If you want to start the
     /// client with an existing session, use [`Self::with_session`].
     pub fn new(buffer: &'c mut B) -> Self {
+        assert!(
+            RECEIVE_MAXIMUM <= 65535,
+            "RECEIVE_MAXIMUM must be less than or equal to 65535"
+        );
+        assert!(
+            RECEIVE_MAXIMUM > 0,
+            "RECEIVE_MAXIMUM must be greater than 0"
+        );
+
         Self {
             client_config: ClientConfig::default(),
             shared_config: SharedConfig::default(),
@@ -100,7 +111,7 @@ impl<
 
             raw: Raw::new_disconnected(buffer),
 
-            packet_identifier_counter: 1,
+            packet_identifier_counter: PacketIdentifier::ONE,
 
             pending_suback: Vec::new(),
             pending_unsuback: Vec::new(),
@@ -121,10 +132,10 @@ impl<
     /// Returns the amount of publications the client is allowed to make according to the server's
     /// receive maximum. Does not account local space for storing publication state.
     fn remaining_send_quota(&self) -> u16 {
-        self.server_config.receive_maximum.into_inner() - self.session.in_flight_cpublishes()
+        self.server_config.receive_maximum.into_inner().get() - self.session.in_flight_cpublishes()
     }
 
-    fn is_packet_identifier_used(&self, packet_identifier: u16) -> bool {
+    fn is_packet_identifier_used(&self, packet_identifier: PacketIdentifier) -> bool {
         self.session
             .is_used_cpublish_packet_identifier(packet_identifier)
             || self.pending_suback.contains(&packet_identifier)
@@ -164,13 +175,11 @@ impl<
     }
 
     /// Generates a new packet identifier.
-    fn packet_identifier(&mut self) -> u16 {
+    fn packet_identifier(&mut self) -> PacketIdentifier {
         loop {
             let packet_identifier = self.packet_identifier_counter;
-            self.packet_identifier_counter = match self.packet_identifier_counter {
-                u16::MAX => 1,
-                i => i + 1,
-            };
+
+            self.packet_identifier_counter = packet_identifier.next();
 
             if !self.is_packet_identifier_used(packet_identifier) {
                 break packet_identifier;
@@ -179,7 +188,10 @@ impl<
     }
 
     /// Returns true if the packet identifier exists.
-    fn remove_packet_identifier_if_exists<const M: usize>(vec: &mut Vec<u16, M>, pid: u16) -> bool {
+    fn remove_packet_identifier_if_exists<const M: usize>(
+        vec: &mut Vec<PacketIdentifier, M>,
+        pid: PacketIdentifier,
+    ) -> bool {
         if let Some(i) = vec.iter().position(|p| *p == pid) {
             // Safety: The index has just been found in the vector
             unsafe { vec.swap_remove_unchecked(i) };
@@ -243,14 +255,15 @@ impl<
 
         self.client_config.maximum_accepted_remaining_length = match options.maximum_packet_size {
             MaximumPacketSize::Unlimited => u32::MAX,
-            MaximumPacketSize::Limit(l) => match l {
-                0..=1 => panic!(
+            MaximumPacketSize::Limit(l) => match l.get() {
+                0 => unreachable!("NonZero invariant"),
+                1 => panic!(
                     "Every MQTT packet is at least 2 bytes long, a smaller maximum packet size makes no sense"
                 ),
-                2..=129 => l - 2,
-                130..=16_386 => l - 3,
-                16_387..=2_097_155 => l - 4,
-                2_097_156..MAX_POSSIBLE_PACKET_SIZE => l - 5,
+                2..=129 => l.get() - 2,
+                130..=16_386 => l.get() - 3,
+                16_387..=2_097_155 => l.get() - 4,
+                2_097_156..MAX_POSSIBLE_PACKET_SIZE => l.get() - 5,
                 MAX_POSSIBLE_PACKET_SIZE.. => VarByteInt::MAX_ENCODABLE,
             },
         };
@@ -272,7 +285,8 @@ impl<
                 options.keep_alive,
                 options.maximum_packet_size,
                 options.session_expiry_interval,
-                RECEIVE_MAXIMUM as u16,
+                // Safety: `Self::new` panics if `RECEIVE_MAXIMUM` is 0 making this code unreachable.
+                unsafe { NonZero::new_unchecked(RECEIVE_MAXIMUM as u16) },
                 options.request_response_information,
             );
 
@@ -433,7 +447,7 @@ impl<
         &mut self,
         topic_filter: TopicFilter<'_>,
         options: SubscriptionOptions,
-    ) -> Result<u16, MqttError<'c>> {
+    ) -> Result<PacketIdentifier, MqttError<'c>> {
         if self.pending_suback.len() == MAX_SUBSCRIBES {
             warn!("maximum concurrent subscriptions reached");
             return Err(MqttError::SessionBuffer);
@@ -446,11 +460,8 @@ impl<
         let _ = subscribe_filters.push(subscribe_filter);
         let packet = SubscribePacket::new(pid, options.subscription_identifier, subscribe_filters)?;
 
-        match self.server_config.maximum_packet_size {
-            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
-                return Err(MqttError::ServerMaximumPacketSizeExceeded);
-            }
-            _ => {}
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
         debug!("sending SUBSCRIBE packet");
@@ -473,7 +484,7 @@ impl<
     pub async fn unsubscribe(
         &mut self,
         topic_filter: TopicFilter<'_>,
-    ) -> Result<u16, MqttError<'c>> {
+    ) -> Result<PacketIdentifier, MqttError<'c>> {
         if self.pending_unsuback.len() == MAX_SUBSCRIBES {
             warn!("maximum concurrent unsubscriptions reached");
             return Err(MqttError::SessionBuffer);
@@ -484,11 +495,8 @@ impl<
         let _ = topic_filters.push(topic_filter);
         let packet = UnsubscribePacket::new(pid, topic_filters)?;
 
-        match self.server_config.maximum_packet_size {
-            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
-                return Err(MqttError::ServerMaximumPacketSizeExceeded);
-            }
-            _ => {}
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
         debug!("sending UNSUBSCRIBE packet");
@@ -503,14 +511,13 @@ impl<
     /// Publish a message. If QoS is greater than 0, the packet identifier is also kept track of by the client
     ///
     /// # Returns:
-    /// - In case of QoS 0, a packet identifier of 0 is returned.
-    ///   This value is not allowed in MQTT and is an escape value without semantic meaning.
+    /// - In case of QoS 0 [`None`] is returned.
     /// - In case of Qos 1 or 2 the packet identifier of the published packet
     pub async fn publish(
         &mut self,
         options: &PublicationOptions<'_>,
         message: Bytes<'_>,
-    ) -> Result<u16, MqttError<'c>> {
+    ) -> Result<Option<PacketIdentifier>, MqttError<'c>> {
         if options.qos > QoS::AtMostOnce {
             if self.remaining_send_quota() == 0 {
                 warn!("server receive maximum reached");
@@ -556,27 +563,24 @@ impl<
             message,
         )?;
 
-        match self.server_config.maximum_packet_size {
-            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
-                return Err(MqttError::ServerMaximumPacketSizeExceeded);
-            }
-            _ => {}
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
         // Treat the packet as sent before successfully sending. In case of a network error,
         // we have tracked the packet as in flight and can republish it.
         let pid = match identified_qos {
-            IdentifiedQoS::AtMostOnce => 0,
-            IdentifiedQoS::AtLeastOnce(packet_identifier) => {
+            IdentifiedQoS::AtMostOnce => None,
+            IdentifiedQoS::AtLeastOnce(packet_identifier) => Some({
                 // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
                 unsafe { self.session.await_puback(packet_identifier) };
                 packet_identifier
-            }
-            IdentifiedQoS::ExactlyOnce(packet_identifier) => {
+            }),
+            IdentifiedQoS::ExactlyOnce(packet_identifier) => Some({
                 // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
                 unsafe { self.session.await_pubrec(packet_identifier) };
                 packet_identifier
-            }
+            }),
         };
 
         match identified_qos.packet_identifier() {
@@ -603,7 +607,7 @@ impl<
     /// - in case of quality of service 2, it must not already be awaiting a PUBCOMP packet
     pub async fn republish(
         &mut self,
-        packet_identifier: u16,
+        packet_identifier: PacketIdentifier,
         options: &PublicationOptions<'_>,
         message: Bytes<'_>,
     ) -> Result<(), MqttError<'c>> {
@@ -674,11 +678,8 @@ impl<
             message,
         )?;
 
-        match self.server_config.maximum_packet_size {
-            MaximumPacketSize::Limit(l) if packet.encoded_len() as u32 > l => {
-                return Err(MqttError::ServerMaximumPacketSizeExceeded);
-            }
-            _ => {}
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
         // We only republish a message if its quality of service and flight state is correct.

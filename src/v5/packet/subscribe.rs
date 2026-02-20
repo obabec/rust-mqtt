@@ -5,14 +5,14 @@ use crate::{
     header::{FixedHeader, PacketType},
     io::write::Writable,
     packet::{Packet, TxError, TxPacket},
-    types::{SubscriptionFilter, TooLargeToEncode, VarByteInt},
+    types::{PacketIdentifier, SubscriptionFilter, TooLargeToEncode, VarByteInt},
     v5::property::SubscriptionIdentifier,
 };
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SubscribePacket<'p, const MAX_TOPIC_FILTERS: usize> {
-    packet_identifier: u16,
+    packet_identifier: PacketIdentifier,
 
     subscription_identifier: Option<SubscriptionIdentifier>,
     subscribe_filters: Vec<SubscriptionFilter<'p>, MAX_TOPIC_FILTERS>,
@@ -44,7 +44,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> TxPacket for SubscribePacket<'p, MAX_TO
 
 impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> {
     pub fn new(
-        packet_identifier: u16,
+        packet_identifier: PacketIdentifier,
         subscription_identifier: Option<VarByteInt>,
         subscribe_filters: Vec<SubscriptionFilter<'p>, MAX_TOPIC_FILTERS>,
     ) -> Result<Self, TooLargeToEncode> {
@@ -93,12 +93,14 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> 
 
 #[cfg(test)]
 mod unit {
+    use core::num::NonZero;
+
     use heapless::Vec;
 
     use crate::{
         client::options::{RetainHandling, SubscriptionOptions},
         test::tx::encode,
-        types::{MqttString, QoS, SubscriptionFilter, TopicFilter, VarByteInt},
+        types::{MqttString, PacketIdentifier, QoS, SubscriptionFilter, TopicFilter, VarByteInt},
         v5::packet::SubscribePacket,
     };
 
@@ -132,7 +134,12 @@ mod unit {
                 },
             ))
             .unwrap();
-        let packet: SubscribePacket<'_, 2> = SubscribePacket::new(23197, None, topics).unwrap();
+        let packet: SubscribePacket<'_, 2> = SubscribePacket::new(
+            PacketIdentifier::new(NonZero::new(23197).unwrap()),
+            None,
+            topics,
+        )
+        .unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [
@@ -188,9 +195,12 @@ mod unit {
             ))
             .unwrap();
 
-        let packet: SubscribePacket<'_, 10> =
-            SubscribePacket::new(23197, Some(VarByteInt::new(87986078u32).unwrap()), topics)
-                .unwrap();
+        let packet: SubscribePacket<'_, 10> = SubscribePacket::new(
+            PacketIdentifier::new(NonZero::new(23197).unwrap()),
+            Some(VarByteInt::new(87986078u32).unwrap()),
+            topics,
+        )
+        .unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [

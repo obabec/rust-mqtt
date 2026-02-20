@@ -12,7 +12,7 @@ use crate::{
         write::{Writable, wlen},
     },
     packet::{Packet, RxError, RxPacket},
-    types::{ReasonCode, VarByteInt},
+    types::{PacketIdentifier, ReasonCode, VarByteInt},
     v5::{
         packet::subacks::types::{Suback, SubackPacketType, Unsuback},
         property::PropertyType,
@@ -29,7 +29,7 @@ pub type UnsubackPacket<'p, const MAX_TOPIC_FILTERS: usize> =
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct GenericSubackPacket<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> {
-    pub packet_identifier: u16,
+    pub packet_identifier: PacketIdentifier,
     // reason string is currently unused and does not have to be read into memory.
     // reason_string: Option<ReasonString<'p>>,
     pub reason_codes: Vec<ReasonCode, MAX_TOPIC_FILTERS>,
@@ -57,7 +57,7 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
         let r = &mut reader;
 
         trace!("reading packet identifier");
-        let packet_identifier = u16::read(r).await?;
+        let packet_identifier = PacketIdentifier::read(r).await?;
 
         trace!("reading properties length");
         let mut properties_length = VarByteInt::read(r).await?.size();
@@ -152,9 +152,15 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
 #[cfg(test)]
 mod unit {
     mod suback {
+        use core::num::NonZero;
+
         use heapless::Vec;
 
-        use crate::{test::rx::decode, types::ReasonCode, v5::packet::SubackPacket};
+        use crate::{
+            test::rx::decode,
+            types::{PacketIdentifier, ReasonCode},
+            v5::packet::SubackPacket,
+        };
 
         #[tokio::test]
         #[test_log::test]
@@ -175,7 +181,10 @@ mod unit {
                 ]
             );
 
-            assert_eq!(packet.packet_identifier, 6025);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(6025).unwrap())
+            );
             // assert!(packet.reason_string.is_none());
 
             let mut reason_codes: Vec<_, 12> = Vec::new();
@@ -232,7 +241,10 @@ mod unit {
                 ]
             );
 
-            assert_eq!(packet.packet_identifier, 5620);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(5620).unwrap())
+            );
             // assert_eq!(
             //     packet.reason_string,
             //     Some(ReasonString(MqttString::try_from("crazy things").unwrap()))
@@ -245,9 +257,15 @@ mod unit {
     }
 
     mod unsuback {
+        use core::num::NonZero;
+
         use heapless::Vec;
 
-        use crate::{test::rx::decode, types::ReasonCode, v5::packet::UnsubackPacket};
+        use crate::{
+            test::rx::decode,
+            types::{PacketIdentifier, ReasonCode},
+            v5::packet::UnsubackPacket,
+        };
 
         #[tokio::test]
         #[test_log::test]
@@ -267,7 +285,10 @@ mod unit {
                 ]
             );
 
-            assert_eq!(packet.packet_identifier, 41972);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(41972).unwrap())
+            );
             // assert!(packet.reason_string.is_none());
 
             let mut reason_codes: Vec<_, 7> = Vec::new();
@@ -320,7 +341,10 @@ mod unit {
                 ]
             );
 
-            assert_eq!(packet.packet_identifier, 9756);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(9756).unwrap())
+            );
             // assert_eq!(
             //     packet.reason_string,
             //     Some(ReasonString(MqttString::try_from("get outta here").unwrap()))

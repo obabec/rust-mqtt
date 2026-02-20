@@ -2,6 +2,7 @@
 
 mod binary;
 mod int;
+mod pid;
 mod qos;
 mod reason_code;
 mod string;
@@ -13,6 +14,7 @@ pub(crate) use will::Will;
 
 pub use binary::MqttBinary;
 pub use int::VarByteInt;
+pub use pid::PacketIdentifier;
 pub use qos::{IdentifiedQoS, QoS};
 pub use reason_code::ReasonCode;
 pub use string::{MqttString, MqttStringError};

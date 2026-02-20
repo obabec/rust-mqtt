@@ -178,6 +178,8 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
 
 #[cfg(test)]
 mod unit {
+    use core::num::NonZero;
+
     use crate::{
         config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
         test::rx::decode,
@@ -294,12 +296,15 @@ mod unit {
             packet.session_expiry_interval,
             Some(SessionExpiryInterval::Seconds(1410754593))
         );
-        assert_eq!(packet.receive_maximum, Some(ReceiveMaximum(4761)));
+        assert_eq!(
+            packet.receive_maximum,
+            Some(ReceiveMaximum(NonZero::new(4761).unwrap()))
+        );
         assert_eq!(packet.maximum_qos, Some(MaximumQoS(QoS::AtLeastOnce)));
         assert_eq!(packet.retain_available, Some(RetainAvailable(true)));
         assert_eq!(
             packet.maximum_packet_size,
-            Some(MaximumPacketSize::Limit(1048576))
+            Some(MaximumPacketSize::Limit(NonZero::new(1048576).unwrap()))
         );
         assert_eq!(
             packet.assigned_client_identifier,
@@ -326,7 +331,9 @@ mod unit {
         );
         assert_eq!(
             packet.server_keep_alive,
-            Some(ServerKeepAlive(KeepAlive::Seconds(60)))
+            Some(ServerKeepAlive(KeepAlive::Seconds(
+                NonZero::new(60).unwrap()
+            )))
         );
         assert_eq!(
             packet.response_information,

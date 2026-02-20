@@ -1,3 +1,5 @@
+use core::num::NonZero;
+
 use const_fn::const_fn;
 
 use crate::{
@@ -71,8 +73,8 @@ impl<'c> Options<'c> {
         self.session_expiry_interval = interval;
         self
     }
-    /// Sets the maximum packet size.
-    pub const fn maximum_packet_size(mut self, maximum_packet_size: u32) -> Self {
+    /// Sets the maximum packet size as a limit in bytes. A value less than 2 does not make sense.
+    pub const fn maximum_packet_size(mut self, maximum_packet_size: NonZero<u32>) -> Self {
         self.maximum_packet_size = MaximumPacketSize::Limit(maximum_packet_size);
         self
     }

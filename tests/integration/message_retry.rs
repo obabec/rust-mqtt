@@ -55,7 +55,7 @@ async fn outgoing_qos1_retry() {
         let pub_options =
             PublicationOptions::new(TopicReference::Name(topic_name.clone())).at_least_once();
 
-        let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await);
+        let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await).unwrap();
         let session = tx.session().clone();
 
         drop(tx);
@@ -142,7 +142,7 @@ async fn outgoing_qos2_retry_publish() {
         let pub_options =
             PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
-        let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await);
+        let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await).unwrap();
         let session = tx.session().clone();
 
         drop(tx);
@@ -225,7 +225,7 @@ async fn outgoing_qos2_retry_pubrel() {
         let pub_options =
             PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
 
-        let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await);
+        let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await).unwrap();
 
         assert_ok!(
             timeout(Duration::from_secs(5), async {
@@ -439,6 +439,7 @@ async fn outgoing_qos1_write_fail_retry() {
                         failed = true;
                         break 'try_publish tx.session().clone();
                     };
+                    let pid = pid.unwrap();
 
                     // Cannot fail on receiving messages
                     match assert_ok!(tx.poll().await) {
@@ -480,7 +481,8 @@ async fn outgoing_qos1_write_fail_retry() {
                         );
                         packet_identifier
                     }
-                    None => assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await),
+                    None => assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await)
+                        .unwrap(),
                 };
 
                 match assert_ok!(tx.poll().await) {
@@ -550,7 +552,8 @@ async fn outgoing_qos1_read_fail_retry() {
                     };
 
                     // Cannot fail on sending messages
-                    let pid = assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await);
+                    let pid = assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await)
+                        .unwrap();
 
                     match tx.poll().await {
                         Ok(Event::PublishAcknowledged(Puback {
@@ -659,6 +662,7 @@ async fn outgoing_qos2_write_fail_retry() {
                         failed = true;
                         break 'try_publish tx.session().clone();
                     };
+                    let pid = pid.unwrap();
 
                     // Can fail because we have to responde with PUBREL
                     match tx.poll().await {
@@ -722,7 +726,8 @@ async fn outgoing_qos2_write_fail_retry() {
                     }
                     Some(_) => unreachable!("Should only have QoS 2 states"),
                     None => (
-                        assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await),
+                        assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await)
+                            .unwrap(),
                         true,
                     ),
                 };
@@ -803,7 +808,8 @@ async fn outgoing_qos2_read_fail_retry() {
                         continue 'outer;
                     };
 
-                    let pid = assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await);
+                    let pid = assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await)
+                        .unwrap();
 
                     match tx.poll().await {
                         Ok(Event::PublishReceived(Puback {
@@ -869,7 +875,8 @@ async fn outgoing_qos2_read_fail_retry() {
                     }
                     Some(_) => unreachable!("Should only have QoS 2 states"),
                     None => (
-                        assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await),
+                        assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await)
+                            .unwrap(),
                         true,
                     ),
                 };

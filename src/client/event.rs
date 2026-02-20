@@ -4,7 +4,9 @@ use heapless::Vec;
 
 use crate::{
     bytes::Bytes,
-    types::{IdentifiedQoS, MqttBinary, MqttString, ReasonCode, TopicName, VarByteInt},
+    types::{
+        IdentifiedQoS, MqttBinary, MqttString, PacketIdentifier, ReasonCode, TopicName, VarByteInt,
+    },
 };
 
 /// Events emitted by the client when receiving an MQTT packet.
@@ -100,7 +102,7 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Suback {
     /// Packet identifier of the acknowledged SUBSCRIBE packet.
-    pub packet_identifier: u16,
+    pub packet_identifier: PacketIdentifier,
     /// Reason code returned for the subscription.
     pub reason_code: ReasonCode,
 }
@@ -167,7 +169,7 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Puback {
     /// Packet identifier of the acknowledged PUBLISH packet.
-    pub packet_identifier: u16,
+    pub packet_identifier: PacketIdentifier,
     /// Reason code of this state in the publication process
     pub reason_code: ReasonCode,
 }
@@ -179,7 +181,7 @@ pub struct Puback {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Pubrej {
     /// Packet identifier of the rejected PUBLISH packet.
-    pub packet_identifier: u16,
+    pub packet_identifier: PacketIdentifier,
     /// Reason code of the rejection.
     pub reason_code: ReasonCode,
 }

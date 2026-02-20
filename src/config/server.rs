@@ -1,3 +1,5 @@
+use core::num::NonZero;
+
 use crate::{
     config::{MaximumPacketSize, ReceiveMaximum},
     types::QoS,
@@ -34,7 +36,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            receive_maximum: ReceiveMaximum(u16::MAX),
+            receive_maximum: ReceiveMaximum(NonZero::new(u16::MAX).unwrap()),
             maximum_qos: QoS::ExactlyOnce,
             retain_supported: true,
             maximum_packet_size: Default::default(),

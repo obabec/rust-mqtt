@@ -1,3 +1,5 @@
+use core::num::NonZero;
+
 use crate::{
     config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
     eio::{Read, Write},
@@ -138,10 +140,11 @@ impl<R: Read> Readable<R> for ServerKeepAlive {
     async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
         let value = u16::read(read).await?;
 
-        Ok(Self(match value {
-            0 => KeepAlive::Infinite,
-            s => KeepAlive::Seconds(s),
-        }))
+        Ok(Self(
+            NonZero::new(value)
+                .map(KeepAlive::Seconds)
+                .unwrap_or(KeepAlive::Infinite),
+        ))
     }
 }
 
@@ -156,7 +159,7 @@ impl Writable for ServerKeepAlive {
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
         let value = match self.0 {
             KeepAlive::Infinite => 0,
-            KeepAlive::Seconds(s) => s,
+            KeepAlive::Seconds(s) => s.get(),
         };
 
         if value != 0 {
@@ -234,11 +237,9 @@ impl<R: Read> Readable<R> for MaximumPacketSize {
     async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
         let max = u32::read(read).await?;
 
-        if max > 0 {
-            Ok(Self::Limit(max))
-        } else {
-            Err(ReadError::ProtocolError)
-        }
+        NonZero::new(max)
+            .map(Self::Limit)
+            .ok_or(ReadError::ProtocolError)
     }
 }
 impl Writable for MaximumPacketSize {
@@ -252,7 +253,7 @@ impl Writable for MaximumPacketSize {
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
         if let Self::Limit(l) = self {
             Self::TYPE.write(write).await?;
-            l.write(write).await?;
+            l.get().write(write).await?;
         }
 
         Ok(())
@@ -261,7 +262,7 @@ impl Writable for MaximumPacketSize {
 
 impl Property for ReceiveMaximum {
     const TYPE: PropertyType = PropertyType::ReceiveMaximum;
-    type Inner = u16;
+    type Inner = NonZero<u16>;
 
     fn into_inner(self) -> Self::Inner {
         self.0
@@ -271,25 +272,21 @@ impl<R: Read> Readable<R> for ReceiveMaximum {
     async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
         let max = u16::read(read).await?;
 
-        if max > 0 {
-            Ok(Self(max))
-        } else {
-            Err(ReadError::ProtocolError)
-        }
+        NonZero::new(max).map(Self).ok_or(ReadError::ProtocolError)
     }
 }
 impl Writable for ReceiveMaximum {
     fn written_len(&self) -> usize {
-        match self.0 {
+        match self.0.get() {
             u16::MAX => 0,
             _ => Self::TYPE.written_len() + wlen!(u16),
         }
     }
 
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
-        if self.0 < u16::MAX {
+        if self.0.get() < u16::MAX {
             Self::TYPE.write(write).await?;
-            self.0.write(write).await?;
+            self.0.get().write(write).await?;
         }
 
         Ok(())

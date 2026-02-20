@@ -10,7 +10,10 @@ use rust_mqtt::{
         event::{Event, Publish, Suback},
         options::{ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions},
     },
-    types::{IdentifiedQoS, MqttBinary, MqttString, QoS, ReasonCode, TopicFilter, TopicName},
+    types::{
+        IdentifiedQoS, MqttBinary, MqttString, PacketIdentifier, QoS, ReasonCode, TopicFilter,
+        TopicName,
+    },
 };
 use tokio::net::TcpStream;
 
@@ -137,7 +140,7 @@ pub async fn subscribe<'c>(
                 packet_identifier,
                 reason_code: _,
             }) => warn!(
-                "Expected SUBACK for packet identifier {}, but received SUBACK for packet identifier {}",
+                "Expected SUBACK for packet identifier {:?}, but received SUBACK for packet identifier {:?}",
                 pid, packet_identifier
             ),
             e => warn!("Expected Event::Suback, but received {:?}", e),
@@ -167,7 +170,7 @@ pub async fn unsubscribe<'c>(
                 packet_identifier,
                 reason_code: _,
             }) => warn!(
-                "Expected UNSUBACK for packet identifier {}, but received UNSUBACK for packet identifier {}",
+                "Expected UNSUBACK for packet identifier {:?}, but received UNSUBACK for packet identifier {:?}",
                 pid, packet_identifier
             ),
             e => warn!("Expected Event::Unsuback, but received {:?}", e),
@@ -200,7 +203,7 @@ pub async fn receive_and_complete<'c>(
                     break;
                 }
                 Event::PublishReleased(p) => warn!(
-                    "Expected PUBREL with packet identifier {}, but received PUBREL with packet identifier {}",
+                    "Expected PUBREL with packet identifier {:?}, but received PUBREL with packet identifier {:?}",
                     pid, p.packet_identifier
                 ),
                 e => warn!("Expected PUBLISH, but received {:?}", e),
@@ -215,19 +218,19 @@ pub async fn publish_and_complete<'c>(
     client: &mut TestClient<'c>,
     options: &PublicationOptions<'_>,
     message: Bytes<'_>,
-) -> Result<u16, MqttError<'c>> {
+) -> Result<Option<PacketIdentifier>, MqttError<'c>> {
     let pid = warn_inspect!(
         client.publish(options, message).await,
-        "Client::poll() failed"
+        "Client::publish() failed"
     )?;
 
     match options.qos {
         QoS::AtMostOnce => {}
         QoS::AtLeastOnce => loop {
             match warn_inspect!(client.poll().await, "Client::poll() failed")? {
-                Event::PublishAcknowledged(p) if p.packet_identifier == pid => break,
+                Event::PublishAcknowledged(p) if p.packet_identifier == pid.unwrap() => break,
                 Event::PublishAcknowledged(p) => warn!(
-                    "Expected PUBACK with packet identifier {}, but received PUBACK with packet identifier {}",
+                    "Expected PUBACK with packet identifier {:?}, but received PUBACK with packet identifier {:?}",
                     pid, p.packet_identifier
                 ),
                 e => warn!("Expected PUBACK, but received {:?}", e),
@@ -236,9 +239,9 @@ pub async fn publish_and_complete<'c>(
         QoS::ExactlyOnce => {
             loop {
                 match warn_inspect!(client.poll().await, "Client::poll() failed")? {
-                    Event::PublishReceived(p) if p.packet_identifier == pid => break,
+                    Event::PublishReceived(p) if p.packet_identifier == pid.unwrap() => break,
                     Event::PublishReceived(p) => warn!(
-                        "Expected PUBREC with packet identifier {}, but received PUBREC with packet identifier {}",
+                        "Expected PUBREC with packet identifier {:?}, but received PUBREC with packet identifier {:?}",
                         pid, p.packet_identifier
                     ),
                     e => warn!("Expected PUBREC, but received {:?}", e),
@@ -246,9 +249,9 @@ pub async fn publish_and_complete<'c>(
             }
             loop {
                 match warn_inspect!(client.poll().await, "Client::poll() failed")? {
-                    Event::PublishComplete(p) if p.packet_identifier == pid => break,
+                    Event::PublishComplete(p) if p.packet_identifier == pid.unwrap() => break,
                     Event::PublishComplete(p) => warn!(
-                        "Expected PUBCOMP with packet identifier {}, but received PUBCOMP with packet identifier {}",
+                        "Expected PUBCOMP with packet identifier {:?}, but received PUBCOMP with packet identifier {:?}",
                         pid, p.packet_identifier
                     ),
                     e => warn!("Expected PUBCOMP, but received {:?}", e),

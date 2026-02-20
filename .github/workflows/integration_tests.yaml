@@ -45,6 +45,7 @@ jobs:
           curl -LO https://github.com/hivemq/hivemq-file-rbac-extension/releases/download/4.6.8/hivemq-file-rbac-extension-4.6.8.zip
           unzip hivemq-file-rbac-extension-4.6.8.zip
           mv hivemq-file-rbac-extension hivemq-ce-2025.5/extensions
+          cp .ci/hive_config.xml hivemq-ce-2025.5/conf/config.xml
           cp .ci/hive_cred.xml hivemq-ce-2025.5/extensions/hivemq-file-rbac-extension/credentials.xml
           cp .ci/hive_extension_config.xml hivemq-ce-2025.5/extensions/hivemq-file-rbac-extension/conf/config.xml
           hivemq-ce-2025.5/bin/run.sh &

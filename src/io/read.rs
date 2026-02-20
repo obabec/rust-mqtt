@@ -32,21 +32,23 @@ impl<R: Read, const N: usize> Readable<R> for [u8; N] {
         Ok(array)
     }
 }
-impl<R: Read> Readable<R> for u8 {
-    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
-        <[u8; 1]>::read(read).await.map(Self::from_be_bytes)
-    }
+
+macro_rules! int_read_impl {
+    ($int:ty) => {
+        impl<R: Read> Readable<R> for $int {
+            async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
+                <[u8; size_of::<$int>()]>::read(read)
+                    .await
+                    .map(Self::from_be_bytes)
+            }
+        }
+    };
 }
-impl<R: Read> Readable<R> for u16 {
-    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
-        <[u8; 2]>::read(read).await.map(Self::from_be_bytes)
-    }
-}
-impl<R: Read> Readable<R> for u32 {
-    async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
-        <[u8; 4]>::read(read).await.map(Self::from_be_bytes)
-    }
-}
+
+int_read_impl!(u8);
+int_read_impl!(u16);
+int_read_impl!(u32);
+
 impl<R: Read> Readable<R> for bool {
     async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
         match u8::read(read).await? {

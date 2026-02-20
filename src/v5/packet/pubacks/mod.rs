@@ -14,7 +14,7 @@ use crate::{
         write::{Writable, wlen},
     },
     packet::{Packet, RxError, RxPacket, TxError, TxPacket},
-    types::{ReasonCode, VarByteInt},
+    types::{PacketIdentifier, ReasonCode, VarByteInt},
     v5::{
         packet::pubacks::types::{Ack, Comp, PubackPacketType, Rec, Rel},
         property::{AtMostOnceProperty, PropertyType, ReasonString},
@@ -31,7 +31,7 @@ pub type PubcompPacket<'p> = GenericPubackPacket<'p, Comp>;
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct GenericPubackPacket<'p, T: PubackPacketType> {
-    pub packet_identifier: u16,
+    pub packet_identifier: PacketIdentifier,
     pub reason_code: ReasonCode,
     pub reason_string: Option<ReasonString<'p>>,
     _phantom_data: PhantomData<T>,
@@ -55,7 +55,7 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
         let r = &mut reader;
 
         trace!("reading packet identifier");
-        let packet_identifier = u16::read(r).await?;
+        let packet_identifier = PacketIdentifier::read(r).await?;
 
         let reason_code = if header.remaining_len.size() == 2 {
             ReasonCode::Success
@@ -124,7 +124,7 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
 }
 impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
     fn remaining_len(&self) -> VarByteInt {
-        let variable_header_length = wlen!(u16) + wlen!(ReasonCode);
+        let variable_header_length = self.packet_identifier.written_len() + wlen!(ReasonCode);
 
         let properties_length = self.properties_length();
         let total_properties_length = properties_length.size() + properties_length.written_len();
@@ -162,7 +162,7 @@ impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
 }
 
 impl<'p, T: PubackPacketType> GenericPubackPacket<'p, T> {
-    pub const fn new(packet_identifier: u16, reason_code: ReasonCode) -> Self {
+    pub const fn new(packet_identifier: PacketIdentifier, reason_code: ReasonCode) -> Self {
         Self {
             packet_identifier,
             reason_code,
@@ -182,9 +182,11 @@ impl<'p, T: PubackPacketType> GenericPubackPacket<'p, T> {
 #[cfg(test)]
 mod unit {
     mod ack {
+        use core::num::NonZero;
+
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{MqttString, ReasonCode},
+            types::{MqttString, PacketIdentifier, ReasonCode},
             v5::{packet::PubackPacket, property::ReasonString},
         };
 
@@ -193,7 +195,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubackPacket::new(7439, ReasonCode::NotAuthorized),
+                PubackPacket::new(PacketIdentifier::new(NonZero::new(7439).unwrap()), ReasonCode::NotAuthorized),
                 [
                     0x40,
                     0x04,
@@ -210,7 +212,10 @@ mod unit {
         async fn decode_simple() {
             let packet = decode!(PubackPacket, 4, [0x40, 0x04, 0x26, 0x29, 0x10, 0x00]);
 
-            assert_eq!(packet.packet_identifier, 9769);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(9769).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::NoMatchingSubscribers);
             assert!(packet.reason_string.is_none());
         }
@@ -220,7 +225,10 @@ mod unit {
         async fn decode_abbreviated() {
             let packet = decode!(PubackPacket, 3, [0x40, 0x03, 0x71, 0x59, 0x80]);
 
-            assert_eq!(packet.packet_identifier, 29017);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(29017).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::UnspecifiedError);
             assert!(packet.reason_string.is_none());
         }
@@ -230,7 +238,10 @@ mod unit {
         async fn decode_minimal() {
             let packet = decode!(PubackPacket, 2, [0x40, 0x02, 0x89, 0x35]);
 
-            assert_eq!(packet.packet_identifier, 35125);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(35125).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             assert!(packet.reason_string.is_none());
         }
@@ -251,7 +262,10 @@ mod unit {
                 b't', b'e', b's', b't', b'-', b'v', b'a', b'l', b'u', b'e',
             ]);
 
-            assert_eq!(packet.packet_identifier, 4660);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(4660).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::PayloadFormatInvalid);
             assert_eq!(
                 packet.reason_string,
@@ -261,9 +275,11 @@ mod unit {
     }
 
     mod rec {
+        use core::num::NonZero;
+
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{MqttString, ReasonCode},
+            types::{MqttString, PacketIdentifier, ReasonCode},
             v5::{packet::PubrecPacket, property::ReasonString},
         };
 
@@ -272,7 +288,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubrecPacket::new(876, ReasonCode::QuotaExceeded),
+                PubrecPacket::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::QuotaExceeded),
                 [
                     0x50,
                     0x04,
@@ -289,7 +305,10 @@ mod unit {
         async fn decode_simple() {
             let packet = decode!(PubrecPacket, 4, [0x50, 0x04, 0x26, 0x94, 0x91, 0x00]);
 
-            assert_eq!(packet.packet_identifier, 9876);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(9876).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierInUse);
             assert!(packet.reason_string.is_none());
         }
@@ -299,7 +318,10 @@ mod unit {
         async fn decode_abbreviated() {
             let packet = decode!(PubrecPacket, 3, [0x50, 0x03, 0x45, 0xC9, 0x83]);
 
-            assert_eq!(packet.packet_identifier, 17865);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(17865).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::ImplementationSpecificError);
             assert!(packet.reason_string.is_none());
         }
@@ -309,7 +331,10 @@ mod unit {
         async fn decode_minimal() {
             let packet = decode!(PubrecPacket, 2, [0x50, 0x02, 0x5B, 0xBF]);
 
-            assert_eq!(packet.packet_identifier, 23487);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(23487).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             assert!(packet.reason_string.is_none());
         }
@@ -333,7 +358,10 @@ mod unit {
                       0x00, 0x0A, b't', b'e', b's', b't', b'-', b'v', b'a', b'l', b'u', b'e',
             ]);
 
-            assert_eq!(packet.packet_identifier, 9786);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(9786).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::TopicNameInvalid);
             assert_eq!(
                 packet.reason_string,
@@ -343,9 +371,11 @@ mod unit {
     }
 
     mod rel {
+        use core::num::NonZero;
+
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{MqttString, ReasonCode},
+            types::{MqttString, PacketIdentifier, ReasonCode},
             v5::{packet::PubrelPacket, property::ReasonString},
         };
 
@@ -354,7 +384,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubrelPacket::new(876, ReasonCode::PacketIdentifierNotFound),
+                PubrelPacket::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::PacketIdentifierNotFound),
                 [
                     0x62,
                     0x04,
@@ -371,7 +401,10 @@ mod unit {
         async fn decode_simple() {
             let packet = decode!(PubrelPacket, 4, [0x62, 0x04, 0x26, 0x94, 0x00, 0x00]);
 
-            assert_eq!(packet.packet_identifier, 9876);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(9876).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             assert!(packet.reason_string.is_none());
         }
@@ -381,7 +414,10 @@ mod unit {
         async fn decode_abbreviated() {
             let packet = decode!(PubrelPacket, 3, [0x62, 0x03, 0x45, 0xC9, 0x92]);
 
-            assert_eq!(packet.packet_identifier, 17865);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(17865).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierNotFound);
             assert!(packet.reason_string.is_none());
         }
@@ -391,7 +427,10 @@ mod unit {
         async fn decode_minimal() {
             let packet = decode!(PubrelPacket, 2, [0x62, 0x02, 0x5B, 0xBF]);
 
-            assert_eq!(packet.packet_identifier, 23487);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(23487).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             assert!(packet.reason_string.is_none());
         }
@@ -422,7 +461,10 @@ mod unit {
                 ]
             );
 
-            assert_eq!(packet.packet_identifier, 9786);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(9786).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierNotFound);
             assert_eq!(
                 packet.reason_string,
@@ -432,9 +474,11 @@ mod unit {
     }
 
     mod comp {
+        use core::num::NonZero;
+
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{MqttString, ReasonCode},
+            types::{MqttString, PacketIdentifier, ReasonCode},
             v5::{packet::PubcompPacket, property::ReasonString},
         };
 
@@ -443,7 +487,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubcompPacket::new(876, ReasonCode::PacketIdentifierNotFound),
+                PubcompPacket::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::PacketIdentifierNotFound),
                 [
                     0x70,
                     0x04,
@@ -460,7 +504,10 @@ mod unit {
         async fn decode_simple() {
             let packet = decode!(PubcompPacket, 4, [0x70, 0x04, 0x26, 0x94, 0x00, 0x00]);
 
-            assert_eq!(packet.packet_identifier, 9876);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(9876).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             assert!(packet.reason_string.is_none());
         }
@@ -470,7 +517,10 @@ mod unit {
         async fn decode_abbreviated() {
             let packet = decode!(PubcompPacket, 3, [0x70, 0x03, 0x45, 0xC9, 0x92]);
 
-            assert_eq!(packet.packet_identifier, 17865);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(17865).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierNotFound);
             assert!(packet.reason_string.is_none());
         }
@@ -480,7 +530,10 @@ mod unit {
         async fn decode_minimal() {
             let packet = decode!(PubcompPacket, 2, [0x70, 0x02, 0x5B, 0xBF]);
 
-            assert_eq!(packet.packet_identifier, 23487);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(23487).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             assert!(packet.reason_string.is_none());
         }
@@ -505,7 +558,10 @@ mod unit {
                       0x00, 0x0A, b't', b'e', b's', b't', b'-', b'v', b'a', b'l', b'u', b'e',
             ]);
 
-            assert_eq!(packet.packet_identifier, 9786);
+            assert_eq!(
+                packet.packet_identifier,
+                PacketIdentifier::new(NonZero::new(9786).unwrap())
+            );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierNotFound);
             assert_eq!(
                 packet.reason_string,

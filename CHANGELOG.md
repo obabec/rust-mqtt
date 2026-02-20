@@ -40,6 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rename `will_payload` to `will_message` in `WillOptions`
 - Expose payload format indicator in `WillOptions` directly instead of boolean marker `is_payload_utf8`
 - Add payload format indicator & content type properties to incoming & outgoing publishes
+- Use `NonZero<T>` optimisations in `KeepAlive`, `MaximumPacketSize` and `ReceiveMaximum`
+- Replace all packet identifier occurrences as `u16` with `PacketIdentifier` newtype around `NonZero<u16>`
 
 ## 0.4.1 - 2026-01-06
 

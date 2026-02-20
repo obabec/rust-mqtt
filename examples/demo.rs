@@ -1,5 +1,6 @@
 use std::{
     net::{Ipv4Addr, SocketAddr},
+    num::NonZero,
     time::Duration,
 };
 
@@ -45,7 +46,7 @@ async fn main() {
             &ConnectOptions::new()
                 .clean_start()
                 .session_expiry_interval(SessionExpiryInterval::Seconds(5))
-                .keep_alive(KeepAlive::Seconds(5))
+                .keep_alive(KeepAlive::Seconds(NonZero::new(5).unwrap()))
                 .user_name(MqttString::try_from("test").unwrap())
                 .password(MqttBinary::try_from("testPass").unwrap())
                 .will(
@@ -123,8 +124,8 @@ async fn main() {
         .await
     {
         Ok(i) => {
-            info!("Published message with packet identifier {}", i);
-            i
+            info!("Published message with packet identifier {}", i.unwrap());
+            i.unwrap()
         }
         Err(e) => {
             error!("Failed to send Publish {:?}", e);
@@ -222,7 +223,7 @@ async fn main() {
     {
         Ok(pid) => {
             info!("Published to topic alias 1 aka \"rust-mqtt/is/great\"");
-            pid
+            pid.unwrap()
         }
         Err(e) => {
             error!("Failed to publish to topic alias {:?}", e);

@@ -1,3 +1,5 @@
+use core::num::NonZero;
+
 use crate::{
     config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
     eio::Write,
@@ -120,7 +122,7 @@ impl<'p> ConnectPacket<'p> {
         keep_alive: KeepAlive,
         maximum_packet_size: MaximumPacketSize,
         session_expiry_interval: SessionExpiryInterval,
-        receive_maximum: u16,
+        receive_maximum: NonZero<u16>,
         request_response_information: bool,
     ) -> Self {
         Self {
@@ -189,6 +191,8 @@ impl<'p> ConnectPacket<'p> {
 
 #[cfg(test)]
 mod unit {
+    use core::num::NonZero;
+
     use crate::{
         config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
         test::tx::encode,
@@ -207,10 +211,10 @@ mod unit {
         let packet = ConnectPacket::new(
             MqttString::try_from("a").unwrap(),
             true,
-            KeepAlive::Seconds(7439),
+            KeepAlive::Seconds(NonZero::new(7439).unwrap()),
             MaximumPacketSize::Unlimited,
             SessionExpiryInterval::EndOnDisconnect,
-            u16::MAX,
+            NonZero::new(u16::MAX).unwrap(),
             false,
         );
 
@@ -242,9 +246,9 @@ mod unit {
             MqttString::try_from("a").unwrap(),
             false,
             KeepAlive::Infinite,
-            MaximumPacketSize::Limit(2309845),
+            MaximumPacketSize::Limit(NonZero::new(2309845).unwrap()),
             SessionExpiryInterval::Seconds(8136391),
-            63543,
+            NonZero::new(63543).unwrap(),
             true,
         );
 
@@ -288,10 +292,10 @@ mod unit {
         let mut packet = ConnectPacket::new(
             MqttString::try_from("giuqen").unwrap(),
             false,
-            KeepAlive::Seconds(6789),
+            KeepAlive::Seconds(NonZero::new(6789).unwrap()),
             MaximumPacketSize::Unlimited,
             SessionExpiryInterval::EndOnDisconnect,
-            u16::MAX,
+            NonZero::new(u16::MAX).unwrap(),
             false,
         );
 
@@ -350,10 +354,10 @@ mod unit {
         let mut packet = ConnectPacket::new(
             MqttString::try_from("cba").unwrap(),
             false,
-            KeepAlive::Seconds(6789),
+            KeepAlive::Seconds(NonZero::new(6789).unwrap()),
             MaximumPacketSize::Unlimited,
             SessionExpiryInterval::Seconds(893475),
-            u16::MAX,
+            NonZero::new(u16::MAX).unwrap(),
             true,
         );
 

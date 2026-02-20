@@ -1,3 +1,5 @@
+use crate::types::PacketIdentifier;
+
 /// MQTT's Quality of Service
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -48,16 +50,16 @@ pub enum IdentifiedQoS {
     /// Quality of Service Level 0. PUBLISH packets do not contain a packet identifier.
     AtMostOnce,
     /// Quality of Service Level 1. PUBLISH packets contain the included packet identifier.
-    AtLeastOnce(u16),
+    AtLeastOnce(PacketIdentifier),
     /// Quality of Service Level 2. PUBLISH packets contain the included packet identifier.
-    ExactlyOnce(u16),
+    ExactlyOnce(PacketIdentifier),
 }
 
 impl IdentifiedQoS {
     /// Returns [`Some`] if [`QoS`] > 0 and therefore has to be identified, and
     /// [`None`] otherwise.
     #[inline]
-    pub const fn packet_identifier(&self) -> Option<u16> {
+    pub const fn packet_identifier(&self) -> Option<PacketIdentifier> {
         match self {
             Self::AtMostOnce => None,
             Self::AtLeastOnce(pid) => Some(*pid),
