@@ -226,13 +226,13 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> Writable
     fn written_len(&self) -> usize {
         self.iter()
             .map(|t| &t.topic)
-            .map(|t| t.as_ref().written_len() + wlen!(u8))
+            .map(|t| t.written_len() + wlen!(u8))
             .sum()
     }
 
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
         for t in self {
-            t.topic.as_ref().write(write).await?;
+            t.topic.write(write).await?;
             t.subscription_options.write(write).await?;
         }
 
