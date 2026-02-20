@@ -44,33 +44,24 @@ impl Writable for [u8] {
         Ok(())
     }
 }
-impl Writable for u8 {
-    fn written_len(&self) -> usize {
-        1
-    }
 
-    async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
-        self.to_be_bytes().write(write).await
-    }
+macro_rules! int_write_impl {
+    ($int:ty) => {
+        impl Writable for $int {
+            fn written_len(&self) -> usize {
+                size_of::<$int>()
+            }
+            async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
+                self.to_be_bytes().write(write).await
+            }
+        }
+    };
 }
-impl Writable for u16 {
-    fn written_len(&self) -> usize {
-        2
-    }
 
-    async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
-        self.to_be_bytes().write(write).await
-    }
-}
-impl Writable for u32 {
-    fn written_len(&self) -> usize {
-        4
-    }
+int_write_impl!(u8);
+int_write_impl!(u16);
+int_write_impl!(u32);
 
-    async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
-        self.to_be_bytes().write(write).await
-    }
-}
 impl Writable for bool {
     fn written_len(&self) -> usize {
         wlen!(u8)
