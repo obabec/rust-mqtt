@@ -310,7 +310,7 @@ async fn server_maximum_packet_size_not_exceeded_by_publishes() {
 
     let msg = vec![0; PAYLOAD_SIZE as usize].into_boxed_slice();
 
-    let packet_identifier = assert_ok!(c.publish(&pub_options, msg.as_ref().into()).await);
+    let packet_identifier = assert_ok!(c.publish(&pub_options, msg.as_ref().into()).await).unwrap();
 
     assert_ok!(c.disconnect(DEFAULT_DC_OPTIONS).await);
 
@@ -374,7 +374,7 @@ async fn server_maximum_packet_size_exceeded_by_publishes() {
     let e = assert_err!(c.publish(&pub_options, msg.as_ref().into()).await);
     assert_eq!(e, MqttError::ServerMaximumPacketSizeExceeded);
 
-    let packet_identifier = assert_ok!(c.publish(&pub_options, "".into()).await);
+    let packet_identifier = assert_ok!(c.publish(&pub_options, "".into()).await).unwrap();
     assert_ok!(c.disconnect(DEFAULT_DC_OPTIONS).await);
 
     connect_options.clean_start = false;

@@ -124,7 +124,7 @@ async fn main() {
         .await
     {
         Ok(i) => {
-            info!("Published message with packet identifier {}", i);
+            info!("Published message with packet identifier {:?}", i);
             i
         }
         Err(e) => {
@@ -223,7 +223,7 @@ async fn main() {
     {
         Ok(pid) => {
             info!("Published to topic alias 1 aka \"rust-mqtt/is/great\"");
-            pid
+            pid.unwrap()
         }
         Err(e) => {
             error!("Failed to publish to topic alias {:?}", e);
@@ -290,11 +290,11 @@ async fn main() {
         .await
     {
         Ok(_) => info!(
-            "Republished packet identifier {} after reconnecting",
+            "Republished packet identifier {:?} after reconnecting",
             incomplete_publish_packet_identifier
         ),
         Err(e) => error!(
-            "Failed to republish packet identifier {} due to {:?}",
+            "Failed to republish packet identifier {:?} due to {:?}",
             incomplete_publish_packet_identifier, e
         ),
     }
@@ -306,7 +306,7 @@ async fn main() {
                 reason_code,
             })) if packet_identifier == incomplete_publish_packet_identifier => {
                 info!(
-                    "Completed republish of packet identifier {}",
+                    "Completed republish of packet identifier {:?}",
                     packet_identifier
                 );
                 break;

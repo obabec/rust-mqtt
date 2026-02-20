@@ -5,13 +5,13 @@ use crate::{
     header::{FixedHeader, PacketType},
     io::write::Writable,
     packet::{Packet, TxError, TxPacket},
-    types::{MqttString, TooLargeToEncode, TopicFilter, VarByteInt},
+    types::{MqttString, PacketIdentifier, TooLargeToEncode, TopicFilter, VarByteInt},
 };
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct UnsubscribePacket<'p, const MAX_TOPIC_FILTERS: usize> {
-    packet_identifier: u16,
+    packet_identifier: PacketIdentifier,
     topic_filters: Vec<TopicFilter<'p>, MAX_TOPIC_FILTERS>,
 }
 
@@ -33,7 +33,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> TxPacket for UnsubscribePacket<'p, MAX_
         self.properties_length().write(write).await?;
 
         for t in &self.topic_filters {
-            t.as_ref().write(write).await?;
+            t.write(write).await?;
         }
 
         Ok(())
@@ -43,7 +43,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> TxPacket for UnsubscribePacket<'p, MAX_
 impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS> {
     /// If MAX_TOPIC_FILTERS is to less than or equal to 4095, it is guaranteed that TooLargeToEncode is never returned.
     pub fn new(
-        packet_identifier: u16,
+        packet_identifier: PacketIdentifier,
         topic_filters: Vec<TopicFilter<'p>, MAX_TOPIC_FILTERS>,
     ) -> Result<Self, TooLargeToEncode> {
         let p = Self {
@@ -92,11 +92,13 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS
 
 #[cfg(test)]
 mod unit {
+    use core::num::NonZero;
+
     use heapless::Vec;
 
     use crate::{
         test::tx::encode,
-        types::{MqttString, TopicFilter},
+        types::{MqttString, PacketIdentifier, TopicFilter},
         v5::packet::UnsubscribePacket,
     };
 
@@ -112,7 +114,9 @@ mod unit {
             .push(TopicFilter::new(MqttString::try_from("test/#").unwrap()).unwrap())
             .unwrap();
 
-        let packet: UnsubscribePacket<'_, 2> = UnsubscribePacket::new(9874, topics).unwrap();
+        let packet: UnsubscribePacket<'_, 2> =
+            UnsubscribePacket::new(PacketIdentifier::new(NonZero::new(9874).unwrap()), topics)
+                .unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [

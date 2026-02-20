@@ -21,8 +21,8 @@ use crate::{
     packet::{Packet, TxPacket},
     session::{CPublishFlightState, SPublishFlightState, Session},
     types::{
-        IdentifiedQoS, MqttBinary, MqttString, QoS, ReasonCode, SubscriptionFilter, TopicFilter,
-        TopicName, VarByteInt,
+        IdentifiedQoS, MqttBinary, MqttString, PacketIdentifier, QoS, ReasonCode,
+        SubscriptionFilter, TopicFilter, TopicName, VarByteInt,
     },
     v5::{
         packet::{
@@ -71,12 +71,12 @@ pub struct Client<
 
     raw: Raw<'c, N, B>,
 
-    packet_identifier_counter: u16,
+    packet_identifier_counter: PacketIdentifier,
 
     /// sent SUBSCRIBE packets
-    pending_suback: Vec<u16, MAX_SUBSCRIBES>,
+    pending_suback: Vec<PacketIdentifier, MAX_SUBSCRIBES>,
     /// sent UNSUBSCRIBE packets
-    pending_unsuback: Vec<u16, MAX_SUBSCRIBES>,
+    pending_unsuback: Vec<PacketIdentifier, MAX_SUBSCRIBES>,
 }
 
 impl<
@@ -111,7 +111,7 @@ impl<
 
             raw: Raw::new_disconnected(buffer),
 
-            packet_identifier_counter: 1,
+            packet_identifier_counter: PacketIdentifier::ONE,
 
             pending_suback: Vec::new(),
             pending_unsuback: Vec::new(),
@@ -135,7 +135,7 @@ impl<
         self.server_config.receive_maximum.into_inner().get() - self.session.in_flight_cpublishes()
     }
 
-    fn is_packet_identifier_used(&self, packet_identifier: u16) -> bool {
+    fn is_packet_identifier_used(&self, packet_identifier: PacketIdentifier) -> bool {
         self.session
             .is_used_cpublish_packet_identifier(packet_identifier)
             || self.pending_suback.contains(&packet_identifier)
@@ -175,13 +175,11 @@ impl<
     }
 
     /// Generates a new packet identifier.
-    fn packet_identifier(&mut self) -> u16 {
+    fn packet_identifier(&mut self) -> PacketIdentifier {
         loop {
             let packet_identifier = self.packet_identifier_counter;
-            self.packet_identifier_counter = match self.packet_identifier_counter {
-                u16::MAX => 1,
-                i => i + 1,
-            };
+
+            self.packet_identifier_counter = packet_identifier.next();
 
             if !self.is_packet_identifier_used(packet_identifier) {
                 break packet_identifier;
@@ -190,7 +188,10 @@ impl<
     }
 
     /// Returns true if the packet identifier exists.
-    fn remove_packet_identifier_if_exists<const M: usize>(vec: &mut Vec<u16, M>, pid: u16) -> bool {
+    fn remove_packet_identifier_if_exists<const M: usize>(
+        vec: &mut Vec<PacketIdentifier, M>,
+        pid: PacketIdentifier,
+    ) -> bool {
         if let Some(i) = vec.iter().position(|p| *p == pid) {
             // Safety: The index has just been found in the vector
             unsafe { vec.swap_remove_unchecked(i) };
@@ -446,7 +447,7 @@ impl<
         &mut self,
         topic_filter: TopicFilter<'_>,
         options: SubscriptionOptions,
-    ) -> Result<u16, MqttError<'c>> {
+    ) -> Result<PacketIdentifier, MqttError<'c>> {
         if self.pending_suback.len() == MAX_SUBSCRIBES {
             warn!("maximum concurrent subscriptions reached");
             return Err(MqttError::SessionBuffer);
@@ -483,7 +484,7 @@ impl<
     pub async fn unsubscribe(
         &mut self,
         topic_filter: TopicFilter<'_>,
-    ) -> Result<u16, MqttError<'c>> {
+    ) -> Result<PacketIdentifier, MqttError<'c>> {
         if self.pending_unsuback.len() == MAX_SUBSCRIBES {
             warn!("maximum concurrent unsubscriptions reached");
             return Err(MqttError::SessionBuffer);
@@ -510,14 +511,13 @@ impl<
     /// Publish a message. If QoS is greater than 0, the packet identifier is also kept track of by the client
     ///
     /// # Returns:
-    /// - In case of QoS 0, a packet identifier of 0 is returned.
-    ///   This value is not allowed in MQTT and is an escape value without semantic meaning.
+    /// - In case of QoS 0 [`None`] is returned.
     /// - In case of Qos 1 or 2 the packet identifier of the published packet
     pub async fn publish(
         &mut self,
         options: &PublicationOptions<'_>,
         message: Bytes<'_>,
-    ) -> Result<u16, MqttError<'c>> {
+    ) -> Result<Option<PacketIdentifier>, MqttError<'c>> {
         if options.qos > QoS::AtMostOnce {
             if self.remaining_send_quota() == 0 {
                 warn!("server receive maximum reached");
@@ -570,17 +570,17 @@ impl<
         // Treat the packet as sent before successfully sending. In case of a network error,
         // we have tracked the packet as in flight and can republish it.
         let pid = match identified_qos {
-            IdentifiedQoS::AtMostOnce => 0,
-            IdentifiedQoS::AtLeastOnce(packet_identifier) => {
+            IdentifiedQoS::AtMostOnce => None,
+            IdentifiedQoS::AtLeastOnce(packet_identifier) => Some({
                 // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
                 unsafe { self.session.await_puback(packet_identifier) };
                 packet_identifier
-            }
-            IdentifiedQoS::ExactlyOnce(packet_identifier) => {
+            }),
+            IdentifiedQoS::ExactlyOnce(packet_identifier) => Some({
                 // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
                 unsafe { self.session.await_pubrec(packet_identifier) };
                 packet_identifier
-            }
+            }),
         };
 
         match identified_qos.packet_identifier() {
@@ -607,7 +607,7 @@ impl<
     /// - in case of quality of service 2, it must not already be awaiting a PUBCOMP packet
     pub async fn republish(
         &mut self,
-        packet_identifier: u16,
+        packet_identifier: PacketIdentifier,
         options: &PublicationOptions<'_>,
         message: Bytes<'_>,
     ) -> Result<(), MqttError<'c>> {

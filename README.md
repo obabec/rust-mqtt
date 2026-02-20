@@ -88,7 +88,7 @@ async fn main() {
     let packet_identifier = client.publish(
         &PublicationOptions::new(topic.as_borrowed().into()).exactly_once(),
         "Hello World!".into(),
-    ).await.unwrap();
+    ).await.unwrap().unwrap();
 
     while let Ok(event) = client.poll().await {
         if let Event::PublishComplete(_) = event {

@@ -1,9 +1,11 @@
+use crate::types::PacketIdentifier;
+
 /// An incomplete QoS 1 or 2 publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct InFlightPublish<S> {
     /// The packet identifier of the publication process.
-    pub packet_identifier: u16,
+    pub packet_identifier: PacketIdentifier,
     /// The state of the publication process.
     pub state: S,
 }

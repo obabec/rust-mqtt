@@ -12,7 +12,10 @@ use crate::{
         write::{Writable, wlen},
     },
     packet::{Packet, RxError, RxPacket, TxError, TxPacket},
-    types::{IdentifiedQoS, MqttBinary, MqttString, QoS, TooLargeToEncode, TopicName, VarByteInt},
+    types::{
+        IdentifiedQoS, MqttBinary, MqttString, PacketIdentifier, QoS, TooLargeToEncode, TopicName,
+        VarByteInt,
+    },
     v5::property::{
         AtMostOnceProperty, ContentType, CorrelationData, MessageExpiryInterval,
         PayloadFormatIndicator, Property, PropertyType, ResponseTopic, SubscriptionIdentifier,
@@ -77,11 +80,11 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
             QoS::AtMostOnce => IdentifiedQoS::AtMostOnce,
             QoS::AtLeastOnce => {
                 trace!("reading packet identifier");
-                IdentifiedQoS::AtLeastOnce(u16::read(r).await?)
+                IdentifiedQoS::AtLeastOnce(PacketIdentifier::read(r).await?)
             }
             QoS::ExactlyOnce => {
                 trace!("reading packet identifier");
-                IdentifiedQoS::ExactlyOnce(u16::read(r).await?)
+                IdentifiedQoS::ExactlyOnce(PacketIdentifier::read(r).await?)
             }
         };
 
@@ -297,7 +300,8 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
             + self
                 .identified_qos
                 .packet_identifier()
-                .map(|p| p.written_len())
+                .as_ref()
+                .map(Writable::written_len)
                 .unwrap_or_default();
 
         let properties_length = self.properties_length();
@@ -331,11 +335,13 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
 
 #[cfg(test)]
 mod unit {
+    use core::num::NonZero;
+
     use crate::{
         bytes::Bytes,
         client::options::TopicReference,
         test::{rx::decode, tx::encode},
-        types::{IdentifiedQoS, MqttBinary, MqttString, TopicName},
+        types::{IdentifiedQoS, MqttBinary, MqttString, PacketIdentifier, TopicName},
         v5::{
             packet::PublishPacket,
             property::{
@@ -350,7 +356,7 @@ mod unit {
     async fn encode_simple() {
         let packet: PublishPacket<'_, 0> = PublishPacket::new(
             false,
-            IdentifiedQoS::AtLeastOnce(5897),
+            IdentifiedQoS::AtLeastOnce(PacketIdentifier::new(NonZero::new(5897).unwrap())),
             false,
             TopicReference::Name(
                 TopicName::new(MqttString::try_from("test/topic").unwrap()).unwrap(),
@@ -396,7 +402,7 @@ mod unit {
     async fn encode_properties() {
         let packet: PublishPacket<'_, 0> = PublishPacket::new(
             true,
-            IdentifiedQoS::ExactlyOnce(9624),
+            IdentifiedQoS::ExactlyOnce(PacketIdentifier::new(NonZero::new(9624).unwrap())),
             true,
             TopicReference::Alias(23408),
             Some(false.into()),
@@ -496,7 +502,10 @@ mod unit {
             ]
         );
 
-        assert_eq!(packet.identified_qos, IdentifiedQoS::ExactlyOnce(21539));
+        assert_eq!(
+            packet.identified_qos,
+            IdentifiedQoS::ExactlyOnce(PacketIdentifier::new(NonZero::new(21539).unwrap()))
+        );
         assert!(packet.dup);
         assert!(packet.retain);
         assert_eq!(
