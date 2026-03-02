@@ -285,7 +285,8 @@ impl<
                 options.keep_alive,
                 options.maximum_packet_size,
                 options.session_expiry_interval,
-                // Safety: `Self::new` panics if `RECEIVE_MAXIMUM` is 0 making this code unreachable.
+                // Safety: `Self::new` panics if `RECEIVE_MAXIMUM` is 0. Thus, this
+                // code is only reached when `RECEIVE_MAXIMUM` is greater than 0.
                 unsafe { NonZero::new_unchecked(RECEIVE_MAXIMUM as u16) },
                 options.request_response_information,
             );

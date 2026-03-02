@@ -29,13 +29,12 @@ impl HeaderState {
         &mut self,
         r: &mut R,
     ) -> Result<Option<FixedHeader>, ReadError<R::Error>> {
+        // `i` is always in the 0..=4 range.
+        // After reading, `i` is always the value of `self.read` + 1. Once 5 bytes have been read,
+        // `self.read` is always reset to 0, never bringing `i` above 4
         let i = self.read as usize;
-        if i > 4 {
-            // Safety: `self.read` gets reset to 0 when reaching 5
-            unsafe { unreachable_unchecked() }
-        }
 
-        // Since i is in the 0..=4 range, we can safely index into `self.buffer`
+        // Since i is in the 0..=4 range, we can expect a value of the current header when indexing into `self.buffer`
 
         trace!("receiving byte {} of header", i);
 
@@ -56,11 +55,12 @@ impl HeaderState {
         trace!("received {} byte(s) in total", self.read);
 
         if i == 0 {
-            return if PacketType::from_type_and_flags(self.buffer[i]).is_err() {
-                self.read = 0;
-                Err(ReadError::MalformedPacket)
-            } else {
-                Ok(None)
+            return match PacketType::from_type_and_flags(self.buffer[i]) {
+                Ok(_) => Ok(None),
+                Err(_) => {
+                    self.read = 0;
+                    Err(ReadError::MalformedPacket)
+                }
             };
         }
 
