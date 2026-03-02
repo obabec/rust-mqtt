@@ -1,8 +1,6 @@
-use core::hint::unreachable_unchecked;
-
 use crate::{
     eio::Read,
-    fmt::trace,
+    fmt::{trace, unreachable},
     header::{FixedHeader, PacketType},
     io::err::ReadError,
     types::VarByteInt,
@@ -49,8 +47,10 @@ impl HeaderState {
         match read {
             0 => return Err(ReadError::UnexpectedEOF),
             1 => self.read += 1,
-            // Safety: `Read` can never return a value greater then the length of the slice.
-            _ => unsafe { unreachable_unchecked() },
+            n @ 2.. => unreachable!(
+                "Incorrect Read impl: {} bytes returned when reading into 1-byte buffer",
+                n
+            ),
         }
 
         trace!("received {} byte(s) in total", self.read);

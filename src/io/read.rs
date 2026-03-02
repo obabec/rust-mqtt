@@ -1,10 +1,10 @@
-use core::{cmp::min, hint::unreachable_unchecked, marker::PhantomData};
+use core::{cmp::min, marker::PhantomData};
 
 use crate::{
     buffer::BufferProvider,
     bytes::Bytes,
     eio::{ErrorType, Read},
-    fmt::trace,
+    fmt::{trace, unreachable},
     io::err::{BodyReadError, ReadError},
     types::{MqttBinary, MqttString, TopicName, VarByteInt},
 };
@@ -67,7 +67,10 @@ impl<R: Read> Readable<R> for VarByteInt {
             match read.read(&mut buffer[i..(i + 1)]).await {
                 Ok(0) => return Err(ReadError::UnexpectedEOF),
                 Ok(1) => {}
-                Ok(_) => unsafe { unreachable_unchecked() },
+                Ok(n) => unreachable!(
+                    "Incorrect Read impl: {} bytes returned when reading into 1-byte buffer",
+                    n
+                ),
                 Err(e) => return Err(ReadError::Read(e)),
             }
 
