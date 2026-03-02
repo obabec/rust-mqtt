@@ -15,7 +15,7 @@ use crate::{
         raw::Raw,
     },
     config::{ClientConfig, MaximumPacketSize, ServerConfig, SessionExpiryInterval, SharedConfig},
-    fmt::{debug, error, panic, unreachable, warn},
+    fmt::{assert, debug, error, panic, unreachable, warn},
     header::{FixedHeader, PacketType},
     io::Transport,
     packet::{Packet, TxPacket},

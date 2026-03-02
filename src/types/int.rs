@@ -1,4 +1,7 @@
-use crate::types::TooLargeToEncode;
+use crate::{
+    fmt::{debug_assert, debug_assert_eq},
+    types::TooLargeToEncode,
+};
 
 /// MQTT's variable byte integer encoding. The value has to be less than
 /// [`VarByteInt::MAX_ENCODABLE`] (268_435_455). Exceeding this ultimately leads to

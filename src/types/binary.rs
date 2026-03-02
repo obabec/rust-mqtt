@@ -4,6 +4,7 @@ use const_fn::const_fn;
 
 use crate::{
     bytes::Bytes,
+    fmt::debug_assert,
     types::{MqttString, TooLargeToEncode},
 };
 

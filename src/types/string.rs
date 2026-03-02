@@ -5,7 +5,10 @@ use core::{
 
 use const_fn::const_fn;
 
-use crate::types::{MqttBinary, TooLargeToEncode};
+use crate::{
+    fmt::debug_assert,
+    types::{MqttBinary, TooLargeToEncode},
+};
 
 /// Error returned when creating [`MqttString`] failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -4,6 +4,7 @@ use heapless::Vec;
 use crate::{
     client::options::{RetainHandling, SubscriptionOptions},
     eio::Write,
+    fmt::debug_assert,
     io::{
         err::WriteError,
         write::{Writable, wlen},

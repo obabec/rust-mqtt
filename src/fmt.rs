@@ -1,6 +1,18 @@
 #![allow(unused)]
 
 #[clippy::format_args]
+macro_rules! assert_ {
+    ($($x:tt)*) => {
+        {
+            #[cfg(not(feature = "defmt"))]
+            ::core::assert!($($x)*);
+            #[cfg(feature = "defmt")]
+            ::defmt::assert!($($x)*);
+        }
+    };
+}
+
+#[clippy::format_args]
 macro_rules! debug_assert_ {
     ($($x:tt)*) => {
         {
@@ -68,7 +80,7 @@ macro_rules! trace {
             ::log::trace!($s $(, $x)*);
             #[cfg(feature = "defmt")]
             ::defmt::trace!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature="defmt")))]
+            #[cfg(not(any(feature = "log", feature = "defmt")))]
             let _ = ($( & $x ),*);
         }
     };
@@ -82,7 +94,7 @@ macro_rules! debug {
             ::log::debug!($s $(, $x)*);
             #[cfg(feature = "defmt")]
             ::defmt::debug!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature="defmt")))]
+            #[cfg(not(any(feature = "log", feature = "defmt")))]
             let _ = ($( & $x ),*);
         }
     };
@@ -96,7 +108,7 @@ macro_rules! info {
             ::defmt::info!($s $(, $x)*);
             #[cfg(feature = "log")]
             ::log::info!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature="defmt")))]
+            #[cfg(not(any(feature = "log", feature = "defmt")))]
             let _ = ($( & $x ),*);
         }
     };
@@ -110,7 +122,7 @@ macro_rules! warn_ {
             ::log::warn!($s $(, $x)*);
             #[cfg(feature = "defmt")]
             ::defmt::warn!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature="defmt")))]
+            #[cfg(not(any(feature = "log", feature = "defmt")))]
             let _ = ($( & $x ),*);
         }
     };
@@ -124,7 +136,7 @@ macro_rules! error {
             ::log::error!($s $(, $x)*);
             #[cfg(feature = "defmt")]
             ::defmt::error!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature="defmt")))]
+            #[cfg(not(any(feature = "log", feature = "defmt")))]
             let _ = ($( & $x ),*);
         }
     };
@@ -135,6 +147,8 @@ pub(crate) use error;
 pub(crate) use info;
 pub(crate) use trace;
 pub(crate) use warn_ as warn;
+
+pub(crate) use assert_ as assert;
 
 pub(crate) use debug_assert_ as debug_assert;
 pub(crate) use debug_assert_eq_ as debug_assert_eq;
