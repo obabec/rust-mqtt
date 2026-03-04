@@ -1,4 +1,4 @@
-# rust-mqtt &emsp; [![build]][actions] [![docs]][docs.rs] [![crates]][crates.io] [![msrv]][rust 1.87] [![license]][MIT]
+# rust-mqtt &emsp; [![build]][actions] [![docs]][docs.rs] [![crates]][crates.io] [![msrv]][rust 1.87] [![license]][MIT OR APACHE-2.0]
 
 [build]: https://img.shields.io/github/actions/workflow/status/obabec/rust-mqtt/ci.yaml?branch=main&label=ci
 [actions]: https://github.com/obabec/rust-mqtt/actions?query=branch%3Amain
@@ -9,7 +9,7 @@
 [msrv]: https://img.shields.io/crates/msrv/rust-mqtt.svg?color=lightgray
 [rust 1.87]: https://blog.rust-lang.org/2025/05/15/Rust-1.87.0/
 [license]: https://img.shields.io/crates/l/rust-mqtt.svg
-[MIT]: https://github.com/obabec/rust-mqtt#license
+[MIT OR APACHE-2.0]: https://github.com/obabec/rust-mqtt#license
 
 `rust-mqtt` provides a MQTT client primarily for no_std environments. The library provides an async API depending on [embedded_io_async](https://docs.rs/embedded-io-async/latest/embedded_io_async/)'s traits. As of now, only [MQTT version 5.0](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html) is supported.
 
