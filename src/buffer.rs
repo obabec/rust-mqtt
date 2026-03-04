@@ -28,7 +28,7 @@ pub trait BufferProvider<'a> {
 
 #[cfg(feature = "bump")]
 mod bump {
-    use core::slice;
+    use core::{marker::PhantomData, slice};
 
     use crate::buffer::BufferProvider;
 
@@ -42,8 +42,10 @@ mod bump {
     /// Can be resetted when no references to buffer contents exist.
     #[derive(Debug)]
     pub struct BumpBuffer<'a> {
-        slice: &'a mut [u8],
+        ptr: *mut u8,
+        len: usize,
         index: usize,
+        _phantom_data: PhantomData<&'a mut [u8]>,
     }
 
     impl<'a> BufferProvider<'a> for BumpBuffer<'a> {
@@ -57,15 +59,19 @@ mod bump {
                 Err(InsufficientSpace)
             } else {
                 let start = self.index;
-                // Safety: we checked bounds above, and the pointer originates from
-                // the backing slice owned by this struct with the same lifetime.
-                let ptr = unsafe { self.slice.as_mut_ptr().add(start) };
-                // Advance index after computing start so callers don't observe a
-                // partially-advanced state if we ever change ordering.
+
+                // Safety: we checked the bounds above meaning the resulting pointer
+                // is in the backing slice's range. This means the pointer arithmetic
+                // does not overflow.
+                // The pointer originates from the backing slice owned by this struct with the same lifetime.
+                let ptr = unsafe { self.ptr.add(start) };
+
                 self.index += len;
 
                 // Safety: the slice starts at the self.index which is not part of any other reservations.
                 // self.index has been skipped ahead the slice's full length
+                // The lifetime is correct as the returned slice has the same lifetime as `Self` which is
+                // in turn has the lifetime of the backing slice.
                 let slice = unsafe { slice::from_raw_parts_mut(ptr, len) };
 
                 Ok(slice)
@@ -76,13 +82,18 @@ mod bump {
     impl<'a> BumpBuffer<'a> {
         /// Creates a new [`BumpBuffer`] with the provided slice as underlying buffer.
         pub fn new(slice: &'a mut [u8]) -> Self {
-            Self { slice, index: 0 }
+            Self {
+                ptr: slice.as_mut_ptr(),
+                len: slice.len(),
+                index: 0,
+                _phantom_data: PhantomData,
+            }
         }
 
         /// Returns the remaining amount of unallocated bytes in the underlying buffer.
         #[inline]
         pub fn remaining_len(&self) -> usize {
-            self.slice.len() - self.index
+            self.len - self.index
         }
 
         /// Invalidates all previous allocations by resetting the [`BumpBuffer`]'s index,
@@ -96,6 +107,10 @@ mod bump {
         pub unsafe fn reset(&mut self) {
             self.index = 0;
         }
+    }
+
+    fn _assert_covariant<'a, 'b: 'a>(x: BumpBuffer<'b>) -> BumpBuffer<'a> {
+        x
     }
 
     #[cfg(test)]
@@ -143,13 +158,22 @@ mod bump {
             {
                 let mut buf = BumpBuffer::new(&mut backing);
 
-                let s1 = assert_ok!(buf.provide_buffer(3));
-                s1.copy_from_slice(&[11, 12, 13]);
+                let s1 = {
+                    let s1 = assert_ok!(buf.provide_buffer(3));
+                    s1.copy_from_slice(&[11, 12, 13]);
+
+                    s1.as_ptr()
+                };
 
                 // reset and take again from start
                 unsafe { buf.reset() }
                 let s2 = assert_ok!(buf.provide_buffer(3));
-                assert_eq!(s1, s2);
+
+                // Checking the slices for equality is UB because we have not upheld the rules of
+                // `BumpBuffer::reset` and it subsequently causes aliasing.
+                // assert_eq!(s1, s2);
+
+                assert_eq!(s1, s2.as_ptr());
             }
 
             assert_eq!(backing, [11, 12, 13, 0, 0, 0]);
