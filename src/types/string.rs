@@ -6,7 +6,7 @@ use core::{
 use const_fn::const_fn;
 
 use crate::{
-    fmt::debug_assert,
+    fmt::const_debug_assert,
     types::{MqttBinary, TooLargeToEncode},
 };
 
@@ -165,11 +165,11 @@ impl<'s> MqttString<'s> {
         if cfg!(debug_assertions) {
             let mut i = 0;
             while i < b.as_bytes().len() {
-                debug_assert!(b.as_bytes()[i] != 0);
+                const_debug_assert!(b.as_bytes()[i] != 0);
                 i += 1;
             }
         }
-        debug_assert!(from_utf8(b.as_bytes()).is_ok());
+        const_debug_assert!(from_utf8(b.as_bytes()).is_ok());
 
         Self(b)
     }
@@ -207,7 +207,7 @@ impl<'s> MqttString<'s> {
         if cfg!(debug_assertions) {
             let mut i = 0;
             while i < s.len() {
-                debug_assert!(s.as_bytes()[i] != 0);
+                const_debug_assert!(s.as_bytes()[i] != 0);
                 i += 1;
             }
         }

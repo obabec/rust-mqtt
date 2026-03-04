@@ -13,6 +13,15 @@ macro_rules! assert_ {
 }
 
 #[clippy::format_args]
+macro_rules! const_debug_assert_ {
+    ($($x:tt)*) => {
+        {
+            ::core::debug_assert!($($x)*);
+        }
+    };
+}
+
+#[clippy::format_args]
 macro_rules! debug_assert_ {
     ($($x:tt)*) => {
         {
@@ -149,6 +158,8 @@ pub(crate) use trace;
 pub(crate) use warn_ as warn;
 
 pub(crate) use assert_ as assert;
+
+pub(crate) use const_debug_assert_ as const_debug_assert;
 
 pub(crate) use debug_assert_ as debug_assert;
 pub(crate) use debug_assert_eq_ as debug_assert_eq;

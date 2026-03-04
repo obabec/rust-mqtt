@@ -1,5 +1,5 @@
 use crate::{
-    fmt::{debug_assert, debug_assert_eq},
+    fmt::{const_debug_assert, debug_assert, debug_assert_eq},
     types::TooLargeToEncode,
 };
 
@@ -42,7 +42,7 @@ impl VarByteInt {
     /// # Panics
     /// Panics in debug builds if `value` exceeds [`VarByteInt::MAX_ENCODABLE`].
     pub const fn new_unchecked(value: u32) -> Self {
-        debug_assert!(
+        const_debug_assert!(
             value <= Self::MAX_ENCODABLE,
             "the value exceeds MAX_ENCODABLE"
         );
