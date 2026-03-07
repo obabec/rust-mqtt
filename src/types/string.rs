@@ -5,7 +5,10 @@ use core::{
 
 use const_fn::const_fn;
 
-use crate::types::{MqttBinary, TooLargeToEncode};
+use crate::{
+    fmt::const_debug_assert,
+    types::{MqttBinary, TooLargeToEncode},
+};
 
 /// Error returned when creating [`MqttString`] failed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -162,11 +165,11 @@ impl<'s> MqttString<'s> {
         if cfg!(debug_assertions) {
             let mut i = 0;
             while i < b.as_bytes().len() {
-                debug_assert!(b.as_bytes()[i] != 0);
+                const_debug_assert!(b.as_bytes()[i] != 0);
                 i += 1;
             }
         }
-        debug_assert!(from_utf8(b.as_bytes()).is_ok());
+        const_debug_assert!(from_utf8(b.as_bytes()).is_ok());
 
         Self(b)
     }
@@ -204,7 +207,7 @@ impl<'s> MqttString<'s> {
         if cfg!(debug_assertions) {
             let mut i = 0;
             while i < s.len() {
-                debug_assert!(s.as_bytes()[i] != 0);
+                const_debug_assert!(s.as_bytes()[i] != 0);
                 i += 1;
             }
         }

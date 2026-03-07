@@ -15,7 +15,7 @@ use crate::{
         raw::Raw,
     },
     config::{ClientConfig, MaximumPacketSize, ServerConfig, SessionExpiryInterval, SharedConfig},
-    fmt::{debug, error, panic, unreachable, warn},
+    fmt::{assert, debug, error, panic, unreachable, warn},
     header::{FixedHeader, PacketType},
     io::Transport,
     packet::{Packet, TxPacket},
@@ -285,7 +285,8 @@ impl<
                 options.keep_alive,
                 options.maximum_packet_size,
                 options.session_expiry_interval,
-                // Safety: `Self::new` panics if `RECEIVE_MAXIMUM` is 0 making this code unreachable.
+                // Safety: `Self::new` panics if `RECEIVE_MAXIMUM` is 0. Thus, this
+                // code is only reached when `RECEIVE_MAXIMUM` is greater than 0.
                 unsafe { NonZero::new_unchecked(RECEIVE_MAXIMUM as u16) },
                 options.request_response_information,
             );
@@ -1018,23 +1019,36 @@ impl<
                             reason_code,
                         })
                     }
-                    Some(s) => {
-                        warn!("packet identifier {} in PUBACK is actually {:?}", pid, s);
+                    Some(CPublishFlightState::AwaitingPubrec) => {
+                        warn!(
+                            "packet identifier {} in PUBACK is actually {:?}",
+                            pid,
+                            CPublishFlightState::AwaitingPubrec
+                        );
 
                         // Readd this packet identifier to the session so that it can be republished
                         // after reconnecting.
 
-                        match s {
-                            CPublishFlightState::AwaitingPuback => unreachable!(),
-                            CPublishFlightState::AwaitingPubrec =>
-                            // Safety: Session::remove_cpublish returning Some and therefore successfully
-                            // removing a cpublish frees space to add a new in flight entry.
-                            unsafe { self.session.await_puback(pid) },
-                            CPublishFlightState::AwaitingPubcomp =>
-                            // Safety: Session::remove_cpublish returning Some and therefore successfully
-                            // removing a cpublish frees space to add a new in flight entry.
-                            unsafe { self.session.await_pubcomp(pid) },
-                        }
+                        // Safety: Session::remove_cpublish returning Some and therefore successfully
+                        // removing a cpublish frees space to add a new in flight entry.
+                        unsafe { self.session.await_pubrec(pid) };
+
+                        self.raw.close_with(Some(ReasonCode::ProtocolError));
+                        return Err(MqttError::Server);
+                    }
+                    Some(CPublishFlightState::AwaitingPubcomp) => {
+                        warn!(
+                            "packet identifier {} in PUBACK is actually {:?}",
+                            pid,
+                            CPublishFlightState::AwaitingPubcomp
+                        );
+
+                        // Readd this packet identifier to the session so that it can be republished
+                        // after reconnecting.
+
+                        // Safety: Session::remove_cpublish returning Some and therefore successfully
+                        // removing a cpublish frees space to add a new in flight entry.
+                        unsafe { self.session.await_pubcomp(pid) };
 
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
@@ -1084,23 +1098,36 @@ impl<
                             reason_code,
                         })
                     }
-                    Some(s) => {
-                        warn!("packet identifier {} in PUBREC is actually {:?}", pid, s);
+                    Some(CPublishFlightState::AwaitingPuback) => {
+                        warn!(
+                            "packet identifier {} in PUBREC is actually {:?}",
+                            pid,
+                            CPublishFlightState::AwaitingPuback
+                        );
 
                         // Readd this packet identifier to the session so that it can be republished
                         // after reconnecting.
 
-                        match s {
-                            CPublishFlightState::AwaitingPuback =>
-                            // Safety: Session::remove_cpublish returning Some and therefore successfully
-                            // removing a cpublish frees space to add a new in flight entry.
-                            unsafe { self.session.await_puback(pid) },
-                            CPublishFlightState::AwaitingPubrec => unreachable!(),
-                            CPublishFlightState::AwaitingPubcomp =>
-                            // Safety: Session::remove_cpublish returning Some and therefore successfully
-                            // removing a cpublish frees space to add a new in flight entry.
-                            unsafe { self.session.await_pubcomp(pid) },
-                        }
+                        // Safety: Session::remove_cpublish returning Some and therefore successfully
+                        // removing a cpublish frees space to add a new in flight entry.
+                        unsafe { self.session.await_puback(pid) };
+
+                        self.raw.close_with(Some(ReasonCode::ProtocolError));
+                        return Err(MqttError::Server);
+                    }
+                    Some(CPublishFlightState::AwaitingPubcomp) => {
+                        warn!(
+                            "packet identifier {} in PUBREC is actually {:?}",
+                            pid,
+                            CPublishFlightState::AwaitingPubcomp
+                        );
+
+                        // Readd this packet identifier to the session so that it can be republished
+                        // after reconnecting.
+
+                        // Safety: Session::remove_cpublish returning Some and therefore successfully
+                        // removing a cpublish frees space to add a new in flight entry.
+                        unsafe { self.session.await_pubcomp(pid) };
 
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
@@ -1193,23 +1220,28 @@ impl<
                             reason_code,
                         })
                     }
-                    Some(s) => {
+                    Some(s @ CPublishFlightState::AwaitingPuback) => {
                         warn!("packet identifier {} in PUBCOMP is actually {:?}", pid, s);
 
                         // Readd this packet identifier to the session so that it can be republished
                         // after reconnecting.
 
-                        match s {
-                            CPublishFlightState::AwaitingPuback =>
-                            // Safety: Session::remove_cpublish returning Some and therefore successfully
-                            // removing a cpublish frees space to add a new in flight entry.
-                            unsafe { self.session.await_puback(pid) },
-                            CPublishFlightState::AwaitingPubrec =>
-                            // Safety: Session::remove_cpublish returning Some and therefore successfully
-                            // removing a cpublish frees space to add a new in flight entry.
-                            unsafe { self.session.await_pubrec(pid) },
-                            CPublishFlightState::AwaitingPubcomp => unreachable!(),
-                        }
+                        // Safety: Session::remove_cpublish returning Some and therefore successfully
+                        // removing a cpublish frees space to add a new in flight entry.
+                        unsafe { self.session.await_puback(pid) };
+
+                        self.raw.close_with(Some(ReasonCode::ProtocolError));
+                        return Err(MqttError::Server);
+                    }
+                    Some(s @ CPublishFlightState::AwaitingPubrec) => {
+                        warn!("packet identifier {} in PUBCOMP is actually {:?}", pid, s);
+
+                        // Readd this packet identifier to the session so that it can be republished
+                        // after reconnecting.
+
+                        // Safety: Session::remove_cpublish returning Some and therefore successfully
+                        // removing a cpublish frees space to add a new in flight entry.
+                        unsafe { self.session.await_pubrec(pid) };
 
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
