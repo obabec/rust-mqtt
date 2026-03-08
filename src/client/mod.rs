@@ -1019,36 +1019,18 @@ impl<
                             reason_code,
                         })
                     }
-                    Some(CPublishFlightState::AwaitingPubrec) => {
-                        warn!(
-                            "packet identifier {} in PUBACK is actually {:?}",
-                            pid,
-                            CPublishFlightState::AwaitingPubrec
-                        );
+                    Some(
+                        s @ CPublishFlightState::AwaitingPubrec
+                        | s @ CPublishFlightState::AwaitingPubcomp,
+                    ) => {
+                        warn!("packet identifier {} in PUBACK is actually {:?}", pid, s);
 
                         // Readd this packet identifier to the session so that it can be republished
                         // after reconnecting.
 
                         // Safety: Session::remove_cpublish returning Some and therefore successfully
                         // removing a cpublish frees space to add a new in flight entry.
-                        unsafe { self.session.await_pubrec(pid) };
-
-                        self.raw.close_with(Some(ReasonCode::ProtocolError));
-                        return Err(MqttError::Server);
-                    }
-                    Some(CPublishFlightState::AwaitingPubcomp) => {
-                        warn!(
-                            "packet identifier {} in PUBACK is actually {:?}",
-                            pid,
-                            CPublishFlightState::AwaitingPubcomp
-                        );
-
-                        // Readd this packet identifier to the session so that it can be republished
-                        // after reconnecting.
-
-                        // Safety: Session::remove_cpublish returning Some and therefore successfully
-                        // removing a cpublish frees space to add a new in flight entry.
-                        unsafe { self.session.await_pubcomp(pid) };
+                        unsafe { self.session.r#await(pid, s) };
 
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
@@ -1098,36 +1080,18 @@ impl<
                             reason_code,
                         })
                     }
-                    Some(CPublishFlightState::AwaitingPuback) => {
-                        warn!(
-                            "packet identifier {} in PUBREC is actually {:?}",
-                            pid,
-                            CPublishFlightState::AwaitingPuback
-                        );
+                    Some(
+                        s @ CPublishFlightState::AwaitingPuback
+                        | s @ CPublishFlightState::AwaitingPubcomp,
+                    ) => {
+                        warn!("packet identifier {} in PUBREC is actually {:?}", pid, s);
 
                         // Readd this packet identifier to the session so that it can be republished
                         // after reconnecting.
 
                         // Safety: Session::remove_cpublish returning Some and therefore successfully
                         // removing a cpublish frees space to add a new in flight entry.
-                        unsafe { self.session.await_puback(pid) };
-
-                        self.raw.close_with(Some(ReasonCode::ProtocolError));
-                        return Err(MqttError::Server);
-                    }
-                    Some(CPublishFlightState::AwaitingPubcomp) => {
-                        warn!(
-                            "packet identifier {} in PUBREC is actually {:?}",
-                            pid,
-                            CPublishFlightState::AwaitingPubcomp
-                        );
-
-                        // Readd this packet identifier to the session so that it can be republished
-                        // after reconnecting.
-
-                        // Safety: Session::remove_cpublish returning Some and therefore successfully
-                        // removing a cpublish frees space to add a new in flight entry.
-                        unsafe { self.session.await_pubcomp(pid) };
+                        unsafe { self.session.r#await(pid, s) };
 
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
@@ -1220,7 +1184,10 @@ impl<
                             reason_code,
                         })
                     }
-                    Some(s @ CPublishFlightState::AwaitingPuback) => {
+                    Some(
+                        s @ CPublishFlightState::AwaitingPuback
+                        | s @ CPublishFlightState::AwaitingPubrec,
+                    ) => {
                         warn!("packet identifier {} in PUBCOMP is actually {:?}", pid, s);
 
                         // Readd this packet identifier to the session so that it can be republished
@@ -1228,20 +1195,7 @@ impl<
 
                         // Safety: Session::remove_cpublish returning Some and therefore successfully
                         // removing a cpublish frees space to add a new in flight entry.
-                        unsafe { self.session.await_puback(pid) };
-
-                        self.raw.close_with(Some(ReasonCode::ProtocolError));
-                        return Err(MqttError::Server);
-                    }
-                    Some(s @ CPublishFlightState::AwaitingPubrec) => {
-                        warn!("packet identifier {} in PUBCOMP is actually {:?}", pid, s);
-
-                        // Readd this packet identifier to the session so that it can be republished
-                        // after reconnecting.
-
-                        // Safety: Session::remove_cpublish returning Some and therefore successfully
-                        // removing a cpublish frees space to add a new in flight entry.
-                        unsafe { self.session.await_pubrec(pid) };
+                        unsafe { self.session.r#await(pid, s) };
 
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);

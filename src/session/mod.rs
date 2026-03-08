@@ -70,20 +70,32 @@ impl<const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
         (self.pending_server_publishes.capacity() - self.pending_server_publishes.len()) as u16
     }
 
+    /// Adds an entry to await a PUBACK/PUBREC/PUBCOMP packet. Assumes the packet identifier has no entry currently.
+    ///
+    /// # Safety
+    /// `self.pending_client_publishes` has free capacity.
+    pub(crate) unsafe fn r#await(
+        &mut self,
+        packet_identifier: PacketIdentifier,
+        state: CPublishFlightState,
+    ) {
+        // Safety: self.pending_client_publishes has free capacity.
+        unsafe {
+            self.pending_client_publishes
+                .push(InFlightPublish {
+                    packet_identifier,
+                    state,
+                })
+                .unwrap_unchecked()
+        }
+    }
     /// Adds an entry to await a PUBACK packet. Assumes the packet identifier has no entry currently.
     ///
     /// # Safety
     /// `self.pending_client_publishes` has free capacity.
     pub(crate) unsafe fn await_puback(&mut self, packet_identifier: PacketIdentifier) {
         // Safety: self.pending_client_publishes has free capacity.
-        unsafe {
-            self.pending_client_publishes
-                .push(InFlightPublish {
-                    packet_identifier,
-                    state: CPublishFlightState::AwaitingPuback,
-                })
-                .unwrap_unchecked()
-        }
+        unsafe { self.r#await(packet_identifier, CPublishFlightState::AwaitingPuback) };
     }
     /// Adds an entry to await a PUBREC packet. Assumes the packet identifier has no entry currently.
     ///
@@ -91,14 +103,7 @@ impl<const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
     /// `self.pending_client_publishes` has free capacity.
     pub(crate) unsafe fn await_pubrec(&mut self, packet_identifier: PacketIdentifier) {
         // Safety: self.pending_client_publishes has free capacity.
-        unsafe {
-            self.pending_client_publishes
-                .push(InFlightPublish {
-                    packet_identifier,
-                    state: CPublishFlightState::AwaitingPubrec,
-                })
-                .unwrap_unchecked()
-        }
+        unsafe { self.r#await(packet_identifier, CPublishFlightState::AwaitingPubrec) };
     }
     /// Adds an entry to await a PUBREL packet. Assumes the packet identifier has no entry currently.
     ///
@@ -121,14 +126,7 @@ impl<const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
     /// `self.pending_client_publishes` has free capacity.
     pub(crate) unsafe fn await_pubcomp(&mut self, packet_identifier: PacketIdentifier) {
         // Safety: self.pending_client_publishes has free capacity.
-        unsafe {
-            self.pending_client_publishes
-                .push(InFlightPublish {
-                    packet_identifier,
-                    state: CPublishFlightState::AwaitingPubcomp,
-                })
-                .unwrap_unchecked()
-        }
+        unsafe { self.r#await(packet_identifier, CPublishFlightState::AwaitingPubcomp) };
     }
 
     pub(crate) fn remove_cpublish(
