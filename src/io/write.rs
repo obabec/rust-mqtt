@@ -1,5 +1,6 @@
 use crate::{
     eio::Write,
+    fmt::unreachable,
     io::err::WriteError,
     types::{MqttBinary, MqttString, TopicFilter, TopicName, VarByteInt},
 };
