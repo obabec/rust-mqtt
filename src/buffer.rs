@@ -41,6 +41,7 @@ mod bump {
     ///
     /// Can be resetted when no references to buffer contents exist.
     #[derive(Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct BumpBuffer<'a> {
         ptr: *mut u8,
         len: usize,
@@ -192,6 +193,7 @@ mod alloc {
 
     /// Allocates memory using the global allocator.
     #[derive(Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct AllocBuffer;
 
     impl<'a> BufferProvider<'a> for AllocBuffer {
