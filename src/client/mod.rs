@@ -167,6 +167,12 @@ impl<
         &self.session
     }
 
+    /// Returns an immutable reference to the supplied [`BufferProvider`] implementation.
+    #[inline]
+    pub fn buffer(&self) -> &B {
+        self.raw.buffer()
+    }
+
     /// Returns a mutable reference to the supplied [`BufferProvider`] implementation.
     ///
     /// This can for example be used to reset the underlying buffer if using `BumpBuffer`.
