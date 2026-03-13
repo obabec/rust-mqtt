@@ -79,7 +79,7 @@ async fn main() {
 
     #[cfg(feature = "bump")]
     unsafe {
-        client.buffer().reset()
+        client.buffer_mut().reset()
     };
 
     let mut sub_options = SubscriptionOptions::new()

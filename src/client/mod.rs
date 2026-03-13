@@ -171,8 +171,8 @@ impl<
     ///
     /// This can for example be used to reset the underlying buffer if using `BumpBuffer`.
     #[inline]
-    pub fn buffer(&mut self) -> &mut B {
-        self.raw.buffer()
+    pub fn buffer_mut(&mut self) -> &mut B {
+        self.raw.buffer_mut()
     }
 
     /// Generates a new packet identifier.

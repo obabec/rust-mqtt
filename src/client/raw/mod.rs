@@ -44,7 +44,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
         self.n.replace(net);
     }
 
-    pub fn buffer(&mut self) -> &mut B {
+    pub fn buffer_mut(&mut self) -> &mut B {
         self.buf
     }
 
