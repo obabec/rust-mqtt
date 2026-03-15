@@ -28,7 +28,7 @@ pub trait BufferProvider<'a> {
 
 #[cfg(feature = "bump")]
 mod bump {
-    use core::slice;
+    use core::{marker::PhantomData, slice};
 
     use crate::buffer::BufferProvider;
 
@@ -39,33 +39,40 @@ mod bump {
 
     /// Allocates memory from an underlying buffer by bumping up a pointer by the requested length.
     ///
-    /// Can be resetted when no references to buffer contents exist.
+    /// Can be reset when no references to buffer contents exist.
     #[derive(Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct BumpBuffer<'a> {
-        slice: &'a mut [u8],
+        ptr: *mut u8,
+        len: usize,
         index: usize,
+        _phantom_data: PhantomData<&'a mut [u8]>,
     }
 
     impl<'a> BufferProvider<'a> for BumpBuffer<'a> {
         type Buffer = &'a mut [u8];
         type ProvisionError = InsufficientSpace;
 
-        /// Return the next `len` bytes from the buffer, advancing the internal
-        /// pointer. Returns [`InsufficientSpace`] if there isn't enough room.
+        /// Return the next `len` bytes from the buffer, advancing the internal tracking
+        /// index. Returns [`InsufficientSpace`] if there isn't enough room.
         fn provide_buffer(&mut self, len: usize) -> Result<Self::Buffer, Self::ProvisionError> {
             if self.remaining_len() < len {
                 Err(InsufficientSpace)
             } else {
                 let start = self.index;
-                // Safety: we checked bounds above, and the pointer originates from
-                // the backing slice owned by this struct with the same lifetime.
-                let ptr = unsafe { self.slice.as_mut_ptr().add(start) };
-                // Advance index after computing start so callers don't observe a
-                // partially-advanced state if we ever change ordering.
+
+                // Safety: we checked the bounds above meaning the resulting pointer
+                // is in the backing slice's range. This means the pointer arithmetic
+                // does not overflow.
+                // The pointer originates from the backing slice owned by this struct with the same lifetime.
+                let ptr = unsafe { self.ptr.add(start) };
+
                 self.index += len;
 
-                // Safety: the slice starts at the self.index which is not part of any other reservations.
-                // self.index has been skipped ahead the slice's full length
+                // Safety: the slice starts at the self.index offset which is not part of any previous reservation.
+                // Everything after this offset is not allocated and referenced.
+                // The lifetime is correct as the returned slice has the same lifetime as `Self` which is
+                // in turn has the lifetime of the backing slice.
                 let slice = unsafe { slice::from_raw_parts_mut(ptr, len) };
 
                 Ok(slice)
@@ -76,26 +83,94 @@ mod bump {
     impl<'a> BumpBuffer<'a> {
         /// Creates a new [`BumpBuffer`] with the provided slice as underlying buffer.
         pub fn new(slice: &'a mut [u8]) -> Self {
-            Self { slice, index: 0 }
+            Self {
+                ptr: slice.as_mut_ptr(),
+                len: slice.len(),
+                index: 0,
+                _phantom_data: PhantomData,
+            }
         }
 
         /// Returns the remaining amount of unallocated bytes in the underlying buffer.
         #[inline]
         pub fn remaining_len(&self) -> usize {
-            self.slice.len() - self.index
+            self.len - self.index
         }
 
-        /// Invalidates all previous allocations by resetting the [`BumpBuffer`]'s index,
-        /// allowing the underlying buffer to be reallocated.
+        /// Invalidates all previous allocations by resetting the [`BumpBuffer`]'s internal tracking index into the underlying
+        /// buffer, allowing the underlying buffer to be reallocated down the line. After this, the bump buffer will allocate
+        /// starting with the first byte of the backing buffer again.
         ///
         /// # Safety
-        /// No more references exist to previously allocated slices / underlying buffer content.
-        /// In the context of the client, this is the case when no server publication content
-        /// (topic & message) and no reason strings still held.
+        ///
+        /// This method is safe to call when no references to previously allocated slices or underlying buffer content exist.
+        /// The caller must ensure no more such references exist. In the context of the client, this is true when no more values
+        /// that have a lifetime tied to the used [`BumpBuffer`] instance exist.
+        ///
+        /// # Example
+        ///
+        /// ## Sound
+        ///
+        /// ```rust,ignore
+        /// use rust_mqtt::buffer::BumpBuffer;
+        /// use rust_mqtt::client::Client;
+        /// use rust_mqtt::client::info::ConnectInfo;
+        /// use rust_mqtt::client::options::ConnectOptions;
+        /// use tokio::net::TcpStream;
+        /// use embedded_io_adapters::tokio_1::FromTokio;
+        ///
+        /// let mut buffer = [0; 1024];
+        /// let mut buffer = BumpBuffer::new(&mut buffer);
+        /// let mut client: Client<'_, FromTokio<TcpStream>, _, 0, 1, 0, 0> = Client::new(&mut buffer);
+        ///
+        /// {
+        ///     // client_identifier lives inside buffer's backing buffer, so it prevents a reset call.
+        ///     let ConnectInfo { client_identifier, .. } = client.connect(todo!(), &ConnectOptions::new(), None).await.unwrap();
+        ///
+        /// }   // client_identifier is dropped here, now we can reset the buffer
+        ///
+        /// // Safety: client_identifier and all other previously returned values living in buffer's backing
+        /// // buffer don't exist anymore. No aliasing possible.
+        /// unsafe { client.buffer_mut().reset() };
+        ///
+        /// // The next allocation can happen safely here.
+        /// client.poll().await.unwrap();
+        /// ```
+        ///
+        /// ## Unsound
+        ///
+        /// ```rust,ignore
+        /// use rust_mqtt::buffer::BumpBuffer;
+        /// use rust_mqtt::client::Client;
+        /// use rust_mqtt::client::info::ConnectInfo;
+        /// use rust_mqtt::client::options::ConnectOptions;
+        /// use tokio::net::TcpStream;
+        /// use embedded_io_adapters::tokio_1::FromTokio;
+        ///
+        /// let mut buffer = [0; 1024];
+        /// let mut buffer = BumpBuffer::new(&mut buffer);
+        /// let mut client: Client<'_, FromTokio<TcpStream>, _, 0, 1, 0, 0> = Client::new(&mut buffer);
+        ///
+        /// // client_identifier lives inside buffer's backing buffer, so it prevents a reset call.
+        /// let ConnectInfo { client_identifier, .. } = client.connect(todo!(), &ConnectOptions::new(), None).await.unwrap();
+        ///
+        /// // (No) Safety: client_identifier still lives.
+        /// unsafe { client.buffer_mut().reset() };
+        ///
+        /// // The next allocation can happen here and cause an alias to client_identifier.
+        /// client.poll().await.unwrap();
+        ///
+        /// // client_identifier is still alive. It might have a different or even non-UTF-8 value now, scary...
+        /// println!("{:?}", client_identifier);
+        /// ```
         #[inline]
         pub unsafe fn reset(&mut self) {
             self.index = 0;
         }
+    }
+
+    fn _assert_covariant<'a, 'b: 'a>(x: BumpBuffer<'b>) -> BumpBuffer<'a> {
+        x
     }
 
     #[cfg(test)]
@@ -143,13 +218,22 @@ mod bump {
             {
                 let mut buf = BumpBuffer::new(&mut backing);
 
-                let s1 = assert_ok!(buf.provide_buffer(3));
-                s1.copy_from_slice(&[11, 12, 13]);
+                let s1 = {
+                    let s1 = assert_ok!(buf.provide_buffer(3));
+                    s1.copy_from_slice(&[11, 12, 13]);
+
+                    s1.as_ptr()
+                };
 
                 // reset and take again from start
                 unsafe { buf.reset() }
                 let s2 = assert_ok!(buf.provide_buffer(3));
-                assert_eq!(s1, s2);
+
+                // Checking the slices for equality is UB because we have not upheld the rules of
+                // `BumpBuffer::reset` and it subsequently causes aliasing.
+                // assert_eq!(s1, s2);
+
+                assert_eq!(s1, s2.as_ptr());
             }
 
             assert_eq!(backing, [11, 12, 13, 0, 0, 0]);
@@ -168,6 +252,7 @@ mod alloc {
 
     /// Allocates memory using the global allocator.
     #[derive(Debug)]
+    #[cfg_attr(feature = "defmt", derive(defmt::Format))]
     pub struct AllocBuffer;
 
     impl<'a> BufferProvider<'a> for AllocBuffer {

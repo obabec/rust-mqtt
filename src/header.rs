@@ -102,12 +102,12 @@ impl PacketType {
             14 => Ok(PacketType::Disconnect),
 
             #[cfg(feature = "v3")]
-            15 => Err(PacketTypeError::Reserved),
+            15 => Err(Reserved),
 
             #[cfg(feature = "v5")]
             15 => Ok(PacketType::Auth),
 
-            _ => unreachable!(),
+            0x10.. => unreachable!("u8 shifted 4 bits: all values 0x0..=0xF are covered"),
         }
     }
 }

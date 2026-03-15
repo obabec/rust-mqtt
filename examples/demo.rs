@@ -79,7 +79,7 @@ async fn main() {
 
     #[cfg(feature = "bump")]
     unsafe {
-        client.buffer().reset()
+        client.buffer_mut().reset()
     };
 
     let mut sub_options = SubscriptionOptions::new()
@@ -303,7 +303,7 @@ async fn main() {
         match client.poll().await {
             Ok(Event::PublishComplete(Puback {
                 packet_identifier,
-                reason_code,
+                reason_code: _,
             })) if packet_identifier == incomplete_publish_packet_identifier => {
                 info!(
                     "Completed republish of packet identifier {}",

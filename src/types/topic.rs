@@ -4,6 +4,7 @@ use heapless::Vec;
 use crate::{
     client::options::{RetainHandling, SubscriptionOptions},
     eio::Write,
+    fmt::const_debug_assert,
     io::{
         err::WriteError,
         write::{Writable, wlen},
@@ -71,7 +72,7 @@ impl<'t> TopicName<'t> {
     /// # Panics
     /// In debug builds, this function will panic if the syntax of `string` is incorrect.
     pub const fn new_unchecked(string: MqttString<'t>) -> Self {
-        debug_assert!(
+        const_debug_assert!(
             Self::is_valid(&string),
             "the provided string is not valid TopicName syntax"
         );
@@ -182,7 +183,7 @@ impl<'t> TopicFilter<'t> {
     /// # Panics
     /// In debug builds, this function will panic if the syntax of `string` is incorrect.
     pub const fn new_unchecked(string: MqttString<'t>) -> Self {
-        debug_assert!(
+        const_debug_assert!(
             Self::is_valid(&string),
             "the provided string is not valid TopicFilter syntax"
         );

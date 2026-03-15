@@ -368,7 +368,7 @@ async fn incoming_qos2_retry_pubcomp() {
                     match assert_ok!(rx.poll().await) {
                         Event::PublishReleased(Puback {
                             packet_identifier,
-                            reason_code,
+                            reason_code: _,
                         }) if packet_identifier == pid => {
                             break;
                         }
@@ -1003,7 +1003,7 @@ async fn incoming_qos1_write_fail_retry() {
                     match rx.poll().await {
                         Ok(Event::Publish(Publish {
                             dup: false,
-                            identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
+                            identified_qos: IdentifiedQoS::AtLeastOnce(_),
                             message,
                             ..
                         })) if &*message == msg.as_slice() => {}
@@ -1031,14 +1031,14 @@ async fn incoming_qos1_write_fail_retry() {
                 match assert_ok!(rx.poll().await) {
                     Event::Publish(Publish {
                         dup: true,
-                        identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
+                        identified_qos: IdentifiedQoS::AtLeastOnce(_),
                         message,
                         ..
                     }) if &*message == msg.as_slice() => {}
                     Event::Publish(p) => panic!("Received non-matching PUBLISH: {:?}", p),
                     _ => panic!("Should only receive a PUBLISH"),
                 };
-            }
+            };
 
             received.send(()).await.unwrap();
         }
@@ -1116,7 +1116,7 @@ async fn incoming_qos1_read_fail_retry() {
                     match rx.poll().await {
                         Ok(Event::Publish(Publish {
                             dup: false,
-                            identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
+                            identified_qos: IdentifiedQoS::AtLeastOnce(_),
                             message,
                             ..
                         })) if &*message == msg.as_slice() => {}
@@ -1143,7 +1143,7 @@ async fn incoming_qos1_read_fail_retry() {
 
                 match assert_ok!(rx.poll().await) {
                     Event::Publish(Publish {
-                        identified_qos: IdentifiedQoS::AtLeastOnce(packet_identifier),
+                        identified_qos: IdentifiedQoS::AtLeastOnce(_),
                         message,
                         ..
                     }) if &*message == msg.as_slice() => {}
@@ -1230,7 +1230,7 @@ async fn incoming_qos2_write_fail_retry() {
                             identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
                             message,
                             ..
-                        })) if &*message == msg.as_slice() => pid,
+                        })) if &*message == msg.as_slice() => packet_identifier,
                         Ok(Event::Publish(_)) => panic!("Received non-matching PUBLISH"),
                         Ok(_) => panic!("Should only receive a PUBLISH"),
                         Err(_) => {
@@ -1276,7 +1276,7 @@ async fn incoming_qos2_write_fail_retry() {
                             Event::Duplicate => {}
                             Event::PublishReleased(Puback {
                                 packet_identifier,
-                                reason_code,
+                                reason_code: _,
                             }) if packet_identifier == pid => break,
                             Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
                             e => panic!("Should only receive PUBLISH or PUBREL: {:?}", e),
@@ -1368,7 +1368,7 @@ async fn incoming_qos2_read_fail_retry() {
                             identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
                             message,
                             ..
-                        })) if &*message == msg.as_slice() => pid,
+                        })) if &*message == msg.as_slice() => packet_identifier,
                         Ok(Event::Publish(_)) => panic!("Received non-matching PUBLISH"),
                         Ok(_) => panic!("Should only receive a PUBLISH"),
                         Err(_) => {
@@ -1414,7 +1414,7 @@ async fn incoming_qos2_read_fail_retry() {
                         Event::Ignored => break 'complete,
                         Event::PublishReleased(Puback {
                             packet_identifier,
-                            reason_code,
+                            reason_code: _,
                         }) if packet_identifier == pid.unwrap() => break 'complete,
                         Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
                         Event::Publish(Publish {
@@ -1429,7 +1429,7 @@ async fn incoming_qos2_read_fail_retry() {
                     match assert_ok!(rx.poll().await) {
                         Event::PublishReleased(Puback {
                             packet_identifier,
-                            reason_code,
+                            reason_code: _,
                         }) if packet_identifier == pid => break 'complete,
                         Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
                         e => panic!("Should only receive PUBREL: {:?}", e),

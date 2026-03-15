@@ -4,6 +4,7 @@ use const_fn::const_fn;
 
 use crate::{
     bytes::Bytes,
+    fmt::const_debug_assert,
     types::{MqttString, TooLargeToEncode},
 };
 
@@ -113,7 +114,7 @@ impl<'b> MqttBinary<'b> {
     /// In debug builds, this function will panic if the bytes' length is greater than
     /// [`MqttBinary::MAX_LENGTH`].
     pub const fn from_bytes_unchecked(bytes: Bytes<'b>) -> Self {
-        debug_assert!(
+        const_debug_assert!(
             bytes.len() <= Self::MAX_LENGTH,
             "the slice's length exceeds MAX_LENGTH"
         );
@@ -134,7 +135,7 @@ impl<'b> MqttBinary<'b> {
     /// In debug builds, this function will panic if the slice's length is greater than
     /// [`MqttBinary::MAX_LENGTH`].
     pub const fn from_slice_unchecked(slice: &'b [u8]) -> Self {
-        debug_assert!(
+        const_debug_assert!(
             slice.len() <= Self::MAX_LENGTH,
             "the slice's length exceeds MAX_LENGTH"
         );
