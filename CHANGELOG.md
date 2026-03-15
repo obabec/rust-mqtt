@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Panic instead of invoking undefined behaviour on incorrect `Read::read` implementations
 - Fix incorrect re-registration of QoS 2 flow state from awaiting PUBREC to awaiting PUBACK on receival of PUBACK packet with the PUBREC's packet identifier
 - Use a raw pointer instead of a mutable slice for `BumpBuffer`'s backing storage to not cause undefined behaviour due to violating Rust's reference aliasing rules.
+- Rename `Client::buffer` to `Client::buffer_mut` and re-add `Client::buffer` with an immutable borrow
 
 ## 0.4.1 - 2026-01-06
 
