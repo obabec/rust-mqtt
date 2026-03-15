@@ -102,7 +102,7 @@ mod bump {
         /// starting with the first byte of the backing buffer again.
         ///
         /// # Safety
-        /// 
+        ///
         /// This method is safe to call when no references to previously allocated slices or underlying buffer content exist.
         /// The caller must ensure no more such references exist. In the context of the client, this is true when no more values
         /// that have a lifetime tied to the used [`BumpBuffer`] instance exist.
@@ -110,7 +110,7 @@ mod bump {
         /// # Example
         ///
         /// ## Sound
-        /// 
+        ///
         /// ```rust,ignore
         /// use rust_mqtt::buffer::BumpBuffer;
         /// use rust_mqtt::client::Client;
