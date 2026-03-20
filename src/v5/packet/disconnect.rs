@@ -4,7 +4,7 @@ use crate::{
     buffer::BufferProvider,
     config::SessionExpiryInterval,
     eio::{Read, Write},
-    fmt::{error, trace},
+    fmt::{error, trace, verbose},
     header::{FixedHeader, PacketType},
     io::{
         read::{BodyReader, Readable},
@@ -34,20 +34,20 @@ impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
         header: &FixedHeader,
         mut reader: BodyReader<'_, 'p, R, B>,
     ) -> Result<Self, RxError<R::Error, B::ProvisionError>> {
-        trace!("decoding");
+        trace!("decoding DISCONNECT packet");
 
         if header.flags() != 0 {
-            error!("flags are not 0");
+            error!("invalid DISCONNECT fixed header flags: {}", header.flags());
             return Err(RxError::MalformedPacket);
         }
 
         let r = &mut reader;
 
         let disconnect_reason_code = if header.remaining_len.size() == 0 {
-            trace!("received minimal packet");
+            verbose!("received minimal DISCONNECT packet");
             ReasonCode::Success
         } else {
-            trace!("reading disconnect reason code");
+            verbose!("reading reason code field");
             ReasonCode::read(r).await?
         };
 
@@ -84,7 +84,10 @@ impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
                 | ReasonCode::SubscriptionIdentifiersNotSupported
                 | ReasonCode::WildcardSubscriptionsNotSupported
         ) {
-            error!("invalid reason code: {:?}", disconnect_reason_code);
+            error!(
+                "invalid DISCONNECT reason code: {:?}",
+                disconnect_reason_code
+            );
             return Err(RxError::ProtocolError);
         }
 
@@ -96,29 +99,29 @@ impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
         };
 
         let properties_length = if header.remaining_len.size() < 2 {
-            trace!("received packet with implicit properties length");
+            verbose!("DISCONNECT packet has implicit property length = 0");
             0
         } else {
-            trace!("reading properties length");
+            verbose!("reading property length field");
             VarByteInt::read(r).await?.size()
         };
 
-        trace!("properties length = {}", properties_length);
+        verbose!("property length: {} bytes", properties_length);
 
         if r.remaining_len() != properties_length {
-            error!("properties length is not equal to remaining packet length");
+            error!("invalid DISCONNECT property length for remaining packet length");
             return Err(RxError::MalformedPacket);
         }
 
         while r.remaining_len() > 0 {
-            trace!(
-                "reading property type with remaining len = {}",
+            verbose!(
+                "reading property identifier (remaining length: {} bytes)",
                 r.remaining_len()
             );
             let property_type = PropertyType::read(r).await?;
 
-            trace!(
-                "reading property body of {:?} with remaining len = {}",
+            verbose!(
+                "reading {:?} property body (remaining length: {} bytes)",
                 property_type,
                 r.remaining_len()
             );
@@ -136,7 +139,7 @@ impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
                 PropertyType::SessionExpiryInterval => return Err(RxError::ProtocolError),
                 // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
                 p => {
-                    error!("packet contains unexpected property {:?}", p);
+                    error!("invalid DISCONNECT property: {:?}", p);
                     return Err(RxError::MalformedPacket)
                 },
             };
@@ -173,7 +176,7 @@ impl<'p> TxPacket for DisconnectPacket<'p> {
 
         // Invariant: Max length: 131086 < VarByteInt::MAX_ENCODABLE
         // variable header (reason_code): 1
-        // properties length: 4
+        // property length: 4
         // properties: 131081
         VarByteInt::new_unchecked(total_length as u32)
     }

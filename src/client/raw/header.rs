@@ -1,6 +1,6 @@
 use crate::{
     eio::Read,
-    fmt::{trace, unreachable},
+    fmt::{unreachable, verbose},
     header::{FixedHeader, PacketType},
     io::err::ReadError,
     types::VarByteInt,
@@ -36,7 +36,7 @@ impl HeaderState {
 
         // Since i is in the 0..=4 range, we can expect a value of the current header when indexing into `self.buffer`
 
-        trace!("receiving byte {} of header", i);
+        verbose!("receiving byte {} of header", i);
 
         let read = r
             .read(&mut self.buffer[i..(i + 1)])
@@ -52,7 +52,7 @@ impl HeaderState {
             ),
         }
 
-        trace!("received {} byte(s) in total", self.read);
+        verbose!("received {} byte(s) in total", self.read);
 
         if i == 0 {
             return match PacketType::from_type_and_flags(self.buffer[i]) {

@@ -4,7 +4,7 @@ use crate::{
     buffer::BufferProvider,
     bytes::Bytes,
     eio::{ErrorType, Read},
-    fmt::{trace, unreachable},
+    fmt::{unreachable, verbose},
     io::err::{BodyReadError, ReadError},
     types::{MqttBinary, MqttString, TopicName, VarByteInt},
 };
@@ -19,7 +19,7 @@ pub trait Store<'a>: Read {
 
 impl<R: Read, const N: usize> Readable<R> for [u8; N] {
     async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
-        trace!("reading array of {} bytes", N);
+        verbose!("reading array of {} bytes", N);
 
         let mut array = [0; N];
         let mut slice = &mut array[..];
@@ -94,7 +94,7 @@ impl<'b, R: Read + Store<'b>> Readable<R> for MqttBinary<'b> {
     async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         let len = u16::read(read).await? as usize;
 
-        trace!("reading slice of {} bytes", len);
+        verbose!("reading slice of {} bytes", len);
 
         Ok(MqttBinary(read.read_and_store(len).await?))
     }

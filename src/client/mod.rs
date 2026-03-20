@@ -15,7 +15,7 @@ use crate::{
         raw::Raw,
     },
     config::{ClientConfig, MaximumPacketSize, ServerConfig, SessionExpiryInterval, SharedConfig},
-    fmt::{assert, debug, error, panic, unreachable, warn},
+    fmt::{assert, debug, error, info, panic, unreachable, warn},
     header::{FixedHeader, PacketType},
     io::Transport,
     packet::{Packet, TxPacket},
@@ -363,7 +363,7 @@ impl<
             debug!("CONNACK packet indicates success");
 
             if !session_present && !options.clean_start {
-                warn!("server does not have the requested session present.");
+                info!("server does not have the requested session present.");
                 self.session.clear();
             }
 
@@ -407,6 +407,8 @@ impl<
                 self.server_config.shared_subscription_supported = s.into_inner();
             }
 
+            info!("connected to server (session present: {})", session_present);
+
             Ok(ConnectInfo {
                 session_present,
                 client_identifier,
@@ -415,6 +417,7 @@ impl<
             })
         } else {
             debug!("CONNACK packet indicates rejection");
+            info!("connection rejected by server (reason: {:?})", reason_code);
 
             self.raw.close_with(None);
 
@@ -457,7 +460,7 @@ impl<
         options: SubscriptionOptions,
     ) -> Result<PacketIdentifier, MqttError<'c>> {
         if self.pending_suback.len() == MAX_SUBSCRIBES {
-            warn!("maximum concurrent subscriptions reached");
+            info!("maximum concurrent subscriptions reached");
             return Err(MqttError::SessionBuffer);
         }
 
@@ -494,7 +497,7 @@ impl<
         topic_filter: TopicFilter<'_>,
     ) -> Result<PacketIdentifier, MqttError<'c>> {
         if self.pending_unsuback.len() == MAX_SUBSCRIBES {
-            warn!("maximum concurrent unsubscriptions reached");
+            info!("maximum concurrent unsubscriptions reached");
             return Err(MqttError::SessionBuffer);
         }
 
@@ -528,11 +531,11 @@ impl<
     ) -> Result<Option<PacketIdentifier>, MqttError<'c>> {
         if options.qos > QoS::AtMostOnce {
             if self.remaining_send_quota() == 0 {
-                warn!("server receive maximum reached");
+                info!("server receive maximum reached");
                 return Err(MqttError::SendQuotaExceeded);
             }
             if self.session.cpublish_remaining_capacity() == 0 {
-                warn!("client maximum concurrent publications reached");
+                info!("client maximum concurrent publications reached");
                 return Err(MqttError::SessionBuffer);
             }
         }
@@ -743,8 +746,10 @@ impl<
     /// This is not cancel-safe but you can set a timeout if reconnecting later anyway or you don't reuse the client.
     #[inline]
     pub async fn abort(&mut self) {
-        #[allow(unused_must_use)]
-        self.raw.abort().await;
+        match self.raw.abort().await {
+            Ok(()) => info!("connection aborted"),
+            Err(e) => warn!("connection abort failed: {:?}", e),
+        }
     }
 
     /// Disconnects gracefully from the server by sending a DISCONNECT packet.
@@ -786,7 +791,7 @@ impl<
         // Terminates (closes) the connection by dropping it
         self.raw.close_with(None);
 
-        debug!("disconnected from server");
+        info!("disconnected from server");
 
         Ok(())
     }
@@ -821,7 +826,11 @@ impl<
         let header = self.raw.recv_header().await?;
 
         match header.packet_type() {
-            Ok(p) => debug!("received header of {:?}", p),
+            Ok(p) => debug!(
+                "received {:?} packet header (remaining length: {})",
+                p,
+                header.remaining_len.value()
+            ),
             Err(_) => {
                 error!("received invalid header {:?}", header);
                 self.raw.close_with(Some(ReasonCode::MalformedPacket));
@@ -856,12 +865,10 @@ impl<
     ) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c>> {
         let event = match header.packet_type()? {
             PacketType::Pingresp => {
-                debug!("receiving PINGRESP packet");
                 self.raw.recv_body::<PingrespPacket>(&header).await?;
                 Event::Pingresp
             }
             PacketType::Suback => {
-                debug!("receiving SUBACK packet");
                 // We only send SUBSCRIBE packets with exactly 1 topic
                 // -> Packets with more than 1 reason code are currently rejected by the RxPacket::receive implementation
                 //    with RxError::Protocol error. This is correct as long as we only send SUBSCRIBE packets with 1 topic.
@@ -882,12 +889,11 @@ impl<
                         reason_code: *r,
                     })
                 } else {
-                    warn!("packet identifier {} in SUBACK not in use", pid);
+                    debug!("packet identifier {} in SUBACK not in use", pid);
                     Event::Ignored
                 }
             }
             PacketType::Unsuback => {
-                debug!("receiving UNSUBACK packet");
                 // We only send UNSUBSCRIBE packets with exactly 1 topic
                 // -> Packets with more than 1 reason code are currently rejected by the RxPacket::receive implementation
                 //    with RxError::Protocol error. This is correct as long as we only send UNSUBSCRIBE packets with 1 topic.
@@ -908,12 +914,11 @@ impl<
                         reason_code: *r,
                     })
                 } else {
-                    warn!("packet identifier {} in UNSUBACK not in use", pid);
+                    debug!("packet identifier {} in UNSUBACK not in use", pid);
                     Event::Ignored
                 }
             }
             PacketType::Publish => {
-                debug!("receiving PUBLISH packet");
                 let publish = self
                     .raw
                     .recv_body::<PublishPacket<'_, MAX_SUBSCRIPTION_IDENTIFIERS>>(&header)
@@ -1004,7 +1009,6 @@ impl<
                 }
             }
             PacketType::Puback => {
-                debug!("receiving PUBACK packet");
                 let puback = self.raw.recv_body::<PubackPacket>(&header).await?;
                 let pid = puback.packet_identifier;
                 let reason_code = puback.reason_code;
@@ -1043,13 +1047,12 @@ impl<
                         return Err(MqttError::Server);
                     }
                     None => {
-                        warn!("packet identifier {} in PUBACK not in use", pid);
+                        debug!("packet identifier {} in PUBACK not in use", pid);
                         Event::Ignored
                     }
                 }
             }
             PacketType::Pubrec => {
-                debug!("receiving PUBREC packet");
                 let pubrec = self.raw.recv_body::<PubrecPacket>(&header).await?;
                 let pid = pubrec.packet_identifier;
                 let reason_code = pubrec.reason_code;
@@ -1104,7 +1107,7 @@ impl<
                         return Err(MqttError::Server);
                     }
                     None => {
-                        warn!("packet identifier {} in PUBREC not in use", pid);
+                        debug!("packet identifier {} in PUBREC not in use", pid);
 
                         let pubrel = PubrelPacket::new(pid, ReasonCode::PacketIdentifierNotFound);
 
@@ -1121,7 +1124,6 @@ impl<
                 }
             }
             PacketType::Pubrel => {
-                debug!("receiving PUBREL packet");
                 let pubrel = self.raw.recv_body::<PubrelPacket>(&header).await?;
                 let pid = pubrel.packet_identifier;
                 let reason_code = pubrel.reason_code;
@@ -1152,7 +1154,7 @@ impl<
                         })
                     }
                     None => {
-                        warn!("packet identifier {} in PUBREL not in use", pid);
+                        debug!("packet identifier {} in PUBREL not in use", pid);
 
                         let pubcomp = PubcompPacket::new(pid, ReasonCode::PacketIdentifierNotFound);
 
@@ -1169,7 +1171,6 @@ impl<
                 }
             }
             PacketType::Pubcomp => {
-                debug!("receiving PUBCOMP packet");
                 let pubcomp = self.raw.recv_body::<PubcompPacket>(&header).await?;
                 let pid = pubcomp.packet_identifier;
                 let reason_code = pubcomp.reason_code;
@@ -1208,13 +1209,12 @@ impl<
                         return Err(MqttError::Server);
                     }
                     None => {
-                        warn!("packet identifier {} in PUBCOMP not in use", pid);
+                        debug!("packet identifier {} in PUBCOMP not in use", pid);
                         Event::Ignored
                     }
                 }
             }
             PacketType::Disconnect => {
-                debug!("receiving DISCONNECT packet");
                 let disconnect = self.raw.recv_body::<DisconnectPacket>(&header).await?;
 
                 return Err(MqttError::Disconnect {
@@ -1227,22 +1227,27 @@ impl<
             | PacketType::Subscribe
             | PacketType::Unsubscribe
             | PacketType::Pingreq) => {
-                error!("received packet server is not allowed to send: {:?}", t);
+                error!(
+                    "received a packet that the server is not allowed to send: {:?}",
+                    t
+                );
 
                 self.raw.close_with(Some(ReasonCode::ProtocolError));
                 return Err(MqttError::Server);
             }
             PacketType::Connack => {
-                error!("received CONNACK packet");
+                error!("received unexpected CONNACK packet");
 
                 self.raw.close_with(Some(ReasonCode::ProtocolError));
                 return Err(MqttError::Server);
             }
             PacketType::Auth => {
-                error!("received AUTH packet");
+                error!("received unexpected AUTH packet");
 
-                self.raw
-                    .close_with(Some(ReasonCode::ImplementationSpecificError));
+                // Receiving a AUTH packet is currently always a protocol error because we never send
+                // an Authentication Method property in the CONNECT packet.
+                // <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901217>
+                self.raw.close_with(Some(ReasonCode::ProtocolError));
                 return Err(MqttError::AuthPacketReceived);
             }
         };

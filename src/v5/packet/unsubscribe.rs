@@ -78,7 +78,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS
         // MAX_TOPIC_FILTERS has to be less than or equal to 4095 to guarantee:
         //   Max length = 3 + MAX_TOPIC_FILTERS * 65537 <= VarByteInt::MAX_ENCODABLE
         // packet identifier: 2
-        // properties length: 1
+        // property length: 1
         // properties: 0
         // topic filters: MAX_TOPIC_FILTERS * 65537
         VarByteInt::try_from(total_length as u32)

@@ -65,7 +65,7 @@ impl<'p> TxPacket for ConnectPacket<'p> {
 
         // Invariant: Max length = 393253 < VarByteInt::MAX_ENCODABLE
         // variable header: 8
-        // properties length: 4
+        // property length: 4
         // properties: 131093
         // will: 2 * 65537 (will topic & will payload)
         // username: 65537
@@ -406,7 +406,7 @@ mod unit {
                 b'b',       //
                 b'a',       // Client identifier
 
-                0x19,       // Will properties length
+                0x19,       // Will property length
 
                 0x18, 0x00, 0x03, 0x94, 0x5D, // Will delay interval
 
