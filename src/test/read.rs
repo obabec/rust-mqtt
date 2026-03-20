@@ -1,4 +1,4 @@
-use core::{cmp::min, fmt};
+use core::cmp::min;
 
 use crate::eio::{self, ErrorType, Read};
 
@@ -10,8 +10,8 @@ pub struct SliceReader<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SliceReaderError;
-impl fmt::Display for SliceReaderError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl core::fmt::Display for SliceReaderError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?}", self)
     }
 }

@@ -34,13 +34,13 @@ impl PacketIdentifier {
     }
 }
 
-impl fmt::Debug for PacketIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl core::fmt::Debug for PacketIdentifier {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         self.get().fmt(f)
     }
 }
-impl fmt::Display for PacketIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl core::fmt::Display for PacketIdentifier {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?}", self)
     }
 }

@@ -1,5 +1,3 @@
-use core::fmt;
-
 use const_fn::const_fn;
 
 use crate::{
@@ -39,8 +37,8 @@ use crate::{
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct MqttBinary<'b>(pub(crate) Bytes<'b>);
 
-impl<'b> fmt::Debug for MqttBinary<'b> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<'b> core::fmt::Debug for MqttBinary<'b> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("MqttBinary").field(&self.as_ref()).finish()
     }
 }

@@ -1,4 +1,4 @@
-use core::{cmp::min, fmt};
+use core::cmp::min;
 
 use crate::eio::{self, ErrorType, Write};
 
@@ -10,8 +10,8 @@ pub struct SliceWriter<'a> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SliceWriterError;
-impl fmt::Display for SliceWriterError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl core::fmt::Display for SliceWriterError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?}", self)
     }
 }

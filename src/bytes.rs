@@ -1,4 +1,4 @@
-use core::{borrow::Borrow, fmt, ops::Deref};
+use core::{borrow::Borrow, ops::Deref};
 
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
@@ -86,8 +86,8 @@ impl<'a> Default for Bytes<'a> {
     }
 }
 
-impl<'a> fmt::Debug for Bytes<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl<'a> core::fmt::Debug for Bytes<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         match self {
             Self::Borrowed(x) => f.debug_tuple("Borrowed").field(x).finish(),
             #[cfg(feature = "alloc")]

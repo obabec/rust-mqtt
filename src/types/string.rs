@@ -1,7 +1,4 @@
-use core::{
-    fmt,
-    str::{Utf8Error, from_utf8, from_utf8_unchecked},
-};
+use core::str::{Utf8Error, from_utf8, from_utf8_unchecked};
 
 use const_fn::const_fn;
 
@@ -88,8 +85,8 @@ impl From<TooLargeToEncode> for MqttStringError {
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct MqttString<'s>(pub(crate) MqttBinary<'s>);
 
-impl<'s> fmt::Debug for MqttString<'s> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<'s> core::fmt::Debug for MqttString<'s> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("MqttString").field(&self.as_ref()).finish()
     }
 }
