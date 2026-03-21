@@ -1,7 +1,6 @@
-use core::{borrow::Borrow, ops::Deref};
-
 #[cfg(feature = "alloc")]
 use alloc::boxed::Box;
+use core::{borrow::Borrow, ops::Deref};
 
 /// Contiguous bytes in memory. Is either a [`u8`] slice or (with crate feature "alloc") an owned
 /// [`alloc::boxed::Box`]<[u8]>.

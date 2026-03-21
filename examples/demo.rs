@@ -6,7 +6,6 @@ use std::{
 
 use embedded_io_adapters::tokio_1::FromTokio;
 use log::{error, info};
-
 use rust_mqtt::{
     Bytes,
     buffer::*,

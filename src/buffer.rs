@@ -1,11 +1,12 @@
 //! Contains the trait the client uses to store slices of memory and basic implementations.
 
-use crate::bytes::Bytes;
-
 #[cfg(feature = "alloc")]
 pub use alloc::AllocBuffer;
+
 #[cfg(feature = "bump")]
 pub use bump::{BumpBuffer, InsufficientSpace};
+
+use crate::bytes::Bytes;
 
 /// A trait to describe anything that can allocate memory.
 ///
@@ -243,10 +244,8 @@ mod bump {
 
 #[cfg(feature = "alloc")]
 mod alloc {
+    use alloc::{boxed::Box, vec};
     use core::convert::Infallible;
-
-    use alloc::boxed::Box;
-    use alloc::vec;
 
     use crate::buffer::BufferProvider;
 
@@ -269,8 +268,9 @@ mod alloc {
 
     #[cfg(test)]
     mod unit {
-        use crate::buffer::{BufferProvider, alloc::AllocBuffer};
         use tokio_test::assert_ok;
+
+        use crate::buffer::{BufferProvider, alloc::AllocBuffer};
 
         #[test]
         fn provide_buffer() {

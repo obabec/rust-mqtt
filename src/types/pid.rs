@@ -1,11 +1,13 @@
-use core::fmt;
 use core::num::NonZero;
 
-use crate::eio::{Read, Write};
-
-use crate::io::err::{ReadError, WriteError};
-use crate::io::read::Readable;
-use crate::io::write::{Writable, wlen};
+use crate::{
+    eio::{Read, Write},
+    io::{
+        err::{ReadError, WriteError},
+        read::Readable,
+        write::{Writable, wlen},
+    },
+};
 
 /// A simple wrapper around [`NonZero`]<[`u16`]>.
 #[derive(Clone, Copy, PartialEq, Eq)]

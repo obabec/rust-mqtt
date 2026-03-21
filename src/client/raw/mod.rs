@@ -199,7 +199,6 @@ mod unit {
     use crate::buffer::AllocBuffer;
     #[cfg(feature = "bump")]
     use crate::buffer::BumpBuffer;
-
     use crate::{
         client::raw::Raw,
         header::{FixedHeader, PacketType},

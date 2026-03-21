@@ -202,7 +202,9 @@ mod unit {
         use tokio_test::{assert_err, assert_ok};
 
         use crate::{
-            io::err::ReadError, io::read::Readable, test::read::SliceReader, types::VarByteInt,
+            io::{err::ReadError, read::Readable},
+            test::read::SliceReader,
+            types::VarByteInt,
         };
 
         #[tokio::test]
@@ -333,7 +335,6 @@ mod unit {
         use crate::buffer::AllocBuffer;
         #[cfg(feature = "bump")]
         use crate::buffer::BumpBuffer;
-
         use crate::{
             io::{
                 err::{BodyReadError, ReadError},

@@ -1,12 +1,11 @@
 //! Contains utilities for session management.
 
+pub use flight::{CPublishFlightState, InFlightPublish, SPublishFlightState};
 use heapless::Vec;
 
-mod flight;
-
-pub use flight::{CPublishFlightState, InFlightPublish, SPublishFlightState};
-
 use crate::types::PacketIdentifier;
+
+mod flight;
 
 /// Session-associated information
 ///

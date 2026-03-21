@@ -1,6 +1,10 @@
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    time::{Duration, SystemTime},
+};
+
 use embedded_io_adapters::tokio_1::FromTokio;
-use embedded_tls::webpki::CertVerifier;
-use embedded_tls::*;
+use embedded_tls::{webpki::CertVerifier, *};
 use log::{error, info};
 use p256::{
     SecretKey,
@@ -16,10 +20,6 @@ use rust_mqtt::{
     },
 };
 use signature::SignerMut;
-use std::{
-    net::{Ipv4Addr, SocketAddr},
-    time::{Duration, SystemTime},
-};
 use tokio::{net::TcpStream, time::sleep};
 
 // Crypto provider implementation from https://github.com/drogue-iot/embedded-tls/blob/71ae455ecba56a05fca4da206532912f7a4716fe/tests/rustpki_test.rs

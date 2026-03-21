@@ -2,6 +2,8 @@
 
 use core::num::NonZero;
 
+use heapless::Vec;
+
 use crate::{
     buffer::BufferProvider,
     bytes::Bytes,
@@ -33,7 +35,6 @@ use crate::{
         property::Property,
     },
 };
-use heapless::Vec;
 
 mod err;
 

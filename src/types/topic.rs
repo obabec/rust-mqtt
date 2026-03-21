@@ -273,8 +273,9 @@ impl<'t> SubscriptionFilter<'t> {
 
 #[cfg(test)]
 mod unit {
-    use crate::types::{MqttString, TopicFilter, TopicName};
     use tokio_test::assert_ok;
+
+    use crate::types::{MqttString, TopicFilter, TopicName};
 
     macro_rules! assert_valid {
         ($t:ty, $l:literal) => {

@@ -62,8 +62,9 @@ impl<'a> SliceWriter<'a> {
 
 #[cfg(test)]
 mod unit {
-    use crate::{eio::Write, test::write::SliceWriter};
     use tokio_test::assert_ok;
+
+    use crate::{eio::Write, test::write::SliceWriter};
 
     #[tokio::test]
     #[test_log::test]

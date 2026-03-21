@@ -1,17 +1,20 @@
-use crate::{eio::Read, io::err::ReadError, types::VarByteInt};
 use tokio_test::assert_ok;
 
 #[cfg(feature = "alloc")]
 use crate::buffer::AllocBuffer;
 #[cfg(feature = "bump")]
 use crate::buffer::BumpBuffer;
-
 use crate::{
     buffer::BufferProvider,
+    eio::Read,
     header::FixedHeader,
-    io::read::{BodyReader, Readable},
+    io::{
+        err::ReadError,
+        read::{BodyReader, Readable},
+    },
     packet::RxPacket,
     test::read::SliceReader,
+    types::VarByteInt,
 };
 
 macro_rules! decode {
