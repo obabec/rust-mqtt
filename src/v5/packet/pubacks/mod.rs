@@ -37,7 +37,7 @@ pub struct GenericPubackPacket<'p, T: PubackPacketType> {
     _phantom_data: PhantomData<T>,
 }
 
-impl<'p, T: PubackPacketType> Packet for GenericPubackPacket<'p, T> {
+impl<T: PubackPacketType> Packet for GenericPubackPacket<'_, T> {
     const PACKET_TYPE: PacketType = T::PACKET_TYPE;
 }
 impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
@@ -129,7 +129,7 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
         })
     }
 }
-impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
+impl<T: PubackPacketType> TxPacket for GenericPubackPacket<'_, T> {
     fn remaining_len(&self) -> VarByteInt {
         let variable_header_length = self.packet_identifier.written_len() + wlen!(ReasonCode);
 
@@ -168,7 +168,7 @@ impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
     }
 }
 
-impl<'p, T: PubackPacketType> GenericPubackPacket<'p, T> {
+impl<T: PubackPacketType> GenericPubackPacket<'_, T> {
     pub const fn new(packet_identifier: PacketIdentifier, reason_code: ReasonCode) -> Self {
         Self {
             packet_identifier,

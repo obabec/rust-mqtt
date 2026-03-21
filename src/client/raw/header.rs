@@ -39,9 +39,9 @@ impl HeaderState {
         verbose!("receiving byte {} of header", i);
 
         let read = r
-            .read(&mut self.buffer[i..(i + 1)])
+            .read(&mut self.buffer[i..=i])
             .await
-            .map_err(ReadError::Read)? as u8;
+            .map_err(ReadError::Read)?;
 
         match read {
             0 => return Err(ReadError::UnexpectedEOF),
@@ -55,12 +55,11 @@ impl HeaderState {
         verbose!("received {} byte(s) in total", self.read);
 
         if i == 0 {
-            return match PacketType::from_type_and_flags(self.buffer[i]) {
-                Ok(_) => Ok(None),
-                Err(_) => {
-                    self.read = 0;
-                    Err(ReadError::MalformedPacket)
-                }
+            return if PacketType::from_type_and_flags(self.buffer[i]).is_ok() {
+                Ok(None)
+            } else {
+                self.read = 0;
+                Err(ReadError::MalformedPacket)
             };
         }
 

@@ -11,7 +11,7 @@
 [license]: https://img.shields.io/crates/l/rust-mqtt.svg
 [MIT OR APACHE-2.0]: https://github.com/obabec/rust-mqtt#license
 
-`rust-mqtt` provides a MQTT client primarily for no_std environments. The library provides an async API depending on [embedded_io_async](https://docs.rs/embedded-io-async/latest/embedded_io_async/)'s traits. As of now, only [MQTT version 5.0](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html) is supported.
+`rust-mqtt` provides an MQTT client primarily for `no_std` environments. The library provides an async API depending on [embedded_io_async](https://docs.rs/embedded-io-async/latest/embedded_io_async/)'s traits. As of now, only [MQTT version 5.0](https://docs.oasis-open.org/mqtt/mqtt/v5.0/mqtt-v5.0.html) is supported.
 
 The design goal is a strict yet flexible and explicit API that leverages Rust's type system to enforce the MQTT specification while exposing all protocol features transparently. Session state, configuration, and Quality of Service message delivery and retry behaviour remain fully under user control, giving complete freedom over protocol usage. Protocol-related errors are prevented by the client API and are modeled in a way that enables maximum recoverability. By avoiding opinionated design choices and making no assumptions about the runtime environment, `rust-mqtt` remains lightweight while providing a powerful MQTT client foundation.
 

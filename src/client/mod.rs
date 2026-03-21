@@ -17,7 +17,7 @@ use crate::{
         raw::Raw,
     },
     config::{ClientConfig, MaximumPacketSize, ServerConfig, SessionExpiryInterval, SharedConfig},
-    fmt::{assert, debug, error, info, panic, unreachable, warn},
+    fmt::{assert, debug, error, info, panic, trace, unreachable, warn},
     header::{FixedHeader, PacketType},
     io::Transport,
     packet::{Packet, TxPacket},
@@ -217,7 +217,7 @@ impl<
     /// - a non-recoverable error has occured and [`Self::abort`] has been called.
     /// - [`Self::disconnect`] has been called.
     ///
-    /// The session expiry interval in ConnectOptions overrides the one in the session of the client.
+    /// The session expiry interval in [`ConnectOptions`] overrides the one in the session of the client.
     ///
     /// Configuration that was negotiated with the server is stored in the `client_config`,
     /// `server_config`, `shared_config`, and `session` fields, which have getters
@@ -228,7 +228,19 @@ impl<
     /// to keep the session state, you can call [`Self::session`] and clone the session before.
     ///
     /// # Returns:
-    /// Information not being used currently by the client and therefore stored in its fields.
+    /// Information about the session/connection that the client does currently not use and therefore  not store
+    /// in its configuration fields.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::Server`] if:
+    ///   * the server sends a malformed packet
+    ///   * the first received packet is something other than a CONNACK packet
+    ///   * `client_identifier` is [`None`] and the server did not assign a client identifier
+    ///   * the server causes a protocol error
+    /// * [`MqttError::Disconnect`] if the CONNACK packet's reason code is not successful (>= 0x80)
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::Alloc`] if the underlying [`BufferProvider`] returned an error
     pub async fn connect<'d>(
         &mut self,
         net: N,
@@ -276,7 +288,7 @@ impl<
             },
         };
 
-        debug!(
+        trace!(
             "maximum accepted remaining length set to {:?}",
             self.client_config.maximum_accepted_remaining_length
         );
@@ -284,7 +296,7 @@ impl<
         {
             let packet_client_identifier = client_identifier
                 .as_ref()
-                .map(|s| s.as_borrowed())
+                .map(MqttString::as_borrowed)
                 .unwrap_or_default();
 
             let mut packet = ConnectPacket::new(
@@ -318,13 +330,16 @@ impl<
             self.raw.flush().await?;
         }
 
-        debug!("awaiting CONNACK packet header");
-
         let header = self.raw.recv_header().await?;
 
         match header.packet_type() {
-            Ok(ConnackPacket::PACKET_TYPE) => {}
-            Ok(_) => {
+            Ok(ConnackPacket::PACKET_TYPE) => debug!(
+                "received CONNACK packet header (remaining length: {})",
+                header.remaining_len.value()
+            ),
+            Ok(t) => {
+                error!("received unexpected {:?} packet header", t);
+
                 self.raw.close_with(Some(ReasonCode::ProtocolError));
                 return Err(MqttError::Server);
             }
@@ -334,8 +349,6 @@ impl<
                 return Err(MqttError::Server);
             }
         }
-
-        debug!("awaiting CONNACK packet body");
 
         let ConnackPacket {
             session_present,
@@ -358,8 +371,6 @@ impl<
             authentication_data: _,
         } = self.raw.recv_body(&header).await?;
 
-        debug!("received CONNACK packet");
-
         if reason_code.is_success() {
             debug!("CONNACK packet indicates success");
 
@@ -379,9 +390,8 @@ impl<
 
             self.shared_config.session_expiry_interval =
                 session_expiry_interval.unwrap_or(options.session_expiry_interval);
-            self.shared_config.keep_alive = server_keep_alive
-                .map(Property::into_inner)
-                .unwrap_or(options.keep_alive);
+            self.shared_config.keep_alive =
+                server_keep_alive.map_or(options.keep_alive, Property::into_inner);
 
             if let Some(r) = receive_maximum {
                 self.server_config.receive_maximum = r;
@@ -431,6 +441,11 @@ impl<
     }
 
     /// Start a ping handshake by sending a PINGRESP packet.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
     pub async fn ping(&mut self) -> Result<(), MqttError<'c>> {
         debug!("sending PINGREQ packet");
 
@@ -454,7 +469,15 @@ impl<
     /// always include the subscription identifier argument if present.
     ///
     /// # Returns:
-    /// - The packet identifier of the sent SUBSCRIBE packet.
+    /// The packet identifier of the sent SUBSCRIBE packet.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::SessionBuffer`] if the buffer for outgoing SUBSCRIBE packet identifiers is full
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
+    ///   exceeded by sending this SUBSCRIBE packet
     pub async fn subscribe(
         &mut self,
         topic_filter: TopicFilter<'_>,
@@ -470,7 +493,8 @@ impl<
         let pid = self.packet_identifier();
         let mut subscribe_filters = Vec::<_, 1>::new();
         let _ = subscribe_filters.push(subscribe_filter);
-        let packet = SubscribePacket::new(pid, options.subscription_identifier, subscribe_filters)?;
+        let packet = SubscribePacket::new(pid, options.subscription_identifier, subscribe_filters)
+            .expect("SUBSCRIBE with a single topic can not exceed VarByteInt::MAX_ENCODABLE");
 
         if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
@@ -492,7 +516,15 @@ impl<
     /// this method can be used to send the UNSUBSCRIBE packet again.
     ///
     /// # Returns:
-    /// - The packet identifier of the sent UNSUBSCRIBE packet.
+    /// The packet identifier of the sent UNSUBSCRIBE packet.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::SessionBuffer`] if the buffer for outgoing UNSUBSCRIBE packet identifiers is full
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
+    ///   exceeded by sending this UNSUBSCRIBE packet
     pub async fn unsubscribe(
         &mut self,
         topic_filter: TopicFilter<'_>,
@@ -505,7 +537,8 @@ impl<
         let pid = self.packet_identifier();
         let mut topic_filters = Vec::<_, 1>::new();
         let _ = topic_filters.push(topic_filter);
-        let packet = UnsubscribePacket::new(pid, topic_filters)?;
+        let packet = UnsubscribePacket::new(pid, topic_filters)
+            .expect("UNSUBSCRIBE with a single topic cannot exceed VarByteInt::MAX_ENCODABLE");
 
         if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
@@ -520,11 +553,26 @@ impl<
         Ok(pid)
     }
 
-    /// Publish a message. If QoS is greater than 0, the packet identifier is also kept track of by the client
+    /// Publish a message. If [`QoS`] is greater than 0, the packet identifier is also kept track of by the client
     ///
     /// # Returns:
-    /// - In case of QoS 0 [`None`] is returned.
-    /// - In case of Qos 1 or 2 the packet identifier of the published packet
+    /// - In case of [`QoS`] 0: [`None`]
+    /// - In case of [`QoS`] 1 or 2: [`Some`] with the packet identifier of the published packet
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::SendQuotaExceeded`] if the server's control flow limit is reached and sending
+    ///   the PUBLISH would exceed the limit causing a protocol error
+    /// * [`MqttError::SessionBuffer`] if the buffer for outgoing PUBLISH packet identifiers is full
+    /// * [`MqttError::InvalidTopicAlias`] if a topic alias is used and
+    ///   * its value is 0
+    ///   * its value is greater than the server's maximum topic alias
+    /// * [`MqttError::PacketMaximumLengthExceeded`] if the PUBLISH packet is too long to be encoded
+    ///   with MQTT's [`VarByteInt`]
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
+    ///   exceeded by sending this PUBLISH packet
     pub async fn publish(
         &mut self,
         options: &PublicationOptions<'_>,
@@ -617,6 +665,28 @@ impl<
     /// - its packet identifier must have an in flight entry with a quality of service matching the
     ///   quality of service in the options parameter
     /// - in case of quality of service 2, it must not already be awaiting a PUBCOMP packet
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::RepublishQoSNotMatching`] if the [`QoS`] of this republish does not match the
+    ///   [`QoS`] that this packet identifier was originally published with    
+    /// * [`MqttError::PacketIdentifierAwaitingPubcomp`] if a PUBREC packet with this packet identifier
+    ///   has already been received and the server has therefore already received the PUBLISH
+    /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in the
+    ///   client's session
+    /// * [`MqttError::InvalidTopicAlias`] if a topic alias is used and
+    ///   * its value is 0
+    ///   * its value is greater than the server's maximum topic alias
+    /// * [`MqttError::PacketMaximumLengthExceeded`] if the PUBLISH packet is too long to be encoded
+    ///   with MQTT's [`VarByteInt`]
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
+    ///   exceeded by sending this PUBLISH packet
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if the [`QoS`] in the `options` is [`QoS::AtMostOnce`].
     pub async fn republish(
         &mut self,
         packet_identifier: PacketIdentifier,
@@ -717,6 +787,11 @@ impl<
     ///
     /// This method assumes that the server's receive maximum after the reconnection is great enough
     /// to handle as many publication flows as dragged between the two connections.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
     pub async fn rerelease(&mut self) -> Result<(), MqttError<'c>> {
         for packet_identifier in self
             .session
@@ -757,6 +832,14 @@ impl<
     ///
     /// # Preconditions:
     /// - The client did not return a non-recoverable Error before
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::IllegalDisconnectSessionExpiryInterval`] if the session expiry interval in the
+    ///   CONNECT packet was zero and the session expiry interval in the [`DisconnectOptions`] is [`Some`]
+    ///   and not [`SessionExpiryInterval::EndOnDisconnect`].
     pub async fn disconnect(&mut self, options: &DisconnectOptions) -> Result<(), MqttError<'c>> {
         let connect_session_expiry_interval_was_zero =
             self.client_config.session_expiry_interval == SessionExpiryInterval::EndOnDisconnect;
@@ -806,7 +889,12 @@ impl<
     /// - The client did not return a non-recoverable Error before
     ///
     /// # Returns:
-    /// - MQTT Events. Their further meaning is documented in [`Event`].
+    /// MQTT Events. Their further meaning is documented in [`Event`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors that [`Client::poll_header`] and [`Client::poll_body`] return.
+    /// For further information view their docs.
     pub async fn poll(&mut self) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c>> {
         let header = self.poll_header().await?;
         self.poll_body(header).await
@@ -821,22 +909,28 @@ impl<
     /// - The client did not return a non-recoverable Error before
     ///
     /// # Returns:
-    /// - The received fixed header with a valid packet type. It can be used to call
-    ///   [`Self::poll_body`].
+    /// The received fixed header with a valid packet type. It can be used to call [`Self::poll_body`].
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::Server`] if:
+    ///   * the server sends a malformed packet header
+    ///   * the packet following this header exceeds the client's maximum packet size
     pub async fn poll_header(&mut self) -> Result<FixedHeader, MqttError<'c>> {
         let header = self.raw.recv_header().await?;
 
-        match header.packet_type() {
-            Ok(p) => debug!(
+        if let Ok(p) = header.packet_type() {
+            debug!(
                 "received {:?} packet header (remaining length: {})",
                 p,
                 header.remaining_len.value()
-            ),
-            Err(_) => {
-                error!("received invalid header {:?}", header);
-                self.raw.close_with(Some(ReasonCode::MalformedPacket));
-                return Err(MqttError::Server);
-            }
+            );
+        } else {
+            error!("received invalid header {:?}", header);
+            self.raw.close_with(Some(ReasonCode::MalformedPacket));
+            return Err(MqttError::Server);
         }
 
         if header.remaining_len.value() > self.client_config.maximum_accepted_remaining_length {
@@ -854,12 +948,28 @@ impl<
     /// Polls the network for the variable header and payload of a packet. Not cancel-safe.
     ///
     /// # Preconditions:
-    /// - The FixedHeader argument was received from the network right before.
-    /// - The client did not return a non-recoverable Error before
+    /// - The [`FixedHeader`] argument was received from the network right before.
+    /// - The client did not return a non-recoverable [`MqttError`] before
     ///
     /// # Returns:
-    /// - MQTT Events for regular communication. Their further meaning is documented in [`Event`].
-    /// - [`MqttError::Disconnect`] when receiving a DISCONNECT packet.
+    /// MQTT Events for regular communication. Their further meaning is documented in [`Event`].
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::Alloc`] if the underlying [`BufferProvider`] returned an error
+    /// * [`MqttError::Server`] if:
+    ///   * the server sends a malformed packet
+    ///   * the server causes a protocol error
+    ///   * the packet following this header exceeds the client's maximum packet size
+    ///   * the server sends a PUBLISH packet with an invalid topic alias
+    ///   * the server exceeded the client's receive maximum with a new [`QoS`] 2 PUBLISH
+    ///   * the server sends a PUBACK/PUBREC/PUBREL/PUBCOMP packet which mismatches what
+    ///     the client expects for this packet identifier from its session state
+    ///   * the fixed header has the packet type CONNECT/SUBSCRIBE/UNSUBSCRIBE/PINGREQ
+    /// * [`MqttError::Disconnect`] if a DISCONNECT packet is received
+    /// * [`MqttError::AuthPacketReceived`] if the fixed header has the packet type AUTH
     pub async fn poll_body(
         &mut self,
         header: FixedHeader,

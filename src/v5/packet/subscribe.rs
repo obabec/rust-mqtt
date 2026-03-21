@@ -18,16 +18,16 @@ pub struct SubscribePacket<'p, const MAX_TOPIC_FILTERS: usize> {
     subscribe_filters: Vec<SubscriptionFilter<'p>, MAX_TOPIC_FILTERS>,
 }
 
-impl<'p, const MAX_TOPIC_FILTERS: usize> Packet for SubscribePacket<'p, MAX_TOPIC_FILTERS> {
+impl<const MAX_TOPIC_FILTERS: usize> Packet for SubscribePacket<'_, MAX_TOPIC_FILTERS> {
     const PACKET_TYPE: PacketType = PacketType::Subscribe;
 }
-impl<'p, const MAX_TOPIC_FILTERS: usize> TxPacket for SubscribePacket<'p, MAX_TOPIC_FILTERS> {
+impl<const MAX_TOPIC_FILTERS: usize> TxPacket for SubscribePacket<'_, MAX_TOPIC_FILTERS> {
     fn remaining_len(&self) -> VarByteInt {
         // Safety: SUBSCRIBE packets that are too long to encode cannot be created
         unsafe { self.remaining_len_raw().unwrap_unchecked() }
     }
 
-    /// If MAX_TOPIC_FILTERS is to less than or equal to 4095, it is guaranteed that TxError::RemainingLenExceeded is never returned.
+    /// If `MAX_TOPIC_FILTERS` is to less than or equal to 4095, it is guaranteed that `TxError::RemainingLenExceeded` is never returned.
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
         FixedHeader::new(Self::PACKET_TYPE, 0x02, self.remaining_len())
             .write(write)

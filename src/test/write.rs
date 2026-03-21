@@ -12,7 +12,7 @@ pub struct SliceWriter<'a> {
 pub struct SliceWriterError;
 impl core::fmt::Display for SliceWriterError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 impl core::error::Error for SliceWriterError {
@@ -25,10 +25,10 @@ impl eio::Error for SliceWriterError {
         eio::ErrorKind::Other
     }
 }
-impl<'a> ErrorType for SliceWriter<'a> {
+impl ErrorType for SliceWriter<'_> {
     type Error = SliceWriterError;
 }
-impl<'a> Write for SliceWriter<'a> {
+impl Write for SliceWriter<'_> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         let left = self.slice.len().saturating_sub(self.index);
         let writing = min(left, buf.len());

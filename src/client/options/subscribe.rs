@@ -40,6 +40,7 @@ impl Default for Options {
 impl Options {
     /// Creates options with values coherent to the [`Default`] implementations of the fields and
     /// [`QoS::AtMostOnce`].
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             retain_handling: RetainHandling::AlwaysSend,
@@ -51,34 +52,41 @@ impl Options {
     }
 
     /// Sets the Quality of Service level.
+    #[must_use]
     pub const fn qos(mut self, qos: QoS) -> Self {
         self.qos = qos;
         self
     }
     /// Sets the Quality of Service level to 1 (At Least Once).
+    #[must_use]
     pub const fn at_least_once(self) -> Self {
         self.qos(QoS::AtLeastOnce)
     }
     /// Sets the Quality of Service level to 1 (Exactly Once).
+    #[must_use]
     pub const fn exactly_once(self) -> Self {
         self.qos(QoS::ExactlyOnce)
     }
     /// Sets the serverside retain handling configuration for this subscription.
+    #[must_use]
     pub const fn retain_handling(mut self, retain_handling: RetainHandling) -> Self {
         self.retain_handling = retain_handling;
         self
     }
     /// Sets the retain as published flag to true.
+    #[must_use]
     pub const fn retain_as_published(mut self) -> Self {
         self.retain_as_published = true;
         self
     }
     /// Sets the no local flag to true.
+    #[must_use]
     pub const fn no_local(mut self) -> Self {
         self.no_local = true;
         self
     }
     /// Sets the subscription identifier property.
+    #[must_use]
     pub const fn subscription_identifier(mut self, subscription_identifier: VarByteInt) -> Self {
         self.subscription_identifier = Some(subscription_identifier);
         self

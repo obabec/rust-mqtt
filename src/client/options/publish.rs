@@ -47,6 +47,7 @@ pub struct Options<'p> {
 impl<'p> Options<'p> {
     /// Creates options with values coherent to the [`Default`] implementations of the fields and
     /// [`QoS::AtMostOnce`].
+    #[must_use]
     pub const fn new(topic: TopicReference<'p>) -> Options<'p> {
         Options {
             qos: QoS::AtMostOnce,
@@ -61,47 +62,56 @@ impl<'p> Options<'p> {
     }
 
     /// Sets the Quality of Service level.
+    #[must_use]
     pub const fn qos(mut self, qos: QoS) -> Self {
         self.qos = qos;
         self
     }
     /// Sets the Quality of Service level to 1 (At Least Once).
+    #[must_use]
     pub const fn at_least_once(self) -> Self {
         self.qos(QoS::AtLeastOnce)
     }
     /// Sets the Quality of Service level to 1 (Exactly Once).
+    #[must_use]
     pub const fn exactly_once(self) -> Self {
         self.qos(QoS::ExactlyOnce)
     }
     /// Sets the retain flag to true.
+    #[must_use]
     pub const fn retain(mut self) -> Self {
         self.retain = true;
         self
     }
     /// Sets the payload format indicator property.
+    #[must_use]
     pub const fn payload_format_indicator(mut self, is_payload_utf8: bool) -> Self {
         self.payload_format_indicator = Some(is_payload_utf8);
         self
     }
     /// Sets the message expiry interval in seconds.
+    #[must_use]
     pub const fn message_expiry_interval(mut self, seconds: u32) -> Self {
         self.message_expiry_interval = Some(seconds);
         self
     }
     /// Marks the publication as a request by setting the response topic property.
     #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
     pub const fn response_topic(mut self, topic: TopicName<'p>) -> Self {
         self.response_topic = Some(topic);
         self
     }
     /// Sets the correlation data property in the request.
     #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
     pub const fn correlation_data(mut self, data: MqttBinary<'p>) -> Self {
         self.correlation_data = Some(data);
         self
     }
     /// Sets the content type property.
     #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
     pub const fn content_type(mut self, content_type: MqttString<'p>) -> Self {
         self.content_type = Some(content_type);
         self
@@ -144,6 +154,7 @@ impl<'t> TopicReference<'t> {
     }
 
     /// Delegates to [`crate::Bytes::as_borrowed`].
+    #[must_use]
     pub fn as_borrowed(&'t self) -> Self {
         match self {
             Self::Name(topic_name) => Self::Name(topic_name.as_borrowed()),

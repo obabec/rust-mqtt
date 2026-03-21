@@ -36,8 +36,8 @@ pub struct GenericSubackPacket<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS:
     _phantom_data: PhantomData<&'p T>,
 }
 
-impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> Packet
-    for GenericSubackPacket<'p, T, MAX_TOPIC_FILTERS>
+impl<T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> Packet
+    for GenericSubackPacket<'_, T, MAX_TOPIC_FILTERS>
 {
     const PACKET_TYPE: PacketType = T::PACKET_TYPE;
 }

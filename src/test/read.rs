@@ -12,7 +12,7 @@ pub struct SliceReader<'a> {
 pub struct SliceReaderError;
 impl core::fmt::Display for SliceReaderError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 impl core::error::Error for SliceReaderError {
@@ -25,10 +25,10 @@ impl eio::Error for SliceReaderError {
         eio::ErrorKind::Other
     }
 }
-impl<'a> ErrorType for SliceReader<'a> {
+impl ErrorType for SliceReader<'_> {
     type Error = SliceReaderError;
 }
-impl<'a> Read for SliceReader<'a> {
+impl Read for SliceReader<'_> {
     async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
         let left = self.slice.len() - self.index;
         let reading = min(left, buf.len());

@@ -26,7 +26,7 @@ pub struct DisconnectPacket<'p> {
     pub server_reference: Option<ServerReference<'p>>,
 }
 
-impl<'p> Packet for DisconnectPacket<'p> {
+impl Packet for DisconnectPacket<'_> {
     const PACKET_TYPE: PacketType = PacketType::Disconnect;
 }
 impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
@@ -148,7 +148,7 @@ impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
         Ok(packet)
     }
 }
-impl<'p> TxPacket for DisconnectPacket<'p> {
+impl TxPacket for DisconnectPacket<'_> {
     async fn send<W: Write>(&self, write: &mut W) -> Result<(), TxError<W::Error>> {
         FixedHeader::new(Self::PACKET_TYPE, 0x00, self.remaining_len())
             .write(write)

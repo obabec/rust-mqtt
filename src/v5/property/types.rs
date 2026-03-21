@@ -125,7 +125,7 @@ impl PropertyType {
             _ => return None,
         })
     }
-    pub const fn identifier(&self) -> u8 {
+    pub const fn identifier(self) -> u8 {
         match self {
             Self::PayloadFormatIndicator => 0x01,
             Self::MessageExpiryInterval => 0x02,

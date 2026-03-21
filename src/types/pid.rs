@@ -21,12 +21,11 @@ impl PacketIdentifier {
     }
 
     pub(crate) fn next(self) -> Self {
-        NonZero::new(self.0.get().wrapping_add(1))
-            .map(Self)
-            .unwrap_or(Self::ONE)
+        NonZero::new(self.0.get().wrapping_add(1)).map_or(Self::ONE, Self)
     }
 
     /// Returns the underlying value.
+    #[must_use]
     pub const fn get(self) -> NonZero<u16> {
         self.0
     }
@@ -43,7 +42,7 @@ impl core::fmt::Debug for PacketIdentifier {
 }
 impl core::fmt::Display for PacketIdentifier {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 

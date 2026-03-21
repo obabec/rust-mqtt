@@ -59,11 +59,11 @@ impl IdentifiedQoS {
     /// Returns [`Some`] if [`QoS`] > 0 and therefore has to be identified, and
     /// [`None`] otherwise.
     #[inline]
+    #[must_use]
     pub const fn packet_identifier(&self) -> Option<PacketIdentifier> {
         match self {
             Self::AtMostOnce => None,
-            Self::AtLeastOnce(pid) => Some(*pid),
-            Self::ExactlyOnce(pid) => Some(*pid),
+            Self::AtLeastOnce(pid) | Self::ExactlyOnce(pid) => Some(*pid),
         }
     }
 }

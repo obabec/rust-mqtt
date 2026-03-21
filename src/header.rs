@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// The fixed header of any MQTT Control Packet containing the packet type, flags
-/// and the remaining_length.
+/// and the remaining length.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FixedHeader {
@@ -43,11 +43,16 @@ impl FixedHeader {
 
     /// Returns the flags of the [`FixedHeader`]. These are the lower 4 bits of the first byte.
     /// The type of the packet is masked away.
+    #[must_use]
     pub fn flags(&self) -> u8 {
         self.type_and_flags & 0x0F
     }
 
     /// Returns the [`PacketType`]
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Reserved`] if the value of the packet type bits is reserved.
     pub fn packet_type(&self) -> Result<PacketType, Reserved> {
         PacketType::from_type_and_flags(self.type_and_flags)
     }

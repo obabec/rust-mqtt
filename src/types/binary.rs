@@ -37,7 +37,7 @@ use crate::{
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct MqttBinary<'b>(pub(crate) Bytes<'b>);
 
-impl<'b> core::fmt::Debug for MqttBinary<'b> {
+impl core::fmt::Debug for MqttBinary<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("MqttBinary").field(&self.as_ref()).finish()
     }
@@ -70,7 +70,7 @@ impl<'b> From<MqttString<'b>> for MqttBinary<'b> {
     }
 }
 
-impl<'b> AsRef<[u8]> for MqttBinary<'b> {
+impl AsRef<[u8]> for MqttBinary<'_> {
     fn as_ref(&self) -> &[u8] {
         self.as_bytes()
     }
@@ -82,6 +82,10 @@ impl<'b> MqttBinary<'b> {
 
     /// Converts [`Bytes`] into [`MqttBinary`] by checking for the max length of
     /// [`MqttBinary::MAX_LENGTH`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TooLargeToEncode`] if `bytes`' length exceeds [`MqttBinary::MAX_LENGTH`].
     #[const_fn(cfg(not(feature = "alloc")))]
     pub const fn from_bytes(bytes: Bytes<'b>) -> Result<Self, TooLargeToEncode> {
         match bytes.len() {
@@ -92,6 +96,10 @@ impl<'b> MqttBinary<'b> {
 
     /// Converts a slice into [`MqttBinary`] by cloning the reference and checking for the max
     /// length of [`MqttBinary::MAX_LENGTH`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TooLargeToEncode`] if `slice`'s length exceeds [`MqttBinary::MAX_LENGTH`].
     pub const fn from_slice(slice: &'b [u8]) -> Result<Self, TooLargeToEncode> {
         match slice.len() {
             ..=Self::MAX_LENGTH => Ok(Self(Bytes::Borrowed(slice))),
@@ -111,6 +119,7 @@ impl<'b> MqttBinary<'b> {
     ///
     /// In debug builds, this function will panic if the bytes' length is greater than
     /// [`MqttBinary::MAX_LENGTH`].
+    #[must_use]
     pub const fn from_bytes_unchecked(bytes: Bytes<'b>) -> Self {
         const_debug_assert!(
             bytes.len() <= Self::MAX_LENGTH,
@@ -132,6 +141,7 @@ impl<'b> MqttBinary<'b> {
     ///
     /// In debug builds, this function will panic if the slice's length is greater than
     /// [`MqttBinary::MAX_LENGTH`].
+    #[must_use]
     pub const fn from_slice_unchecked(slice: &'b [u8]) -> Self {
         const_debug_assert!(
             slice.len() <= Self::MAX_LENGTH,
@@ -143,24 +153,28 @@ impl<'b> MqttBinary<'b> {
 
     /// Returns the length of the underlying data.
     #[inline]
+    #[must_use]
     pub const fn len(&self) -> u16 {
         self.0.len() as u16
     }
 
     /// Returns whether the underlying data is empty.
     #[inline]
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     /// Returns the underlying bytes as `&[u8]`
     #[inline]
+    #[must_use]
     pub const fn as_bytes(&self) -> &[u8] {
         self.0.as_bytes()
     }
 
     /// Delegates to [`Bytes::as_borrowed`].
     #[inline]
+    #[must_use]
     pub const fn as_borrowed(&'b self) -> Self {
         Self(self.0.as_borrowed())
     }

@@ -44,8 +44,8 @@ pub struct PublishPacket<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     pub message: Bytes<'p>,
 }
 
-impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> Packet
-    for PublishPacket<'p, MAX_SUBSCRIPTION_IDENTIFIERS>
+impl<const MAX_SUBSCRIPTION_IDENTIFIERS: usize> Packet
+    for PublishPacket<'_, MAX_SUBSCRIPTION_IDENTIFIERS>
 {
     const PACKET_TYPE: PacketType = PacketType::Publish;
 }
@@ -176,7 +176,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
                     error!("invalid PUBLISH property: {:?}", p);
                     return Err(RxError::MalformedPacket);
                 }
-            };
+            }
         }
 
         let topic = match (topic_name, topic_alias) {
@@ -207,8 +207,8 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
         })
     }
 }
-impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
-    for PublishPacket<'p, MAX_SUBSCRIPTION_IDENTIFIERS>
+impl<const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
+    for PublishPacket<'_, MAX_SUBSCRIPTION_IDENTIFIERS>
 {
     fn remaining_len(&self) -> VarByteInt {
         // Safety: PUBLISH packets that are too long to encode cannot be created
@@ -226,13 +226,12 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
         self.topic
             .topic_name()
             .map(TopicName::as_borrowed)
-            .map(Into::into)
-            .unwrap_or(Self::EMPTY_TOPIC)
+            .map_or(Self::EMPTY_TOPIC, Into::into)
             .write(write)
             .await?;
 
         if let Some(p) = self.identified_qos.packet_identifier() {
-            p.write(write).await?
+            p.write(write).await?;
         }
 
         self.properties_length().write(write).await?;
@@ -292,8 +291,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
             .topic
             .topic_name()
             .map(TopicName::as_borrowed)
-            .map(Into::into)
-            .unwrap_or(Self::EMPTY_TOPIC)
+            .map_or(Self::EMPTY_TOPIC, Into::into)
             .written_len();
 
         let variable_header_length = topic_name_length

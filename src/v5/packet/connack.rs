@@ -40,7 +40,7 @@ pub struct ConnackPacket<'p> {
     pub authentication_data: Option<AuthenticationData<'p>>,
 }
 
-impl<'p> Packet for ConnackPacket<'p> {
+impl Packet for ConnackPacket<'_> {
     const PACKET_TYPE: PacketType = PacketType::Connack;
 }
 impl<'p> RxPacket<'p> for ConnackPacket<'p> {

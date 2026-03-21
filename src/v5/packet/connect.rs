@@ -38,18 +38,18 @@ pub struct ConnectPacket<'p> {
     /// Must always be in Connect Payload. Can be length 0
     client_identifier: MqttString<'p>,
 
-    /// Has to be present if will_flag is set
+    /// Has to be present if `will_flag` is set
     will: Option<Will<'p>>,
 
-    /// Has to be present if user_name flag is set
+    /// Has to be present if `user_name` flag is set
     user_name: Option<MqttString<'p>>,
-    /// Has to be present if password flag is set
+    /// Has to be present if `password` flag is set
     password: Option<MqttBinary<'p>>,
 }
-impl<'p> Packet for ConnectPacket<'p> {
+impl Packet for ConnectPacket<'_> {
     const PACKET_TYPE: PacketType = PacketType::Connect;
 }
-impl<'p> TxPacket for ConnectPacket<'p> {
+impl TxPacket for ConnectPacket<'_> {
     fn remaining_len(&self) -> VarByteInt {
         let variable_header_length = wlen!([u8; 7]) + wlen!(u8) + wlen!(u16);
 

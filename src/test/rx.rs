@@ -67,7 +67,7 @@ pub async fn decode_packet<'a, T: RxPacket<'a>, const N: usize, const REMAINING_
 }
 
 #[allow(unused_variables)]
-fn create_buffer<'a>(buffer: &'a mut [u8]) -> impl BufferProvider<'a> {
+fn create_buffer(buffer: &mut [u8]) -> impl BufferProvider<'_> {
     #[cfg(feature = "bump")]
     {
         BumpBuffer::new(buffer)

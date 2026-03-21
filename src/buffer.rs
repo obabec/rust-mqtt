@@ -24,6 +24,10 @@ pub trait BufferProvider<'a> {
     type ProvisionError: core::fmt::Debug;
 
     /// If successful, returns contiguous memory with a size in bytes of the `len` argument.
+    ///
+    /// # Errors
+    ///
+    /// Returns a value of its associated error type if the buffer provision fails.
     fn provide_buffer(&mut self, len: usize) -> Result<Self::Buffer, Self::ProvisionError>;
 }
 
@@ -83,6 +87,7 @@ mod bump {
 
     impl<'a> BumpBuffer<'a> {
         /// Creates a new [`BumpBuffer`] with the provided slice as underlying buffer.
+        #[must_use]
         pub fn new(slice: &'a mut [u8]) -> Self {
             Self {
                 ptr: slice.as_mut_ptr(),
@@ -94,6 +99,7 @@ mod bump {
 
         /// Returns the remaining amount of unallocated bytes in the underlying buffer.
         #[inline]
+        #[must_use]
         pub fn remaining_len(&self) -> usize {
             self.len - self.index
         }

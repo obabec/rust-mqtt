@@ -69,7 +69,7 @@ async fn main() {
 
     let mut client = Client::<'_, _, _, 1, 1, 1, 0>::new(&mut buffer);
 
-    let addr = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 8883);
+    let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8883);
     let connection = TcpStream::connect(addr).await.unwrap();
     let connection = FromTokio::new(connection);
 
@@ -98,12 +98,12 @@ async fn main() {
         .connect(tls_connection, &ConnectOptions::new().clean_start(), None)
         .await
     {
-        Ok(c) => info!("Connected to server: {:?}", c),
+        Ok(c) => info!("Connected to server: {c:?}"),
         Err(e) => {
-            error!("Failed to connect to server: {:?}", e);
+            error!("Failed to connect to server: {e:?}");
             return;
         }
-    };
+    }
 
     sleep(Duration::from_secs(5)).await;
 

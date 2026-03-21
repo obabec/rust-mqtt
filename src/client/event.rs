@@ -9,6 +9,9 @@ use crate::{
     },
 };
 
+#[allow(unused_imports)]
+use crate::types::QoS;
+
 /// Events emitted by the client when receiving an MQTT packet.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -19,9 +22,9 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// The server sent a PUBLISH packet.
     ///
     /// The client has acted as follows:
-    /// - QoS 0: No action
-    /// - QoS 1: A PUBACK packet has been sent to the server.
-    /// - QoS 2: A PUBREC packet has been sent to the server and the packet identifier is tracked as in flight
+    /// - [`QoS`] 0: No action
+    /// - [`QoS`] 1: A PUBACK packet has been sent to the server.
+    /// - [`QoS`] 2: A PUBREC packet has been sent to the server and the packet identifier is tracked as in flight
     Publish(Publish<'e, MAX_SUBSCRIPTION_IDENTIFIERS>),
 
     /// The server sent a SUBACK packet matching a SUBSCRIBE packet.
@@ -44,43 +47,43 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// The publication process is aborted.
     PublishRejected(Pubrej),
 
-    /// The server sent a PUBACK packet matching a QoS 1 PUBLISH packet
+    /// The server sent a PUBACK packet matching a [`QoS`] 1 PUBLISH packet
     /// confirming that the PUBLISH has been received.
     ///
     /// The included reason code is always successful.
     ///
-    /// The QoS 1 publication process is complete,
+    /// The [`QoS`] 1 publication process is complete,
     /// the PUBLISH packet won't have to be resent.
     PublishAcknowledged(Puback),
 
-    /// The server sent a PUBREC packet matching a QoS 2 PUBLISH packet
+    /// The server sent a PUBREC packet matching a [`QoS`] 2 PUBLISH packet
     /// confirming that the PUBLISH has been received.
     ///
     /// The included reason code is always successful.
     ///
     /// The client has responded with a PUBREL packet.
     ///
-    /// The first handshake of the QoS 2 publication process is complete,
+    /// The first handshake of the [`QoS`] 2 publication process is complete,
     /// the PUBLISH packet won't have to be resent.
     PublishReceived(Puback),
 
-    /// The server sent a PUBREL packet matching a QoS 2 PUBREC packet
+    /// The server sent a PUBREL packet matching a [`QoS`] 2 PUBREC packet
     /// confirming that the PUBREC has been received.
     ///
     /// The included reason code is always successful.
     ///
     /// The client has responded with a PUBCOMP packet.
     ///
-    /// The QoS 2 publication process is complete,
+    /// The [`QoS`] 2 publication process is complete,
     /// the PUBREC packet won't have to be resent.
     PublishReleased(Puback),
 
-    /// The server sent a PUBCOMP packet matching a QoS 2 PUBREL packet
+    /// The server sent a PUBCOMP packet matching a [`QoS`] 2 PUBREL packet
     /// confirming that the PUBREL has been received.
     ///
     /// The included reason code is always successful.
     ///
-    /// The QoS 2 publication process is complete,
+    /// The [`QoS`] 2 publication process is complete,
     /// the PUBREL packet won't have to be resent.
     PublishComplete(Puback),
 
@@ -91,7 +94,7 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// to prevent a potential protocol deadlock.
     Ignored,
 
-    /// The server sent a QoS 2 PUBLISH packet which would cause a duplicate.
+    /// The server sent a [`QoS`] 2 PUBLISH packet which would cause a duplicate.
     ///
     /// The client has responded with a PUBREC packet.
     Duplicate,

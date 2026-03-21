@@ -18,7 +18,7 @@ macro_rules! wlen {
 
 impl<T: Writable> Writable for Option<T> {
     fn written_len(&self) -> usize {
-        self.as_ref().map(|t| t.written_len()).unwrap_or_default()
+        self.as_ref().map(Writable::written_len).unwrap_or_default()
     }
 
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
@@ -104,7 +104,7 @@ impl Writable for VarByteInt {
         }
     }
 }
-impl<'b> Writable for MqttBinary<'b> {
+impl Writable for MqttBinary<'_> {
     fn written_len(&self) -> usize {
         self.0.len() + wlen!(u16)
     }
@@ -118,7 +118,7 @@ impl<'b> Writable for MqttBinary<'b> {
         Ok(())
     }
 }
-impl<'b> Writable for MqttString<'b> {
+impl Writable for MqttString<'_> {
     fn written_len(&self) -> usize {
         self.0.written_len()
     }
@@ -127,7 +127,7 @@ impl<'b> Writable for MqttString<'b> {
         self.0.write(write).await
     }
 }
-impl<'b> Writable for TopicName<'b> {
+impl Writable for TopicName<'_> {
     fn written_len(&self) -> usize {
         self.as_ref().written_len()
     }
@@ -136,7 +136,7 @@ impl<'b> Writable for TopicName<'b> {
         self.as_ref().write(write).await
     }
 }
-impl<'b> Writable for TopicFilter<'b> {
+impl Writable for TopicFilter<'_> {
     fn written_len(&self) -> usize {
         self.as_ref().written_len()
     }

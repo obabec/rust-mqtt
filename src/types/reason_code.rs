@@ -15,7 +15,7 @@ use crate::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ReasonCode {
-    /// # aka GrantedQoS0, NormalDisconnection
+    /// # aka `GrantedQoS0`, `NormalDisconnection`
     ///
     /// CONNACK, PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, UNSUBACK, AUTH, DISCONNECT
     Success,
@@ -150,7 +150,8 @@ pub enum ReasonCode {
 
 impl ReasonCode {
     /// Returns the numeric value of the reason code.
-    pub const fn value(&self) -> u8 {
+    #[must_use]
+    pub const fn value(self) -> u8 {
         match self {
             Self::Success => 0x00,
             Self::GrantedQoS1 => 0x01,
@@ -200,12 +201,14 @@ impl ReasonCode {
 
     /// Returns whether the reason code is successful.
     /// This is the case if the reason code's numeric value is less than 0x80.
+    #[must_use]
     pub const fn is_success(&self) -> bool {
         self.value() < 0x80
     }
 
     /// Returns whether the reason code indicates an error.
     /// This is the case if the reason code's numeric value is greater than or equal to 0x80.
+    #[must_use]
     pub const fn is_erroneous(&self) -> bool {
         self.value() >= 0x80
     }

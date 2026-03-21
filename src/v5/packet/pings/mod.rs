@@ -32,17 +32,17 @@ impl<'p, T: PingPacketType> RxPacket<'p> for GenericPingPacket<T> {
     ) -> Result<Self, RxError<R::Error, B::ProvisionError>> {
         trace!("decoding {:?} packet", T::PACKET_TYPE);
 
-        if header.flags() != T::FLAGS {
+        if header.flags() == T::FLAGS {
+            Ok(Self {
+                phantom_data: PhantomData,
+            })
+        } else {
             error!(
                 "invalid {:?} fixed header flags: {}",
                 T::PACKET_TYPE,
                 header.flags()
             );
             Err(RxError::MalformedPacket)
-        } else {
-            Ok(Self {
-                phantom_data: PhantomData,
-            })
         }
     }
 }

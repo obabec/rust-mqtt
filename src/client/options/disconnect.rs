@@ -21,6 +21,7 @@ impl Default for Options {
 
 impl Options {
     /// Creates new disconnect options with will publication disabled and no session expiry interval.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             publish_will: false,
@@ -29,11 +30,13 @@ impl Options {
     }
 
     /// Sets the publish will flag to true.
+    #[must_use]
     pub const fn publish_will(mut self) -> Self {
         self.publish_will = true;
         self
     }
     /// Sets the session expiry interval property.
+    #[must_use]
     pub const fn session_expiry_interval(mut self, interval: SessionExpiryInterval) -> Self {
         self.session_expiry_interval = Some(interval);
         self
