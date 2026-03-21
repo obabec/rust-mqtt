@@ -1,5 +1,3 @@
-use core::fmt;
-
 use crate::{
     buffer::BufferProvider,
     eio::Read,
@@ -33,7 +31,7 @@ pub enum RxError<E, B> {
     InvalidTopicName,
 }
 
-impl<E, B: fmt::Debug> From<BodyReadError<E, B>> for RxError<E, B> {
+impl<E, B: core::fmt::Debug> From<BodyReadError<E, B>> for RxError<E, B> {
     fn from(e: BodyReadError<E, B>) -> Self {
         match e {
             BodyReadError::Read(e) => Self::Read(e),
@@ -46,7 +44,7 @@ impl<E, B: fmt::Debug> From<BodyReadError<E, B>> for RxError<E, B> {
         }
     }
 }
-impl<E, B: fmt::Debug> From<ReadError<BodyReadError<E, B>>> for RxError<E, B> {
+impl<E, B: core::fmt::Debug> From<ReadError<BodyReadError<E, B>>> for RxError<E, B> {
     fn from(e: ReadError<BodyReadError<E, B>>) -> Self {
         match e {
             ReadError::Read(e) => e.into(),
@@ -57,7 +55,7 @@ impl<E, B: fmt::Debug> From<ReadError<BodyReadError<E, B>>> for RxError<E, B> {
         }
     }
 }
-impl<E, B: fmt::Debug> From<ReadError<E>> for RxError<E, B> {
+impl<E, B: core::fmt::Debug> From<ReadError<E>> for RxError<E, B> {
     fn from(e: ReadError<E>) -> Self {
         match e {
             ReadError::Read(e) => Self::Read(e),
@@ -68,7 +66,7 @@ impl<E, B: fmt::Debug> From<ReadError<E>> for RxError<E, B> {
         }
     }
 }
-impl<E, B: fmt::Debug> From<AtMostOncePropertyError<ReadError<BodyReadError<E, B>>>>
+impl<E, B: core::fmt::Debug> From<AtMostOncePropertyError<ReadError<BodyReadError<E, B>>>>
     for RxError<E, B>
 {
     fn from(e: AtMostOncePropertyError<ReadError<BodyReadError<E, B>>>) -> Self {

@@ -141,9 +141,7 @@ impl<R: Read> Readable<R> for ServerKeepAlive {
         let value = u16::read(read).await?;
 
         Ok(Self(
-            NonZero::new(value)
-                .map(KeepAlive::Seconds)
-                .unwrap_or(KeepAlive::Infinite),
+            NonZero::new(value).map_or(KeepAlive::Infinite, KeepAlive::Seconds),
         ))
     }
 }

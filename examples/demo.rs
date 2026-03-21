@@ -6,7 +6,6 @@ use std::{
 
 use embedded_io_adapters::tokio_1::FromTokio;
 use log::{error, info};
-
 use rust_mqtt::{
     Bytes,
     buffer::*,
@@ -36,7 +35,7 @@ async fn main() {
 
     let mut client = Client::<'_, _, _, 1, 1, 1, 1>::new(&mut buffer);
 
-    let addr = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 1883);
+    let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 1883);
     let connection = TcpStream::connect(addr).await.unwrap();
     let connection = FromTokio::new(connection);
 
@@ -65,22 +64,22 @@ async fn main() {
         .await
     {
         Ok(c) => {
-            info!("Connected to server: {:?}", c);
+            info!("Connected to server: {c:?}");
             info!("{:?}", client.client_config());
             info!("{:?}", client.server_config());
             info!("{:?}", client.shared_config());
             info!("{:?}", client.session());
         }
         Err(e) => {
-            error!("Failed to connect to server: {:?}", e);
+            error!("Failed to connect to server: {e:?}");
             return;
         }
-    };
+    }
 
     #[cfg(feature = "bump")]
     unsafe {
-        client.buffer_mut().reset()
-    };
+        client.buffer_mut().reset();
+    }
 
     let mut sub_options = SubscriptionOptions::new()
         .retain_handling(RetainHandling::SendIfNotSubscribedBefore)
@@ -88,7 +87,7 @@ async fn main() {
         .exactly_once();
 
     if client.server_config().subscription_identifiers_supported {
-        sub_options.subscription_identifier = Some(VarByteInt::from(42u16))
+        sub_options.subscription_identifier = Some(VarByteInt::from(42u16));
     }
 
     let topic = TopicName::new(MqttString::from_str("rust-mqtt/is/great").unwrap()).unwrap();
@@ -96,22 +95,22 @@ async fn main() {
     match client.subscribe(topic.clone().into(), sub_options).await {
         Ok(_) => info!("Sent Subscribe"),
         Err(e) => {
-            error!("Failed to subscribe: {:?}", e);
+            error!("Failed to subscribe: {e:?}");
             return;
         }
-    };
+    }
 
     match client.poll().await {
         Ok(Event::Suback(Suback {
             packet_identifier: _,
             reason_code,
-        })) => info!("Subscribed with reason code {:?}", reason_code),
+        })) => info!("Subscribed with reason code {reason_code:?}"),
         Ok(e) => {
-            error!("Expected Suback but received event {:?}", e);
+            error!("Expected Suback but received event {e:?}");
             return;
         }
         Err(e) => {
-            error!("Failed to receive Suback {:?}", e);
+            error!("Failed to receive Suback {e:?}");
             return;
         }
     }
@@ -128,7 +127,7 @@ async fn main() {
             i.unwrap()
         }
         Err(e) => {
-            error!("Failed to send Publish {:?}", e);
+            error!("Failed to send Publish {e:?}");
             return;
         }
     };
@@ -139,9 +138,9 @@ async fn main() {
                 info!("Publish complete");
                 break;
             }
-            Ok(e) => info!("Received event {:?}", e),
+            Ok(e) => info!("Received event {e:?}"),
             Err(e) => {
-                error!("Failed to poll: {:?}", e);
+                error!("Failed to poll: {e:?}");
                 return;
             }
         }
@@ -151,14 +150,14 @@ async fn main() {
 
     while pings > 0 {
         select! {
-            _ = sleep(Duration::from_secs(4)) => {
+            () = sleep(Duration::from_secs(4)) => {
                 match client.ping().await {
-                    Ok(_) => {
+                    Ok(()) => {
                         pings -= 1;
                         info!("Pinged server");
                     },
                     Err(e) => {
-                        error!("Failed to ping: {:?}", e);
+                        error!("Failed to ping: {e:?}");
                         return;
                     }
                 }
@@ -167,15 +166,15 @@ async fn main() {
                 let h = match header {
                     Ok(h) => h,
                     Err(e) => {
-                        error!("Failed to poll header: {:?}", e);
+                        error!("Failed to poll header: {e:?}");
                         return;
                     }
                 };
                 info!("Received header {:?}", h.packet_type());
                 match client.poll_body(h).await {
-                    Ok(e) => info!("Received Event {:?}", e),
+                    Ok(e) => info!("Received Event {e:?}"),
                     Err(e) => {
-                        error!("Failed to poll body: {:?}", e);
+                        error!("Failed to poll body: {e:?}");
                         return;
                     }
                 }
@@ -184,9 +183,9 @@ async fn main() {
     }
 
     match client.poll().await {
-        Ok(e) => info!("Received Event {:?}", e),
+        Ok(e) => info!("Received Event {e:?}"),
         Err(e) => {
-            error!("Failed to poll: {:?}", e);
+            error!("Failed to poll: {e:?}");
             return;
         }
     }
@@ -194,22 +193,22 @@ async fn main() {
     match client.unsubscribe(topic.clone().into()).await {
         Ok(_) => info!("Sent Unsubscribe"),
         Err(e) => {
-            error!("Failed to unsubscribe: {:?}", e);
+            error!("Failed to unsubscribe: {e:?}");
             return;
         }
-    };
+    }
 
     match client.poll().await {
         Ok(Event::Unsuback(Suback {
             packet_identifier: _,
             reason_code,
-        })) => info!("Unsubscribed with reason code {:?}", reason_code),
+        })) => info!("Unsubscribed with reason code {reason_code:?}"),
         Ok(e) => {
-            info!("Expected Unsuback but received event {:?}", e);
+            info!("Expected Unsuback but received event {e:?}");
             return;
         }
         Err(e) => {
-            error!("Failed to receive Unsuback {:?}", e);
+            error!("Failed to receive Unsuback {e:?}");
             return;
         }
     }
@@ -226,7 +225,7 @@ async fn main() {
             pid.unwrap()
         }
         Err(e) => {
-            error!("Failed to publish to topic alias {:?}", e);
+            error!("Failed to publish to topic alias {e:?}");
             return;
         }
     };
@@ -252,7 +251,7 @@ async fn main() {
     // Continue the previous session
     let mut client = Client::<'_, _, _, 1, 1, 1, 1>::with_session(session, &mut buffer);
 
-    let addr = SocketAddr::new(Ipv4Addr::new(127, 0, 0, 1).into(), 1883);
+    let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 1883);
     let connection = TcpStream::connect(addr).await.unwrap();
     let connection = FromTokio::new(connection);
 
@@ -267,17 +266,17 @@ async fn main() {
         .await
     {
         Ok(c) => {
-            info!("Connected to server: {:?}", c);
+            info!("Connected to server: {c:?}");
             info!("{:?}", client.client_config());
             info!("{:?}", client.server_config());
             info!("{:?}", client.shared_config());
             info!("{:?}", client.session());
         }
         Err(e) => {
-            error!("Failed to connect to server: {:?}", e);
+            error!("Failed to connect to server: {e:?}");
             return;
         }
-    };
+    }
 
     let pub_options = PublicationOptions::new(TopicReference::Name(topic.clone())).exactly_once();
 
@@ -289,13 +288,11 @@ async fn main() {
         )
         .await
     {
-        Ok(_) => info!(
-            "Republished packet identifier {} after reconnecting",
-            incomplete_publish_packet_identifier
+        Ok(()) => info!(
+            "Republished packet identifier {incomplete_publish_packet_identifier} after reconnecting"
         ),
         Err(e) => error!(
-            "Failed to republish packet identifier {} due to {:?}",
-            incomplete_publish_packet_identifier, e
+            "Failed to republish packet identifier {incomplete_publish_packet_identifier} due to {e:?}"
         ),
     }
 
@@ -305,24 +302,21 @@ async fn main() {
                 packet_identifier,
                 reason_code: _,
             })) if packet_identifier == incomplete_publish_packet_identifier => {
-                info!(
-                    "Completed republish of packet identifier {}",
-                    packet_identifier
-                );
+                info!("Completed republish of packet identifier {packet_identifier}");
                 break;
             }
-            Ok(e) => info!("Received Event {:?}", e),
+            Ok(e) => info!("Received Event {e:?}"),
             Err(e) => {
-                error!("Failed to poll: {:?}", e);
+                error!("Failed to poll: {e:?}");
                 return;
             }
         }
     }
 
     match client.disconnect(&DisconnectOptions::new()).await {
-        Ok(_) => info!("Disconnected from server"),
+        Ok(()) => info!("Disconnected from server"),
         Err(e) => {
-            error!("Failed to disconnect from server: {:?}", e);
+            error!("Failed to disconnect from server: {e:?}");
             return;
         }
     }

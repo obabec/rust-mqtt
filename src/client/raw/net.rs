@@ -8,7 +8,7 @@ pub(crate) enum NetState<N: Transport> {
     /// The connection and dialogue with the server is ok
     Ok(N),
 
-    /// The connection is ok but some protocol specific error (e.g. MalformedPacket or ProtocolError occured)
+    /// The connection is ok but some protocol specific error (e.g. `MalformedPacket` or `ProtocolError` occured)
     ///
     /// Sending messages can be considered, but the session should ultimately be closed according to spec
     Faulted(N, ReasonCode),

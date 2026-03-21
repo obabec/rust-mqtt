@@ -25,7 +25,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            session_expiry_interval: Default::default(),
+            session_expiry_interval: SessionExpiryInterval::default(),
             maximum_accepted_remaining_length: VarByteInt::MAX_ENCODABLE,
         }
     }

@@ -9,87 +9,88 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(u8)]
 pub enum PropertyType {
     /// PUBLISH, Will Properties
-    PayloadFormatIndicator,
+    PayloadFormatIndicator = 0x01,
 
     /// PUBLISH, Will Properties
-    MessageExpiryInterval,
+    MessageExpiryInterval = 0x02,
 
     /// PUBLISH, Will Properties
-    ContentType,
+    ContentType = 0x03,
 
     /// PUBLISH, Will Properties
-    ResponseTopic,
+    ResponseTopic = 0x08,
 
     /// PUBLISH, Will Properties
-    CorrelationData,
+    CorrelationData = 0x09,
 
     /// PUBLISH, SUBSCRIBE
-    SubscriptionIdentifier,
+    SubscriptionIdentifier = 0x0B,
 
     /// CONNECT, CONNACK, DISCONNECT
-    SessionExpiryInterval,
+    SessionExpiryInterval = 0x11,
 
     /// CONNACK
-    AssignedClientIdentifier,
+    AssignedClientIdentifier = 0x12,
 
     /// CONNACK
-    ServerKeepAlive,
+    ServerKeepAlive = 0x13,
 
     /// CONNECT, CONNACK, AUTH
-    AuthenticationMethod,
+    AuthenticationMethod = 0x15,
 
     /// CONNET, CONNACK, AUTH
-    AuthenticationData,
+    AuthenticationData = 0x16,
 
     /// CONNECT
-    RequestProblemInformation,
+    RequestProblemInformation = 0x17,
 
     /// Will Properties
-    WillDelayInterval,
+    WillDelayInterval = 0x18,
 
     /// CONNECT
-    RequestResponseInformation,
+    RequestResponseInformation = 0x19,
 
     /// CONNACK
-    ResponseInformation,
+    ResponseInformation = 0x1A,
 
     /// CONNACK, DISCONNECT
-    ServerReference,
+    ServerReference = 0x1C,
 
     /// CONNACK, PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, UNSUBACK, DISCONNECT, AUTH
-    ReasonString,
+    ReasonString = 0x1F,
 
     /// CONNECT, CONNACK
-    ReceiveMaximum,
+    ReceiveMaximum = 0x21,
 
     /// CONNECT, CONNACK
-    TopicAliasMaximum,
+    TopicAliasMaximum = 0x22,
 
     /// PUBLISH
-    TopicAlias,
+    TopicAlias = 0x23,
 
     /// CONNACK
-    MaximumQoS,
+    MaximumQoS = 0x24,
 
     /// CONNACK
-    RetainAvailable,
+    RetainAvailable = 0x25,
 
     /// CONNECT, CONNACK, PUBLISH, Will Properties, PUBACK, PUBREC, PUBREL, PUBCOMP, SUBSCRIBE, SUBACK, UNSUBSCRIBE, UNSUBACK, DISCONNECT, AUTH
-    UserProperty,
+    UserProperty = 0x26,
 
     /// CONNECT, CONNACK
-    MaximumPacketSize,
+    MaximumPacketSize = 0x27,
 
     /// CONNACK
-    WildcardSubscriptionAvailable,
+    WildcardSubscriptionAvailable = 0x28,
 
     /// CONNACK
-    SubscriptionIdentifierAvailable,
+    SubscriptionIdentifierAvailable = 0x29,
 
     /// CONNACK
-    SharedSubscriptionAvailable,
+    SharedSubscriptionAvailable = 0x2A,
 }
 
 impl PropertyType {
@@ -125,36 +126,8 @@ impl PropertyType {
             _ => return None,
         })
     }
-    pub const fn identifier(&self) -> u8 {
-        match self {
-            Self::PayloadFormatIndicator => 0x01,
-            Self::MessageExpiryInterval => 0x02,
-            Self::ContentType => 0x03,
-            Self::ResponseTopic => 0x08,
-            Self::CorrelationData => 0x09,
-            Self::SubscriptionIdentifier => 0x0B,
-            Self::SessionExpiryInterval => 0x11,
-            Self::AssignedClientIdentifier => 0x12,
-            Self::ServerKeepAlive => 0x13,
-            Self::AuthenticationMethod => 0x15,
-            Self::AuthenticationData => 0x16,
-            Self::RequestProblemInformation => 0x17,
-            Self::WillDelayInterval => 0x18,
-            Self::RequestResponseInformation => 0x19,
-            Self::ResponseInformation => 0x1A,
-            Self::ServerReference => 0x1C,
-            Self::ReasonString => 0x1F,
-            Self::ReceiveMaximum => 0x21,
-            Self::TopicAliasMaximum => 0x22,
-            Self::TopicAlias => 0x23,
-            Self::MaximumQoS => 0x24,
-            Self::RetainAvailable => 0x25,
-            Self::UserProperty => 0x26,
-            Self::MaximumPacketSize => 0x27,
-            Self::WildcardSubscriptionAvailable => 0x28,
-            Self::SubscriptionIdentifierAvailable => 0x29,
-            Self::SharedSubscriptionAvailable => 0x2A,
-        }
+    pub const fn identifier(self) -> u8 {
+        self as u8
     }
 }
 

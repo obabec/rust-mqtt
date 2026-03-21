@@ -1,7 +1,4 @@
-use core::{
-    fmt,
-    str::{Utf8Error, from_utf8, from_utf8_unchecked},
-};
+use core::str::{Utf8Error, from_utf8, from_utf8_unchecked};
 
 use const_fn::const_fn;
 
@@ -88,8 +85,8 @@ impl From<TooLargeToEncode> for MqttStringError {
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct MqttString<'s>(pub(crate) MqttBinary<'s>);
 
-impl<'s> fmt::Debug for MqttString<'s> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl core::fmt::Debug for MqttString<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("MqttString").field(&self.as_ref()).finish()
     }
 }
@@ -116,7 +113,7 @@ impl<'s> TryFrom<&'s str> for MqttString<'s> {
     }
 }
 
-impl<'s> AsRef<str> for MqttString<'s> {
+impl AsRef<str> for MqttString<'_> {
     fn as_ref(&self) -> &str {
         // Safety: MqttString contains valid UTF-8
         unsafe { from_utf8_unchecked(self.0.as_ref()) }
@@ -130,6 +127,12 @@ impl<'s> MqttString<'s> {
 
     /// Converts [`MqttBinary`] into [`MqttString`] by checking for null characters and valid UTF-8.
     /// Valid length is guaranteed by [`MqttBinary`]'s invariant.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttStringError::Utf8Error`] if `b` is not valid UTF-8.
+    /// * [`MqttStringError::NullCharacter`] if `b` contains an ASCII `\0` character.
+    /// * [`MqttStringError::TooLargeToEncode`] if `b`'s length exceeds [`MqttString::MAX_LENGTH`].
     #[const_fn(cfg(not(feature = "alloc")))]
     pub const fn from_utf8_binary(b: MqttBinary<'s>) -> Result<Self, MqttStringError> {
         let mut i = 0;
@@ -161,6 +164,7 @@ impl<'s> MqttString<'s> {
     ///
     /// In debug builds, this function will panic if the binary contains a null character or is not
     /// valid UTF-8.
+    #[must_use]
     pub const unsafe fn from_utf8_binary_unchecked(b: MqttBinary<'s>) -> Self {
         if cfg!(debug_assertions) {
             let mut i = 0;
@@ -176,6 +180,11 @@ impl<'s> MqttString<'s> {
 
     /// Converts a string slice into [`MqttString`] by checking for null characters and the max
     /// length of [`MqttString::MAX_LENGTH`].
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttStringError::NullCharacter`] if `s` contains an ASCII `\0` character.
+    /// * [`MqttStringError::TooLargeToEncode`] if `s`' length exceeds [`MqttString::MAX_LENGTH`].
     pub const fn from_str(s: &'s str) -> Result<Self, MqttStringError> {
         let mut i = 0;
         while i < s.len() {
@@ -203,6 +212,7 @@ impl<'s> MqttString<'s> {
     ///
     /// In debug builds, this function will panic if the slice contains a null character or its length is greater
     /// than [`MqttString::MAX_LENGTH`].
+    #[must_use]
     pub const fn from_str_unchecked(s: &'s str) -> Self {
         if cfg!(debug_assertions) {
             let mut i = 0;
@@ -217,18 +227,21 @@ impl<'s> MqttString<'s> {
 
     /// Returns the length of the underlying data in bytes.
     #[inline]
+    #[must_use]
     pub const fn len(&self) -> u16 {
         self.0.len()
     }
 
     /// Returns whether the underlying data is empty.
     #[inline]
+    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
 
     /// Returns the underlying string as `&str`
     #[inline]
+    #[must_use]
     pub const fn as_str(&self) -> &str {
         // Safety: MqttString contains valid UTF-8
         unsafe { from_utf8_unchecked(self.0.as_bytes()) }
@@ -236,6 +249,7 @@ impl<'s> MqttString<'s> {
 
     /// Delegates to [`crate::Bytes::as_borrowed`].
     #[inline]
+    #[must_use]
     pub const fn as_borrowed(&'s self) -> Self {
         Self(self.0.as_borrowed())
     }

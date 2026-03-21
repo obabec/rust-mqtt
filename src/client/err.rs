@@ -120,7 +120,7 @@ pub enum Error<'e> {
     /// been emitted that indicates that buffer might be free again.
     SendQuotaExceeded,
 
-    /// A publish now with the given session expiry interval would cause a protocol error.
+    /// A disconnect now with the given session expiry interval would cause a protocol error.
     ///
     /// A disconnection was attempted with a session expiry interval change where the session expiry interval in the
     /// CONNECT packet was zero ([`crate::config::SessionExpiryInterval::EndOnDisconnect`]) and was
@@ -132,8 +132,9 @@ pub enum Error<'e> {
     IllegalDisconnectSessionExpiryInterval,
 }
 
-impl<'e> Error<'e> {
+impl Error<'_> {
     /// Returns whether the client can recover from this error without closing the network connection.
+    #[must_use]
     pub fn is_recoverable(&self) -> bool {
         matches!(
             self,
@@ -150,13 +151,13 @@ impl<'e> Error<'e> {
     }
 }
 
-impl<'e> From<Reserved> for Error<'e> {
+impl From<Reserved> for Error<'_> {
     fn from(_: Reserved) -> Self {
         Self::Server
     }
 }
 
-impl<'e, B> From<RawError<B>> for Error<'e> {
+impl<B> From<RawError<B>> for Error<'_> {
     fn from(e: RawError<B>) -> Self {
         match e {
             RawError::Disconnected => Self::RecoveryRequired,
@@ -167,7 +168,7 @@ impl<'e, B> From<RawError<B>> for Error<'e> {
     }
 }
 
-impl<'e> From<TooLargeToEncode> for Error<'e> {
+impl From<TooLargeToEncode> for Error<'_> {
     fn from(_: TooLargeToEncode) -> Self {
         Self::PacketMaximumLengthExceeded
     }

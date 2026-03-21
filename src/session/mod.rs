@@ -1,12 +1,11 @@
 //! Contains utilities for session management.
 
+pub use flight::{CPublishFlightState, InFlightPublish, SPublishFlightState};
 use heapless::Vec;
 
-mod flight;
-
-pub use flight::{CPublishFlightState, InFlightPublish, SPublishFlightState};
-
 use crate::types::PacketIdentifier;
+
+mod flight;
 
 /// Session-associated information
 ///
@@ -24,15 +23,18 @@ impl<const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
     Session<RECEIVE_MAXIMUM, SEND_MAXIMUM>
 {
     /// Returns whether the packet identifier is currently in-flight in a client->server publication process.
+    #[must_use]
     pub fn is_used_cpublish_packet_identifier(&self, packet_identifier: PacketIdentifier) -> bool {
         self.cpublish_flight_state(packet_identifier).is_some()
     }
     /// Returns whether the packet identifier is currently in-flight in a server->client publication process.
+    #[must_use]
     pub fn is_used_spublish_packet_identifier(&self, packet_identifier: PacketIdentifier) -> bool {
         self.spublish_flight_state(packet_identifier).is_some()
     }
 
     /// Returns the state of the publication of the packet identifier if the packet identifier is in-flight in an outgoing publication.
+    #[must_use]
     pub fn cpublish_flight_state(
         &self,
         packet_identifier: PacketIdentifier,
@@ -43,6 +45,7 @@ impl<const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
             .map(|f| f.state)
     }
     /// Returns the state of the publication of the packet identifier if the packet identifier is in-flight in an incoming publication.
+    #[must_use]
     pub fn spublish_flight_state(
         &self,
         packet_identifier: PacketIdentifier,
@@ -54,18 +57,22 @@ impl<const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
     }
 
     /// Returns the amount of currently in-flight outgoing publications.
+    #[must_use]
     pub fn in_flight_cpublishes(&self) -> u16 {
         self.pending_client_publishes.len() as u16
     }
     /// Returns the amount of currently in-flight incoming publications.
+    #[must_use]
     pub fn in_flight_spublishes(&self) -> u16 {
         self.pending_server_publishes.len() as u16
     }
     /// Returns the amount of slots for outgoing publications.
+    #[must_use]
     pub fn cpublish_remaining_capacity(&self) -> u16 {
         (self.pending_client_publishes.capacity() - self.pending_client_publishes.len()) as u16
     }
     /// Returns the amount of slots for incoming publications.
+    #[must_use]
     pub fn spublish_remaining_capacity(&self) -> u16 {
         (self.pending_server_publishes.capacity() - self.pending_server_publishes.len()) as u16
     }
@@ -86,7 +93,7 @@ impl<const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
                     packet_identifier,
                     state,
                 })
-                .unwrap_unchecked()
+                .unwrap_unchecked();
         }
     }
     /// Adds an entry to await a PUBACK packet. Assumes the packet identifier has no entry currently.
@@ -117,7 +124,7 @@ impl<const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
                     packet_identifier,
                     state: SPublishFlightState::AwaitingPubrel,
                 })
-                .unwrap_unchecked()
+                .unwrap_unchecked();
         }
     }
     /// Adds an entry to await a PUBCOMP packet. Assumes the packet identifier has no entry currently.

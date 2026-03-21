@@ -43,7 +43,7 @@ impl<'w> From<WillOptions<'w>> for Will<'w> {
     }
 }
 
-impl<'p> Writable for Will<'p> {
+impl Writable for Will<'_> {
     fn written_len(&self) -> usize {
         let will_properties_length = self.will_properties_length();
 
@@ -72,7 +72,7 @@ impl<'p> Writable for Will<'p> {
     }
 }
 
-impl<'p> Will<'p> {
+impl Will<'_> {
     pub fn will_properties_length(&self) -> VarByteInt {
         let will_properties_length = self.will_delay_interval.written_len()
             + self.payload_format_indicator.written_len()

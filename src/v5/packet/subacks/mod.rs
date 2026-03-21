@@ -5,7 +5,7 @@ use heapless::Vec;
 use crate::{
     buffer::BufferProvider,
     eio::Read,
-    fmt::{error, trace},
+    fmt::{error, trace, verbose},
     header::{FixedHeader, PacketType},
     io::{
         read::{BodyReader, Readable},
@@ -36,8 +36,8 @@ pub struct GenericSubackPacket<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS:
     _phantom_data: PhantomData<&'p T>,
 }
 
-impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> Packet
-    for GenericSubackPacket<'p, T, MAX_TOPIC_FILTERS>
+impl<T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> Packet
+    for GenericSubackPacket<'_, T, MAX_TOPIC_FILTERS>
 {
     const PACKET_TYPE: PacketType = T::PACKET_TYPE;
 }
@@ -48,40 +48,47 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
         header: &FixedHeader,
         mut reader: BodyReader<'_, 'p, R, B>,
     ) -> Result<Self, RxError<R::Error, B::ProvisionError>> {
-        trace!("decoding");
+        trace!("decoding {:?} packet", T::PACKET_TYPE);
 
         if header.flags() != 0 {
-            error!("flags are not 0");
+            error!(
+                "invalid {:?} fixed header flags: {}",
+                T::PACKET_TYPE,
+                header.flags()
+            );
             return Err(RxError::MalformedPacket);
         }
         let r = &mut reader;
 
-        trace!("reading packet identifier");
+        verbose!("reading packet identifier field");
         let packet_identifier = PacketIdentifier::read(r).await?;
 
-        trace!("reading properties length");
+        verbose!("reading property length field");
         let mut properties_length = VarByteInt::read(r).await?.size();
 
-        trace!("properties length = {}", properties_length);
+        verbose!("property length: {} bytes", properties_length);
 
         if properties_length > r.remaining_len() {
-            error!("properties length greater than remaining length");
+            error!(
+                "invalid {:?} property length for remaining packet length",
+                T::PACKET_TYPE
+            );
             return Err(RxError::MalformedPacket);
         }
         if properties_length == r.remaining_len() {
-            error!("packet contains no reason code");
+            error!("{:?} packet does not contain a reason code", T::PACKET_TYPE);
             return Err(RxError::ProtocolError);
         }
 
         while properties_length > 0 {
-            trace!(
-                "reading property type with remaining len = {}",
+            verbose!(
+                "reading property identifier (remaining length: {} bytes)",
                 r.remaining_len()
             );
             let property_type = PropertyType::read(r).await?;
 
-            trace!(
-                "reading property body of {:?} with remaining len = {}",
+            verbose!(
+                "reading {:?} property body (remaining length: {} bytes)",
                 property_type,
                 r.remaining_len()
             );
@@ -97,7 +104,7 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
                     properties_length = properties_length.checked_sub(1).ok_or(RxError::MalformedPacket)?;
                     seen_reason_string = true;
                     let len = u16::read(r).await? as usize;
-                    trace!("Skipping reason string of length {}", len);
+                    verbose!("skipping reason string ({} bytes)", len);
                     r.skip(len).await?;
                     properties_length = properties_length.checked_sub(wlen!(u16) + len).ok_or(RxError::MalformedPacket)?;
                 },
@@ -112,7 +119,7 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
                 },
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
-                    error!("packet contains unexpected property {:?}", p);
+                    error!("invalid {:?} property: {:?}", T::PACKET_TYPE, p);
                     return Err(RxError::MalformedPacket)
                 },
             };
@@ -122,11 +129,15 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
 
         let mut reason_codes = Vec::new();
         while r.remaining_len() > 0 {
-            trace!("reading reason code");
+            verbose!("reading reason code field");
             let reason_code = ReasonCode::read(r).await?;
 
             if !T::reason_code_allowed(reason_code) {
-                error!("invalid reason code: {:?}", reason_code);
+                error!(
+                    "invalid {:?} reason code: {:?}",
+                    T::PACKET_TYPE,
+                    reason_code
+                );
                 return Err(RxError::ProtocolError);
             }
 

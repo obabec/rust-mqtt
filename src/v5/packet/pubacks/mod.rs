@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 use crate::{
     buffer::BufferProvider,
     eio::{Read, Write},
-    fmt::{error, trace},
+    fmt::{error, trace, verbose},
     header::{FixedHeader, PacketType},
     io::{
         read::{BodyReader, Readable},
@@ -37,7 +37,7 @@ pub struct GenericPubackPacket<'p, T: PubackPacketType> {
     _phantom_data: PhantomData<T>,
 }
 
-impl<'p, T: PubackPacketType> Packet for GenericPubackPacket<'p, T> {
+impl<T: PubackPacketType> Packet for GenericPubackPacket<'_, T> {
     const PACKET_TYPE: PacketType = T::PACKET_TYPE;
 }
 impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
@@ -45,25 +45,29 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
         header: &FixedHeader,
         mut reader: BodyReader<'_, 'p, R, B>,
     ) -> Result<Self, RxError<R::Error, B::ProvisionError>> {
-        trace!("decoding");
+        trace!("decoding {:?} packet", T::PACKET_TYPE);
 
         if header.flags() != T::FLAGS {
-            error!("flags are not matching");
+            error!(
+                "invalid {:?} fixed header flags: {}",
+                T::PACKET_TYPE,
+                header.flags()
+            );
             return Err(RxError::MalformedPacket);
         }
 
         let r = &mut reader;
 
-        trace!("reading packet identifier");
+        verbose!("reading packet identifier field");
         let packet_identifier = PacketIdentifier::read(r).await?;
 
         let reason_code = if header.remaining_len.size() == 2 {
             ReasonCode::Success
         } else {
-            trace!("reading reason code");
+            verbose!("reading reason code field");
             let c = ReasonCode::read(r).await?;
             if !T::reason_code_allowed(c) {
-                error!("invalid reason code: {:?}", c);
+                error!("invalid {:?} reason code: {:?}", T::PACKET_TYPE, c);
                 return Err(RxError::ProtocolError);
             }
             c
@@ -74,26 +78,29 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
         let properties_length = if header.remaining_len.value() < 4 {
             0
         } else {
-            trace!("reading properties length");
+            verbose!("reading property length field");
             VarByteInt::read(r).await?.size()
         };
 
-        trace!("properties length = {}", properties_length);
+        verbose!("property length: {} bytes", properties_length);
 
         if r.remaining_len() != properties_length {
-            error!("properties length is not equal to remaining packet length");
+            error!(
+                "invalid {:?} property length for remaining packet length",
+                T::PACKET_TYPE
+            );
             return Err(RxError::MalformedPacket);
         }
 
         while r.remaining_len() > 0 {
-            trace!(
-                "reading property type with remaining len = {}",
+            verbose!(
+                "reading property identifier (remaining length: {} bytes)",
                 r.remaining_len()
             );
             let property_type = PropertyType::read(r).await?;
 
-            trace!(
-                "reading property body of {:?} with remaining len = {}",
+            verbose!(
+                "reading {:?} property body (remaining length: {} bytes)",
                 property_type,
                 r.remaining_len()
             );
@@ -108,7 +115,7 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
                 },
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
-                    error!("packet contains unexpected property {:?}", p);
+                    error!("invalid packet {:?} property: {:?}", T::PACKET_TYPE, p);
                     return Err(RxError::MalformedPacket)
                 },
             };
@@ -122,7 +129,7 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
         })
     }
 }
-impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
+impl<T: PubackPacketType> TxPacket for GenericPubackPacket<'_, T> {
     fn remaining_len(&self) -> VarByteInt {
         let variable_header_length = self.packet_identifier.written_len() + wlen!(ReasonCode);
 
@@ -132,7 +139,7 @@ impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
         let total_length = variable_header_length + total_properties_length;
 
         // Invariant: Max length = 65545 < VarByteInt::MAX_ENCODABLE
-        // properties length: 4
+        // property length: 4
         // properties: 65538
         // variable header: 3
         VarByteInt::new_unchecked(total_length as u32)
@@ -161,7 +168,7 @@ impl<'p, T: PubackPacketType> TxPacket for GenericPubackPacket<'p, T> {
     }
 }
 
-impl<'p, T: PubackPacketType> GenericPubackPacket<'p, T> {
+impl<T: PubackPacketType> GenericPubackPacket<'_, T> {
     pub const fn new(packet_identifier: PacketIdentifier, reason_code: ReasonCode) -> Self {
         Self {
             packet_identifier,
