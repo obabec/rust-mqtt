@@ -46,12 +46,15 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 
 ### Feature flags
 
-- `log`: Enables logging via the `log` crate
-- `defmt`: Implements `defmt::Format` for crate items & enables logging via the `defmt` crate (version 1)
 - `bump`: Adds a simple bump allocator `BufferProvider` implementation
 - `alloc`: Adds an `Owned(Box<[u8]>)` variant to `Bytes` and a heap-allocation based `BufferProvider` implementation using the `alloc` crate
 - `v3`: Unused
 - `v5`: Enables MQTT version 5.0
+- Logging-related:
+  - `log`: Enables logging via the `log` crate
+  - `defmt`: Implements `defmt::Format` for crate items & enables logging via the `defmt` crate (version 1)
+  - `log-level-*`: Enables logs at the selected level and more severe levels (error, warn, info, debug, trace)
+  - `log-verbose`: Enables high-overhead IO traces at the trace log level and enables `log-level-trace`
 
 ## Usage
 
