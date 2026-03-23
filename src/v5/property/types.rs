@@ -41,7 +41,7 @@ pub enum PropertyType {
     /// CONNECT, CONNACK, AUTH
     AuthenticationMethod = 0x15,
 
-    /// CONNET, CONNACK, AUTH
+    /// CONNECT, CONNACK, AUTH
     AuthenticationData = 0x16,
 
     /// CONNECT
