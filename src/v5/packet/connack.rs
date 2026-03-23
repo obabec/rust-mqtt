@@ -159,14 +159,14 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
                 PropertyType::ServerKeepAlive => packet.server_keep_alive.try_set(r).await?,
                 PropertyType::ResponseInformation => packet.response_information.try_set(r).await?,
                 PropertyType::ServerReference => packet.server_reference.try_set(r).await?,
-                PropertyType::AuthenticationMethod if seen_authentication_method => return Err(RxError::MalformedPacket),
+                PropertyType::AuthenticationMethod if seen_authentication_method => return Err(RxError::ProtocolError),
                 PropertyType::AuthenticationMethod => {
                     seen_authentication_method = true;
                     let len = u16::read(r).await? as usize;
                     verbose!("skipping authentication method ({} bytes)", len);
                     r.skip(len).await?;
                 },
-                PropertyType::AuthenticationData if seen_authentication_data => return Err(RxError::MalformedPacket),
+                PropertyType::AuthenticationData if seen_authentication_data => return Err(RxError::ProtocolError),
                 PropertyType::AuthenticationData => {
                     seen_authentication_data = true;
                     let len = u16::read(r).await? as usize;

@@ -100,9 +100,7 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
 
             #[rustfmt::skip]
             match property_type {
-                PropertyType::ReasonString if seen_reason_string => {
-                    return Err(RxError::MalformedPacket);
-                }
+                PropertyType::ReasonString if seen_reason_string => return Err(RxError::ProtocolError),
                 PropertyType::ReasonString => {
                     seen_reason_string = true;
                     let len = u16::read(r).await? as usize;
