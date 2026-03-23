@@ -106,9 +106,9 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
                 r.remaining_len()
             );
             let property_type = PropertyType::read(r).await?;
-            properties_length = properties_length
-                .checked_sub(property_type.written_len())
-                .ok_or(RxError::MalformedPacket)?;
+
+            // unchecked sub because `properties_length` > 0
+            properties_length -= property_type.written_len();
 
             verbose!(
                 "reading {:?} property body (remaining length: {} bytes)",
@@ -149,9 +149,11 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
                 #[rustfmt::skip]
                 PropertyType::UserProperty => {
                     let len = u16::read(r).await? as usize;
+                    verbose!("skipping user property name ({} bytes)", len);
                     r.skip(len).await?;
                     properties_length = properties_length.checked_sub(wlen!(u16) + len).ok_or(RxError::MalformedPacket)?;
                     let len = u16::read(r).await? as usize;
+                    verbose!("skipping user property value ({} bytes)", len);
                     r.skip(len).await?;
                     properties_length = properties_length.checked_sub(wlen!(u16) + len).ok_or(RxError::MalformedPacket)?;
                 }

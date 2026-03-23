@@ -160,8 +160,10 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
                 PropertyType::AuthenticationData => packet.authentication_data.try_set(r).await?,
                 PropertyType::UserProperty => {
                     let len = u16::read(r).await? as usize;
+                    verbose!("skipping user property name ({} bytes)", len);
                     r.skip(len).await?;
                     let len = u16::read(r).await? as usize;
+                    verbose!("skipping user property value ({} bytes)", len);
                     r.skip(len).await?;
                 },
                 p => {

@@ -87,6 +87,9 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
             );
             let property_type = PropertyType::read(r).await?;
 
+            // unchecked sub because `properties_length` > 0
+            properties_length -= property_type.written_len();
+
             verbose!(
                 "reading {:?} property body (remaining length: {} bytes)",
                 property_type,
@@ -101,7 +104,6 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
                     return Err(RxError::MalformedPacket);
                 }
                 PropertyType::ReasonString => {
-                    properties_length = properties_length.checked_sub(1).ok_or(RxError::MalformedPacket)?;
                     seen_reason_string = true;
                     let len = u16::read(r).await? as usize;
                     verbose!("skipping reason string ({} bytes)", len);
@@ -109,11 +111,12 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
                     properties_length = properties_length.checked_sub(wlen!(u16) + len).ok_or(RxError::MalformedPacket)?;
                 },
                 PropertyType::UserProperty => {
-                    properties_length = properties_length.checked_sub(1).ok_or(RxError::MalformedPacket)?;
                     let len = u16::read(r).await? as usize;
+                    verbose!("skipping user property name ({} bytes)", len);
                     r.skip(len).await?;
                     properties_length = properties_length.checked_sub(wlen!(u16) + len).ok_or(RxError::MalformedPacket)?;
                     let len = u16::read(r).await? as usize;
+                    verbose!("skipping user property value ({} bytes)", len);
                     r.skip(len).await?;
                     properties_length = properties_length.checked_sub(wlen!(u16) + len).ok_or(RxError::MalformedPacket)?;
                 },
