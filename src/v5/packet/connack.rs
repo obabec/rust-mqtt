@@ -8,10 +8,10 @@ use crate::{
     packet::{Packet, RxError, RxPacket},
     types::{ReasonCode, VarByteInt},
     v5::property::{
-        AssignedClientIdentifier, AtMostOnceProperty, AuthenticationData, AuthenticationMethod,
-        MaximumQoS, PropertyType, ReasonString, ResponseInformation, RetainAvailable,
-        ServerKeepAlive, ServerReference, SharedSubscriptionAvailable,
-        SubscriptionIdentifierAvailable, TopicAliasMaximum, WildcardSubscriptionAvailable,
+        AssignedClientIdentifier, AtMostOnceProperty, MaximumQoS, PropertyType, ReasonString,
+        ResponseInformation, RetainAvailable, ServerKeepAlive, ServerReference,
+        SharedSubscriptionAvailable, SubscriptionIdentifierAvailable, TopicAliasMaximum,
+        WildcardSubscriptionAvailable,
     },
 };
 
@@ -36,8 +36,10 @@ pub struct ConnackPacket<'p> {
     pub server_keep_alive: Option<ServerKeepAlive>,
     pub response_information: Option<ResponseInformation<'p>>,
     pub server_reference: Option<ServerReference<'p>>,
-    pub authentication_method: Option<AuthenticationMethod<'p>>,
-    pub authentication_data: Option<AuthenticationData<'p>>,
+    // authentication method is currently unused and does not have to be read into memory.
+    // pub authentication_method: Option<AuthenticationMethod<'p>>,
+    // authentication data is currently unused and does not have to be read into memory.
+    // pub authentication_data: Option<AuthenticationData<'p>>,
 }
 
 impl Packet for ConnackPacket<'_> {
@@ -114,8 +116,6 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
             server_keep_alive: None,
             response_information: None,
             server_reference: None,
-            authentication_method: None,
-            authentication_data: None,
         };
 
         verbose!("reading property length field");
@@ -127,6 +127,9 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
             error!("invalid CONNACK property length for remaining packet length");
             return Err(RxError::MalformedPacket);
         }
+
+        let mut seen_authentication_method = false;
+        let mut seen_authentication_data = false;
 
         while r.remaining_len() > 0 {
             verbose!(
@@ -156,8 +159,20 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
                 PropertyType::ServerKeepAlive => packet.server_keep_alive.try_set(r).await?,
                 PropertyType::ResponseInformation => packet.response_information.try_set(r).await?,
                 PropertyType::ServerReference => packet.server_reference.try_set(r).await?,
-                PropertyType::AuthenticationMethod => packet.authentication_method.try_set(r).await?,
-                PropertyType::AuthenticationData => packet.authentication_data.try_set(r).await?,
+                PropertyType::AuthenticationMethod if seen_authentication_method => return Err(RxError::MalformedPacket),
+                PropertyType::AuthenticationMethod => {
+                    seen_authentication_method = true;
+                    let len = u16::read(r).await? as usize;
+                    verbose!("skipping authentication method ({} bytes)", len);
+                    r.skip(len).await?;
+                },
+                PropertyType::AuthenticationData if seen_authentication_data => return Err(RxError::MalformedPacket),
+                PropertyType::AuthenticationData => {
+                    seen_authentication_data = true;
+                    let len = u16::read(r).await? as usize;
+                    verbose!("skipping authentication data ({} bytes)", len);
+                    r.skip(len).await?;
+                },
                 PropertyType::UserProperty => {
                     let len = u16::read(r).await? as usize;
                     verbose!("skipping user property name ({} bytes)", len);
@@ -185,14 +200,13 @@ mod unit {
     use crate::{
         config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
         test::rx::decode,
-        types::{MqttBinary, MqttString, QoS, ReasonCode},
+        types::{MqttString, QoS, ReasonCode},
         v5::{
             packet::ConnackPacket,
             property::{
-                AssignedClientIdentifier, AuthenticationData, AuthenticationMethod, MaximumQoS,
-                ReasonString, ResponseInformation, RetainAvailable, ServerKeepAlive,
-                ServerReference, SharedSubscriptionAvailable, SubscriptionIdentifierAvailable,
-                TopicAliasMaximum, WildcardSubscriptionAvailable,
+                AssignedClientIdentifier, MaximumQoS, ReasonString, ResponseInformation,
+                RetainAvailable, ServerKeepAlive, ServerReference, SharedSubscriptionAvailable,
+                SubscriptionIdentifierAvailable, TopicAliasMaximum, WildcardSubscriptionAvailable,
             },
         },
     };
@@ -219,8 +233,8 @@ mod unit {
         assert!(packet.server_keep_alive.is_none());
         assert!(packet.response_information.is_none());
         assert!(packet.server_reference.is_none());
-        assert!(packet.authentication_method.is_none());
-        assert!(packet.authentication_data.is_none());
+        // assert!(packet.authentication_method.is_none());
+        // assert!(packet.authentication_data.is_none());
     }
 
     #[tokio::test]
@@ -349,17 +363,17 @@ mod unit {
                 MqttString::try_from("server.example.com").unwrap()
             ))
         );
-        assert_eq!(
-            packet.authentication_method,
-            Some(AuthenticationMethod(
-                MqttString::try_from("SCRAM-SHA-256").unwrap()
-            ))
-        );
-        assert_eq!(
-            packet.authentication_data,
-            Some(AuthenticationData(
-                MqttBinary::try_from("auth_data".as_bytes()).unwrap()
-            ))
-        );
+        // assert_eq!(
+        //     packet.authentication_method,
+        //     Some(AuthenticationMethod(
+        //         MqttString::try_from("SCRAM-SHA-256").unwrap()
+        //     ))
+        // );
+        // assert_eq!(
+        //     packet.authentication_data,
+        //     Some(AuthenticationData(
+        //         MqttBinary::try_from("auth_data".as_bytes()).unwrap()
+        //     ))
+        // );
     }
 }
