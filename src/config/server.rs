@@ -39,7 +39,7 @@ impl Default for Config {
             receive_maximum: ReceiveMaximum(NonZero::new(u16::MAX).unwrap()),
             maximum_qos: QoS::ExactlyOnce,
             retain_supported: true,
-            maximum_packet_size: Default::default(),
+            maximum_packet_size: MaximumPacketSize::default(),
             topic_alias_maximum: 0,
             wildcard_subscription_supported: true,
             subscription_identifiers_supported: true,

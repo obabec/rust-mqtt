@@ -1,4 +1,4 @@
-use core::{cmp::min, fmt};
+use core::cmp::min;
 
 use crate::eio::{self, ErrorType, Write};
 
@@ -10,9 +10,9 @@ pub struct SliceWriter<'a> {
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SliceWriterError;
-impl fmt::Display for SliceWriterError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+impl core::fmt::Display for SliceWriterError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{self:?}")
     }
 }
 impl core::error::Error for SliceWriterError {
@@ -25,10 +25,10 @@ impl eio::Error for SliceWriterError {
         eio::ErrorKind::Other
     }
 }
-impl<'a> ErrorType for SliceWriter<'a> {
+impl ErrorType for SliceWriter<'_> {
     type Error = SliceWriterError;
 }
-impl<'a> Write for SliceWriter<'a> {
+impl Write for SliceWriter<'_> {
     async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
         let left = self.slice.len().saturating_sub(self.index);
         let writing = min(left, buf.len());
@@ -62,8 +62,9 @@ impl<'a> SliceWriter<'a> {
 
 #[cfg(test)]
 mod unit {
-    use crate::{eio::Write, test::write::SliceWriter};
     use tokio_test::assert_ok;
+
+    use crate::{eio::Write, test::write::SliceWriter};
 
     #[tokio::test]
     #[test_log::test]

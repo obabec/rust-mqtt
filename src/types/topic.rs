@@ -56,6 +56,7 @@ impl<'t> TopicName<'t> {
 
     /// Creates a new topic name while checking for correct syntax of the topic name string.
     #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
     pub fn new(string: MqttString<'t>) -> Option<Self> {
         if Self::is_valid(&string) {
             Some(Self(string))
@@ -71,6 +72,7 @@ impl<'t> TopicName<'t> {
     ///
     /// # Panics
     /// In debug builds, this function will panic if the syntax of `string` is incorrect.
+    #[must_use]
     pub const fn new_unchecked(string: MqttString<'t>) -> Self {
         const_debug_assert!(
             Self::is_valid(&string),
@@ -82,6 +84,7 @@ impl<'t> TopicName<'t> {
 
     /// Delegates to [`crate::Bytes::as_borrowed`].
     #[inline]
+    #[must_use]
     pub const fn as_borrowed(&'t self) -> Self {
         Self(self.0.as_borrowed())
     }
@@ -167,6 +170,7 @@ impl<'t> TopicFilter<'t> {
 
     /// Creates a new topic filter while checking for correct syntax of the topic filter string
     #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
     pub fn new(string: MqttString<'t>) -> Option<Self> {
         if Self::is_valid(&string) {
             Some(Self(string))
@@ -182,6 +186,7 @@ impl<'t> TopicFilter<'t> {
     ///
     /// # Panics
     /// In debug builds, this function will panic if the syntax of `string` is incorrect.
+    #[must_use]
     pub const fn new_unchecked(string: MqttString<'t>) -> Self {
         const_debug_assert!(
             Self::is_valid(&string),
@@ -193,6 +198,7 @@ impl<'t> TopicFilter<'t> {
 
     /// Delegates to [`crate::Bytes::as_borrowed`].
     #[inline]
+    #[must_use]
     pub const fn as_borrowed(&'t self) -> Self {
         Self(self.0.as_borrowed())
     }
@@ -221,9 +227,7 @@ pub struct SubscriptionFilter<'t> {
     subscription_options: u8,
 }
 
-impl<'p, const MAX_TOPIC_FILTERS: usize> Writable
-    for Vec<SubscriptionFilter<'p>, MAX_TOPIC_FILTERS>
-{
+impl<const MAX_TOPIC_FILTERS: usize> Writable for Vec<SubscriptionFilter<'_>, MAX_TOPIC_FILTERS> {
     fn written_len(&self) -> usize {
         self.iter()
             .map(|t| &t.topic)
@@ -273,8 +277,9 @@ impl<'t> SubscriptionFilter<'t> {
 
 #[cfg(test)]
 mod unit {
-    use crate::types::{MqttString, TopicFilter, TopicName};
     use tokio_test::assert_ok;
+
+    use crate::types::{MqttString, TopicFilter, TopicName};
 
     macro_rules! assert_valid {
         ($t:ty, $l:literal) => {

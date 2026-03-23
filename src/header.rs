@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// The fixed header of any MQTT Control Packet containing the packet type, flags
-/// and the remaining_length.
+/// and the remaining length.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct FixedHeader {
@@ -43,11 +43,16 @@ impl FixedHeader {
 
     /// Returns the flags of the [`FixedHeader`]. These are the lower 4 bits of the first byte.
     /// The type of the packet is masked away.
+    #[must_use]
     pub fn flags(&self) -> u8 {
         self.type_and_flags & 0x0F
     }
 
     /// Returns the [`PacketType`]
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Reserved`] if the value of the packet type bits is reserved.
     pub fn packet_type(&self) -> Result<PacketType, Reserved> {
         PacketType::from_type_and_flags(self.type_and_flags)
     }
@@ -60,8 +65,7 @@ pub struct Reserved;
 
 /// An MQTT Control Packet type.
 #[allow(missing_docs)]
-#[derive(Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(PartialEq, Eq)]
 pub enum PacketType {
     Connect = 1,
     Connack = 2,
@@ -80,6 +84,55 @@ pub enum PacketType {
 
     #[cfg(feature = "v5")]
     Auth = 15,
+}
+
+impl core::fmt::Debug for PacketType {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Connect => write!(f, "CONNECT"),
+            Self::Connack => write!(f, "CONNACK"),
+            Self::Publish => write!(f, "PUBLISH"),
+            Self::Puback => write!(f, "PUBACK"),
+            Self::Pubrec => write!(f, "PUBREC"),
+            Self::Pubrel => write!(f, "PUBREL"),
+            Self::Pubcomp => write!(f, "PUBCOMP"),
+            Self::Subscribe => write!(f, "SUBSCRIBE"),
+            Self::Suback => write!(f, "SUBACK"),
+            Self::Unsubscribe => write!(f, "UNSUBSCRIBE"),
+            Self::Unsuback => write!(f, "UNSUBACK"),
+            Self::Pingreq => write!(f, "PINGREQ"),
+            Self::Pingresp => write!(f, "PINGRESP"),
+            Self::Disconnect => write!(f, "DISCONNECT"),
+
+            #[cfg(feature = "v5")]
+            Self::Auth => write!(f, "AUTH"),
+        }
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for PacketType {
+    fn format(&self, fmt: defmt::Formatter) {
+        match self {
+            Self::Connect => defmt::write!(fmt, "CONNECT"),
+            Self::Connack => defmt::write!(fmt, "CONNACK"),
+            Self::Publish => defmt::write!(fmt, "PUBLISH"),
+            Self::Puback => defmt::write!(fmt, "PUBACK"),
+            Self::Pubrec => defmt::write!(fmt, "PUBREC"),
+            Self::Pubrel => defmt::write!(fmt, "PUBREL"),
+            Self::Pubcomp => defmt::write!(fmt, "PUBCOMP"),
+            Self::Subscribe => defmt::write!(fmt, "SUBSCRIBE"),
+            Self::Suback => defmt::write!(fmt, "SUBACK"),
+            Self::Unsubscribe => defmt::write!(fmt, "UNSUBSCRIBE"),
+            Self::Unsuback => defmt::write!(fmt, "UNSUBACK"),
+            Self::Pingreq => defmt::write!(fmt, "PINGREQ"),
+            Self::Pingresp => defmt::write!(fmt, "PINGRESP"),
+            Self::Disconnect => defmt::write!(fmt, "DISCONNECT"),
+
+            #[cfg(feature = "v5")]
+            Self::Auth => defmt::write!(fmt, "AUTH"),
+        }
+    }
 }
 
 impl PacketType {

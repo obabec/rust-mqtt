@@ -15,10 +15,10 @@ pub struct UnsubscribePacket<'p, const MAX_TOPIC_FILTERS: usize> {
     topic_filters: Vec<TopicFilter<'p>, MAX_TOPIC_FILTERS>,
 }
 
-impl<'p, const MAX_TOPIC_FILTERS: usize> Packet for UnsubscribePacket<'p, MAX_TOPIC_FILTERS> {
+impl<const MAX_TOPIC_FILTERS: usize> Packet for UnsubscribePacket<'_, MAX_TOPIC_FILTERS> {
     const PACKET_TYPE: PacketType = PacketType::Unsubscribe;
 }
-impl<'p, const MAX_TOPIC_FILTERS: usize> TxPacket for UnsubscribePacket<'p, MAX_TOPIC_FILTERS> {
+impl<const MAX_TOPIC_FILTERS: usize> TxPacket for UnsubscribePacket<'_, MAX_TOPIC_FILTERS> {
     fn remaining_len(&self) -> VarByteInt {
         // Safety: UNSUBSCRIBE packets that are too long to encode cannot be created
         unsafe { self.remaining_len_raw().unwrap_unchecked() }
@@ -41,7 +41,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> TxPacket for UnsubscribePacket<'p, MAX_
 }
 
 impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS> {
-    /// If MAX_TOPIC_FILTERS is to less than or equal to 4095, it is guaranteed that TooLargeToEncode is never returned.
+    /// If `MAX_TOPIC_FILTERS` is to less than or equal to 4095, it is guaranteed that `TooLargeToEncode` is never returned.
     pub fn new(
         packet_identifier: PacketIdentifier,
         topic_filters: Vec<TopicFilter<'p>, MAX_TOPIC_FILTERS>,
@@ -78,7 +78,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> UnsubscribePacket<'p, MAX_TOPIC_FILTERS
         // MAX_TOPIC_FILTERS has to be less than or equal to 4095 to guarantee:
         //   Max length = 3 + MAX_TOPIC_FILTERS * 65537 <= VarByteInt::MAX_ENCODABLE
         // packet identifier: 2
-        // properties length: 1
+        // property length: 1
         // properties: 0
         // topic filters: MAX_TOPIC_FILTERS * 65537
         VarByteInt::try_from(total_length as u32)

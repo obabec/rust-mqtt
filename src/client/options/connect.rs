@@ -36,7 +36,7 @@ pub struct Options<'c> {
     pub will: Option<WillOptions<'c>>,
 }
 
-impl<'c> Default for Options<'c> {
+impl Default for Options<'_> {
     fn default() -> Self {
         Self::new()
     }
@@ -45,6 +45,7 @@ impl<'c> Default for Options<'c> {
 impl<'c> Options<'c> {
     /// Creates new connect options with no clean start, infinite keep alive and session
     /// expiry immediately after disconnecting.
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             clean_start: false,
@@ -59,45 +60,53 @@ impl<'c> Options<'c> {
     }
 
     /// Sets the clean start flag to true.
+    #[must_use]
     pub const fn clean_start(mut self) -> Self {
         self.clean_start = true;
         self
     }
     /// Sets the desired keep alive of the connection.
+    #[must_use]
     pub const fn keep_alive(mut self, keep_alive: KeepAlive) -> Self {
         self.keep_alive = keep_alive;
         self
     }
     /// Sets the desired session expiry interval of the connection.
+    #[must_use]
     pub const fn session_expiry_interval(mut self, interval: SessionExpiryInterval) -> Self {
         self.session_expiry_interval = interval;
         self
     }
     /// Sets the maximum packet size as a limit in bytes. A value less than 2 does not make sense.
+    #[must_use]
     pub const fn maximum_packet_size(mut self, maximum_packet_size: NonZero<u32>) -> Self {
         self.maximum_packet_size = MaximumPacketSize::Limit(maximum_packet_size);
         self
     }
     /// Sets the request response information property to true prompting the server to return
     /// a response information property to construct response topics.
+    #[must_use]
     pub const fn request_response_information(mut self) -> Self {
         self.request_response_information = true;
         self
     }
     /// Sets the user name.
     #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
     pub const fn user_name(mut self, user_name: MqttString<'c>) -> Self {
         self.user_name = Some(user_name);
         self
     }
     /// Sets the password.
     #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
     pub const fn password(mut self, password: MqttBinary<'c>) -> Self {
         self.password = Some(password);
         self
     }
     /// Sets the will.
     #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
     pub const fn will(mut self, will: WillOptions<'c>) -> Self {
         self.will = Some(will);
         self

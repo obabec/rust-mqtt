@@ -82,14 +82,34 @@ macro_rules! panic_ {
 }
 
 #[clippy::format_args]
+macro_rules! verbose {
+    ($s:literal $(, $x:expr)* $(,)?) => {
+        {
+            #[cfg(all(feature = "log", feature = "log-verbose"))]
+            ::log::trace!($s $(, $x)*);
+            #[cfg(all(feature = "defmt", feature = "log-verbose"))]
+            ::defmt::trace!($s $(, $x)*);
+            #[cfg(not(any(
+                all(feature = "log", feature = "log-verbose"),
+                all(feature = "defmt", feature = "log-verbose"),
+            )))]
+            let _ = ($( & $x ),*);
+        }
+    };
+}
+
+#[clippy::format_args]
 macro_rules! trace {
     ($s:literal $(, $x:expr)* $(,)?) => {
         {
-            #[cfg(feature = "log")]
+            #[cfg(all(feature = "log", feature = "log-level-trace"))]
             ::log::trace!($s $(, $x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(all(feature = "defmt", feature = "log-level-trace"))]
             ::defmt::trace!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature = "defmt")))]
+            #[cfg(not(any(
+                all(feature = "log", feature = "log-level-trace"),
+                all(feature = "defmt", feature = "log-level-trace"),
+            )))]
             let _ = ($( & $x ),*);
         }
     };
@@ -99,11 +119,14 @@ macro_rules! trace {
 macro_rules! debug {
     ($s:literal $(, $x:expr)* $(,)?) => {
         {
-            #[cfg(feature = "log")]
+            #[cfg(all(feature = "log", feature = "log-level-debug"))]
             ::log::debug!($s $(, $x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(all(feature = "defmt", feature = "log-level-debug"))]
             ::defmt::debug!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature = "defmt")))]
+            #[cfg(not(any(
+                all(feature = "log", feature = "log-level-debug"),
+                all(feature = "defmt", feature = "log-level-debug"),
+            )))]
             let _ = ($( & $x ),*);
         }
     };
@@ -113,11 +136,14 @@ macro_rules! debug {
 macro_rules! info {
     ($s:literal $(, $x:expr)* $(,)?) => {
         {
-            #[cfg(feature = "defmt")]
+            #[cfg(all(feature = "defmt", feature = "log-level-info"))]
             ::defmt::info!($s $(, $x)*);
-            #[cfg(feature = "log")]
+            #[cfg(all(feature = "log", feature = "log-level-info"))]
             ::log::info!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature = "defmt")))]
+            #[cfg(not(any(
+                all(feature = "log", feature = "log-level-info"),
+                all(feature = "defmt", feature = "log-level-info"),
+            )))]
             let _ = ($( & $x ),*);
         }
     };
@@ -127,11 +153,14 @@ macro_rules! info {
 macro_rules! warn_ {
     ($s:literal $(, $x:expr)* $(,)?) => {
         {
-            #[cfg(feature = "log")]
+            #[cfg(all(feature = "log", feature = "log-level-warn"))]
             ::log::warn!($s $(, $x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(all(feature = "defmt", feature = "log-level-warn"))]
             ::defmt::warn!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature = "defmt")))]
+            #[cfg(not(any(
+                all(feature = "log", feature = "log-level-warn"),
+                all(feature = "defmt", feature = "log-level-warn"),
+            )))]
             let _ = ($( & $x ),*);
         }
     };
@@ -141,11 +170,14 @@ macro_rules! warn_ {
 macro_rules! error {
     ($s:literal $(, $x:expr)* $(,)?) => {
         {
-            #[cfg(feature = "log")]
+            #[cfg(all(feature = "log", feature = "log-level-error"))]
             ::log::error!($s $(, $x)*);
-            #[cfg(feature = "defmt")]
+            #[cfg(all(feature = "defmt", feature = "log-level-error"))]
             ::defmt::error!($s $(, $x)*);
-            #[cfg(not(any(feature = "log", feature = "defmt")))]
+            #[cfg(not(any(
+                all(feature = "log", feature = "log-level-error"),
+                all(feature = "defmt", feature = "log-level-error"),
+            )))]
             let _ = ($( & $x ),*);
         }
     };
@@ -155,6 +187,7 @@ pub(crate) use debug;
 pub(crate) use error;
 pub(crate) use info;
 pub(crate) use trace;
+pub(crate) use verbose;
 pub(crate) use warn_ as warn;
 
 pub(crate) use assert_ as assert;

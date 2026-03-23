@@ -63,7 +63,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
 
     /// Disconnect handler after an error occured.
     ///
-    /// This expects the network to not be in Ok() state
+    /// This expects the network to not be in `Ok()` state
     pub async fn abort(&mut self) -> Result<(), RawError<B::ProvisionError>> {
         debug_assert!(
             !self.n.is_ok(),
@@ -172,7 +172,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
         packet.send(net).await.map_err(|e| self.handle_tx(e))
     }
 
-    /// Cancel-safe if N::flush() is cancel-safe
+    /// Cancel-safe if `N::flush()` is cancel-safe
     pub async fn flush(&mut self) -> Result<(), RawError<B::ProvisionError>> {
         self.n.get()?.flush().await.map_err(|e| {
             let e: WriteError<_> = e.into();
@@ -199,7 +199,6 @@ mod unit {
     use crate::buffer::AllocBuffer;
     #[cfg(feature = "bump")]
     use crate::buffer::BumpBuffer;
-
     use crate::{
         client::raw::Raw,
         header::{FixedHeader, PacketType},

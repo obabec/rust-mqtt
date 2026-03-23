@@ -4,7 +4,7 @@ use crate::{
 };
 
 /// MQTT's variable byte integer encoding. The value has to be less than
-/// [`VarByteInt::MAX_ENCODABLE`] (268_435_455). Exceeding this ultimately leads to
+/// [`VarByteInt::MAX_ENCODABLE`] (`268_435_455`). Exceeding this ultimately leads to
 /// panics or malformed packets.
 ///
 /// Used for packet length and some properties.
@@ -23,6 +23,7 @@ impl VarByteInt {
     /// Creates a variable byte integer by checking for the maximum value of
     /// [`VarByteInt::MAX_ENCODABLE`].
     /// For a version accepting [`u16`] and [`u8`], use [`From::from`].
+    #[must_use]
     pub const fn new(value: u32) -> Option<Self> {
         if value > Self::MAX_ENCODABLE {
             None
@@ -41,6 +42,7 @@ impl VarByteInt {
     ///
     /// # Panics
     /// Panics in debug builds if `value` exceeds [`VarByteInt::MAX_ENCODABLE`].
+    #[must_use]
     pub const fn new_unchecked(value: u32) -> Self {
         const_debug_assert!(
             value <= Self::MAX_ENCODABLE,
@@ -51,11 +53,13 @@ impl VarByteInt {
     }
 
     /// Returns the inner value.
+    #[must_use]
     pub const fn value(&self) -> u32 {
         self.0
     }
 
     /// Returns [`Self::value`] as [`usize`].
+    #[must_use]
     pub const fn size(&self) -> usize {
         self.0 as usize
     }
@@ -82,7 +86,7 @@ impl VarByteInt {
         );
 
         for b in slice {
-            value += (b & 0x7F) as u32 * multiplier;
+            value += u32::from(b & 0x7F) * multiplier;
             multiplier *= 128;
             if b & 128 == 0 {
                 break;
@@ -102,11 +106,11 @@ impl TryFrom<u32> for VarByteInt {
 }
 impl From<u16> for VarByteInt {
     fn from(value: u16) -> Self {
-        Self(value as u32)
+        Self(u32::from(value))
     }
 }
 impl From<u8> for VarByteInt {
     fn from(value: u8) -> Self {
-        Self(value as u32)
+        Self(u32::from(value))
     }
 }

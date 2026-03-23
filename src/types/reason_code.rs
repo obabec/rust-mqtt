@@ -14,198 +14,158 @@ use crate::{
 /// contain a list of one or more Reason Codes in the Payload.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[repr(u8)]
 pub enum ReasonCode {
-    /// # aka GrantedQoS0, NormalDisconnection
+    /// # aka `GrantedQoS0`, `NormalDisconnection`
     ///
     /// CONNACK, PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, UNSUBACK, AUTH, DISCONNECT
-    Success,
+    Success = 0x00,
 
     /// SUBACK
-    GrantedQoS1,
+    GrantedQoS1 = 0x01,
 
     /// SUBACK
-    GrantedQoS2,
+    GrantedQoS2 = 0x02,
 
     /// DISCONNECT
-    DisconnectWithWillMessage,
+    DisconnectWithWillMessage = 0x04,
 
     /// PUBACK, PUBREC
-    NoMatchingSubscribers,
+    NoMatchingSubscribers = 0x10,
 
     /// UNSUBACK
-    NoSubscriptionExisted,
+    NoSubscriptionExisted = 0x11,
 
     /// AUTH
-    ContinueAuthentication,
+    ContinueAuthentication = 0x18,
 
     /// AUTH
-    ReAuthenticate,
+    ReAuthenticate = 0x19,
 
     #[default]
     /// CONNACK, PUBACK, PUBREC, SUBACK, UNSUBACK, DISCONNECT
-    UnspecifiedError,
+    UnspecifiedError = 0x80,
 
     /// CONNACK, DISCONNECT
-    MalformedPacket,
+    MalformedPacket = 0x81,
 
     /// CONNACK, DISCONNECT
-    ProtocolError,
+    ProtocolError = 0x82,
 
     /// CONNACK, PUBACK, PUBREC, SUBACK, UNSUBACK, DISCONNECT
-    ImplementationSpecificError,
+    ImplementationSpecificError = 0x83,
 
     /// CONNACK
-    UnsupportedProtocolVersion,
+    UnsupportedProtocolVersion = 0x84,
 
     /// CONNACK
-    ClientIdentifierNotValid,
+    ClientIdentifierNotValid = 0x85,
 
     /// CONNACK
-    BadUserNameOrPassword,
+    BadUserNameOrPassword = 0x86,
 
     /// CONNACK, PUBACK, PUBREC, SUBACK, UNSUBACK, DISCONNECT
-    NotAuthorized,
+    NotAuthorized = 0x87,
 
     /// CONNACK
-    ServerUnavailable,
+    ServerUnavailable = 0x88,
 
     /// CONNACK, DISCONNECT
-    ServerBusy,
+    ServerBusy = 0x89,
 
     /// CONNACK
-    Banned,
+    Banned = 0x8A,
 
     /// DISCONNECT
-    ServerShuttingDown,
+    ServerShuttingDown = 0x8B,
 
     /// CONNACK, DISCONNECT
-    BadAuthenticationMethod,
+    BadAuthenticationMethod = 0x8C,
 
     /// DISCONNECT
-    KeepAliveTimeout,
+    KeepAliveTimeout = 0x8D,
 
     /// DISCONNECT
-    SessionTakenOver,
+    SessionTakenOver = 0x8E,
 
     /// SUBACK, UNSUBACK, DISCONNECT
-    TopicFilterInvalid,
+    TopicFilterInvalid = 0x8F,
 
     /// CONNACK, PUBACK, PUBREC, DISCONNECT
-    TopicNameInvalid,
+    TopicNameInvalid = 0x90,
 
     /// PUBACK, PUBREC, SUBACK, UNSUBACK
-    PacketIdentifierInUse,
+    PacketIdentifierInUse = 0x91,
 
     /// PUBREL, PUBCOMP
-    PacketIdentifierNotFound,
+    PacketIdentifierNotFound = 0x92,
 
     /// DISCONNECT
-    ReceiveMaximumExceeded,
+    ReceiveMaximumExceeded = 0x93,
 
     /// DISCONNECT
-    TopicAliasInvalid,
+    TopicAliasInvalid = 0x94,
 
     /// CONNACK, DISCONNECT
-    PacketTooLarge,
+    PacketTooLarge = 0x95,
 
     /// DISCONNECT
-    MessageRateTooHigh,
+    MessageRateTooHigh = 0x96,
 
     /// CONNACK, PUBACK, PUBREC, SUBACK, DISCONNECT
-    QuotaExceeded,
+    QuotaExceeded = 0x97,
 
     /// DISCONNECT
-    AdministrativeAction,
+    AdministrativeAction = 0x98,
 
     /// CONNACK, PUBACK, PUBREC, DISCONNECT
-    PayloadFormatInvalid,
+    PayloadFormatInvalid = 0x99,
 
     /// CONNACK, DISCONNECT
-    RetainNotSupported,
+    RetainNotSupported = 0x9A,
 
     /// CONNACK, DISCONNECT
-    QoSNotSupported,
+    QoSNotSupported = 0x9B,
 
     /// CONNACK, DISCONNECT
-    UseAnotherServer,
+    UseAnotherServer = 0x9C,
 
     /// CONNACK, DISCONNECT
-    ServerMoved,
+    ServerMoved = 0x9D,
 
     /// SUBACK, DISCONNECT
-    SharedSubscriptionsNotSupported,
+    SharedSubscriptionsNotSupported = 0x9E,
 
     /// CONNACK, DISCONNECT
-    ConnectionRateExceeded,
+    ConnectionRateExceeded = 0x9F,
 
     /// DISCONNECT
-    MaximumConnectTime,
+    MaximumConnectTime = 0xA0,
 
     /// SUBACK, DISCONNECT
-    SubscriptionIdentifiersNotSupported,
+    SubscriptionIdentifiersNotSupported = 0xA1,
 
     /// SUBACK, DISCONNECT
-    WildcardSubscriptionsNotSupported,
+    WildcardSubscriptionsNotSupported = 0xA2,
 }
 
 impl ReasonCode {
     /// Returns the numeric value of the reason code.
-    pub const fn value(&self) -> u8 {
-        match self {
-            Self::Success => 0x00,
-            Self::GrantedQoS1 => 0x01,
-            Self::GrantedQoS2 => 0x02,
-            Self::DisconnectWithWillMessage => 0x04,
-            Self::NoMatchingSubscribers => 0x10,
-            Self::NoSubscriptionExisted => 0x11,
-            Self::ContinueAuthentication => 0x18,
-            Self::ReAuthenticate => 0x19,
-            Self::UnspecifiedError => 0x80,
-            Self::MalformedPacket => 0x81,
-            Self::ProtocolError => 0x82,
-            Self::ImplementationSpecificError => 0x83,
-            Self::UnsupportedProtocolVersion => 0x84,
-            Self::ClientIdentifierNotValid => 0x85,
-            Self::BadUserNameOrPassword => 0x86,
-            Self::NotAuthorized => 0x87,
-            Self::ServerUnavailable => 0x88,
-            Self::ServerBusy => 0x89,
-            Self::Banned => 0x8A,
-            Self::ServerShuttingDown => 0x8B,
-            Self::BadAuthenticationMethod => 0x8C,
-            Self::KeepAliveTimeout => 0x8D,
-            Self::SessionTakenOver => 0x8E,
-            Self::TopicFilterInvalid => 0x8F,
-            Self::TopicNameInvalid => 0x90,
-            Self::PacketIdentifierInUse => 0x91,
-            Self::PacketIdentifierNotFound => 0x92,
-            Self::ReceiveMaximumExceeded => 0x93,
-            Self::TopicAliasInvalid => 0x94,
-            Self::PacketTooLarge => 0x95,
-            Self::MessageRateTooHigh => 0x96,
-            Self::QuotaExceeded => 0x97,
-            Self::AdministrativeAction => 0x98,
-            Self::PayloadFormatInvalid => 0x99,
-            Self::RetainNotSupported => 0x9A,
-            Self::QoSNotSupported => 0x9B,
-            Self::UseAnotherServer => 0x9C,
-            Self::ServerMoved => 0x9D,
-            Self::SharedSubscriptionsNotSupported => 0x9E,
-            Self::ConnectionRateExceeded => 0x9F,
-            Self::MaximumConnectTime => 0xA0,
-            Self::SubscriptionIdentifiersNotSupported => 0xA1,
-            Self::WildcardSubscriptionsNotSupported => 0xA2,
-        }
+    #[must_use]
+    pub const fn value(self) -> u8 {
+        self as u8
     }
 
     /// Returns whether the reason code is successful.
     /// This is the case if the reason code's numeric value is less than 0x80.
+    #[must_use]
     pub const fn is_success(&self) -> bool {
         self.value() < 0x80
     }
 
     /// Returns whether the reason code indicates an error.
     /// This is the case if the reason code's numeric value is greater than or equal to 0x80.
+    #[must_use]
     pub const fn is_erroneous(&self) -> bool {
         self.value() >= 0x80
     }

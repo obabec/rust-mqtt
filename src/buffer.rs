@@ -1,11 +1,12 @@
 //! Contains the trait the client uses to store slices of memory and basic implementations.
 
-use crate::bytes::Bytes;
-
 #[cfg(feature = "alloc")]
 pub use alloc::AllocBuffer;
+
 #[cfg(feature = "bump")]
 pub use bump::{BumpBuffer, InsufficientSpace};
+
+use crate::bytes::Bytes;
 
 /// A trait to describe anything that can allocate memory.
 ///
@@ -23,6 +24,10 @@ pub trait BufferProvider<'a> {
     type ProvisionError: core::fmt::Debug;
 
     /// If successful, returns contiguous memory with a size in bytes of the `len` argument.
+    ///
+    /// # Errors
+    ///
+    /// Returns a value of its associated error type if the buffer provision fails.
     fn provide_buffer(&mut self, len: usize) -> Result<Self::Buffer, Self::ProvisionError>;
 }
 
@@ -82,6 +87,7 @@ mod bump {
 
     impl<'a> BumpBuffer<'a> {
         /// Creates a new [`BumpBuffer`] with the provided slice as underlying buffer.
+        #[must_use]
         pub fn new(slice: &'a mut [u8]) -> Self {
             Self {
                 ptr: slice.as_mut_ptr(),
@@ -93,6 +99,7 @@ mod bump {
 
         /// Returns the remaining amount of unallocated bytes in the underlying buffer.
         #[inline]
+        #[must_use]
         pub fn remaining_len(&self) -> usize {
             self.len - self.index
         }
@@ -243,10 +250,8 @@ mod bump {
 
 #[cfg(feature = "alloc")]
 mod alloc {
+    use alloc::{boxed::Box, vec};
     use core::convert::Infallible;
-
-    use alloc::boxed::Box;
-    use alloc::vec;
 
     use crate::buffer::BufferProvider;
 
@@ -269,8 +274,9 @@ mod alloc {
 
     #[cfg(test)]
     mod unit {
-        use crate::buffer::{BufferProvider, alloc::AllocBuffer};
         use tokio_test::assert_ok;
+
+        use crate::buffer::{BufferProvider, alloc::AllocBuffer};
 
         #[test]
         fn provide_buffer() {

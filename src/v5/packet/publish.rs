@@ -5,7 +5,7 @@ use crate::{
     bytes::Bytes,
     client::options::TopicReference,
     eio::{Read, Write},
-    fmt::{error, trace},
+    fmt::{error, trace, verbose},
     header::{FixedHeader, PacketType},
     io::{
         read::{BodyReader, Readable, Store},
@@ -44,8 +44,8 @@ pub struct PublishPacket<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     pub message: Bytes<'p>,
 }
 
-impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> Packet
-    for PublishPacket<'p, MAX_SUBSCRIPTION_IDENTIFIERS>
+impl<const MAX_SUBSCRIPTION_IDENTIFIERS: usize> Packet
+    for PublishPacket<'_, MAX_SUBSCRIPTION_IDENTIFIERS>
 {
     const PACKET_TYPE: PacketType = PacketType::Publish;
 }
@@ -56,18 +56,18 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
         header: &FixedHeader,
         mut reader: BodyReader<'_, 'p, R, B>,
     ) -> Result<Self, RxError<R::Error, B::ProvisionError>> {
-        trace!("decoding");
+        trace!("decoding PUBLISH packet");
 
         let flags = header.flags();
 
-        trace!("decoding flags");
+        verbose!("decoding PUBLISH flags");
         let dup = flags >> 3 == 1;
         let qos = QoS::try_from_bits((flags >> 1) & 0x03).ok_or(RxError::MalformedPacket)?;
         let retain = flags & 0x01 == 1;
 
         let r = &mut reader;
 
-        trace!("reading topic name");
+        verbose!("reading topic name field");
         let topic_name = MqttString::read(r).await?;
 
         let topic_name = if topic_name.is_empty() {
@@ -79,18 +79,18 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
         let identified_qos = match qos {
             QoS::AtMostOnce => IdentifiedQoS::AtMostOnce,
             QoS::AtLeastOnce => {
-                trace!("reading packet identifier");
+                verbose!("reading packet identifier field");
                 IdentifiedQoS::AtLeastOnce(PacketIdentifier::read(r).await?)
             }
             QoS::ExactlyOnce => {
-                trace!("reading packet identifier");
+                verbose!("reading packet identifier field");
                 IdentifiedQoS::ExactlyOnce(PacketIdentifier::read(r).await?)
             }
         };
 
-        trace!("reading properties length");
+        verbose!("reading property length field");
         let mut properties_length = VarByteInt::read(r).await?.size();
-        trace!("properties length = {}", properties_length);
+        verbose!("property length: {} bytes", properties_length);
 
         let mut payload_format_indicator: Option<PayloadFormatIndicator> = None;
         let mut message_expiry_interval: Option<MessageExpiryInterval> = None;
@@ -101,8 +101,8 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
         let mut content_type: Option<ContentType<'_>> = None;
 
         while properties_length > 0 {
-            trace!(
-                "reading property type with remaining len = {}",
+            verbose!(
+                "reading property identifier (remaining length: {} bytes)",
                 r.remaining_len()
             );
             let property_type = PropertyType::read(r).await?;
@@ -110,8 +110,8 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
                 .checked_sub(property_type.written_len())
                 .ok_or(RxError::MalformedPacket)?;
 
-            trace!(
-                "reading property body of {:?} with remaining len = {}",
+            verbose!(
+                "reading {:?} property body (remaining length: {} bytes)",
                 property_type,
                 r.remaining_len()
             );
@@ -173,10 +173,10 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
                 }
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
-                    error!("packet contains unexpected property {:?}", p);
+                    error!("invalid PUBLISH property: {:?}", p);
                     return Err(RxError::MalformedPacket);
                 }
-            };
+            }
         }
 
         let topic = match (topic_name, topic_alias) {
@@ -188,7 +188,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
 
         let message_len = r.remaining_len();
 
-        trace!("reading message ({} bytes)", message_len);
+        verbose!("reading PUBLISH payload ({} bytes)", message_len);
 
         let message = r.read_and_store(r.remaining_len()).await?;
 
@@ -207,8 +207,8 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
         })
     }
 }
-impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
-    for PublishPacket<'p, MAX_SUBSCRIPTION_IDENTIFIERS>
+impl<const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
+    for PublishPacket<'_, MAX_SUBSCRIPTION_IDENTIFIERS>
 {
     fn remaining_len(&self) -> VarByteInt {
         // Safety: PUBLISH packets that are too long to encode cannot be created
@@ -226,13 +226,12 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> TxPacket
         self.topic
             .topic_name()
             .map(TopicName::as_borrowed)
-            .map(Into::into)
-            .unwrap_or(Self::EMPTY_TOPIC)
+            .map_or(Self::EMPTY_TOPIC, Into::into)
             .write(write)
             .await?;
 
         if let Some(p) = self.identified_qos.packet_identifier() {
-            p.write(write).await?
+            p.write(write).await?;
         }
 
         self.properties_length().write(write).await?;
@@ -292,8 +291,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize>
             .topic
             .topic_name()
             .map(TopicName::as_borrowed)
-            .map(Into::into)
-            .unwrap_or(Self::EMPTY_TOPIC)
+            .map_or(Self::EMPTY_TOPIC, Into::into)
             .written_len();
 
         let variable_header_length = topic_name_length

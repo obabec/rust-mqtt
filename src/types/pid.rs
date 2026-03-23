@@ -1,11 +1,13 @@
-use core::fmt;
 use core::num::NonZero;
 
-use crate::eio::{Read, Write};
-
-use crate::io::err::{ReadError, WriteError};
-use crate::io::read::Readable;
-use crate::io::write::{Writable, wlen};
+use crate::{
+    eio::{Read, Write},
+    io::{
+        err::{ReadError, WriteError},
+        read::Readable,
+        write::{Writable, wlen},
+    },
+};
 
 /// A simple wrapper around [`NonZero`]<[`u16`]>.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -19,12 +21,11 @@ impl PacketIdentifier {
     }
 
     pub(crate) fn next(self) -> Self {
-        NonZero::new(self.0.get().wrapping_add(1))
-            .map(Self)
-            .unwrap_or(Self::ONE)
+        NonZero::new(self.0.get().wrapping_add(1)).map_or(Self::ONE, Self)
     }
 
     /// Returns the underlying value.
+    #[must_use]
     pub const fn get(self) -> NonZero<u16> {
         self.0
     }
@@ -34,14 +35,14 @@ impl PacketIdentifier {
     }
 }
 
-impl fmt::Debug for PacketIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl core::fmt::Debug for PacketIdentifier {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         self.get().fmt(f)
     }
 }
-impl fmt::Display for PacketIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+impl core::fmt::Display for PacketIdentifier {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{self:?}")
     }
 }
 

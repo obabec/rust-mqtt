@@ -58,6 +58,7 @@ pub struct Options<'c> {
 impl<'c> Options<'c> {
     /// Creates options with values coherent to the [`Default`] implementations of the fields and
     /// [`QoS::AtMostOnce`].
+    #[must_use]
     pub const fn new(topic: TopicName<'c>, message: MqttBinary<'c>) -> Options<'c> {
         Options {
             will_qos: QoS::AtMostOnce,
@@ -74,53 +75,63 @@ impl<'c> Options<'c> {
     }
 
     /// Sets the Quality of Service level.
+    #[must_use]
     pub const fn qos(mut self, qos: QoS) -> Self {
         self.will_qos = qos;
         self
     }
     /// Sets the Quality of Service level to 1 (At Least Once).
+    #[must_use]
     pub const fn at_least_once(self) -> Self {
         self.qos(QoS::AtLeastOnce)
     }
     /// Sets the Quality of Service level to 1 (Exactly Once).
+    #[must_use]
     pub const fn exactly_once(self) -> Self {
         self.qos(QoS::ExactlyOnce)
     }
     /// Sets the retain flag in the will message to true.
+    #[must_use]
     pub const fn retain(mut self) -> Self {
         self.will_retain = true;
         self
     }
     /// Sets the delay in seconds after which the will message is published.
+    #[must_use]
     pub const fn delay_interval(mut self, delay_interval: u32) -> Self {
         self.will_delay_interval = delay_interval;
         self
     }
     /// Sets the payload format indicator property to true thus marking the payload of the will message.
     /// as valid UTF-8.
+    #[must_use]
     pub const fn payload_format_indicator(mut self, is_payload_utf8: bool) -> Self {
         self.payload_format_indicator = Some(is_payload_utf8);
         self
     }
     /// Sets the message expiry interval in seconds of the will message.
+    #[must_use]
     pub const fn message_expiry_interval(mut self, message_expiry_interval: u32) -> Self {
         self.message_expiry_interval = Some(message_expiry_interval);
         self
     }
     /// Sets a custom content type of the will message.
     #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
     pub const fn content_type(mut self, content_type: MqttString<'c>) -> Self {
         self.content_type = Some(content_type);
         self
     }
     /// Marks the will message as a request by setting the response topic property.
     #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
     pub const fn response_topic(mut self, response_topic: TopicName<'c>) -> Self {
         self.response_topic = Some(response_topic);
         self
     }
     /// Sets the correlation data property in the request.
     #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
     pub const fn correlation_data(mut self, correlation_data: MqttBinary<'c>) -> Self {
         self.correlation_data = Some(correlation_data);
         self

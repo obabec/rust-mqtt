@@ -2,7 +2,7 @@ use crate::{
     buffer::BufferProvider,
     config::{MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
     eio::Read,
-    fmt::{error, trace},
+    fmt::{error, trace, verbose},
     header::{FixedHeader, PacketType},
     io::read::{BodyReader, Readable},
     packet::{Packet, RxError, RxPacket},
@@ -40,7 +40,7 @@ pub struct ConnackPacket<'p> {
     pub authentication_data: Option<AuthenticationData<'p>>,
 }
 
-impl<'p> Packet for ConnackPacket<'p> {
+impl Packet for ConnackPacket<'_> {
     const PACKET_TYPE: PacketType = PacketType::Connack;
 }
 impl<'p> RxPacket<'p> for ConnackPacket<'p> {
@@ -48,18 +48,18 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
         header: &FixedHeader,
         mut reader: BodyReader<'_, 'p, R, B>,
     ) -> Result<Self, RxError<R::Error, B::ProvisionError>> {
-        trace!("decoding");
+        trace!("decoding CONNACK packet");
 
         if header.flags() != 0 {
-            error!("flags are not 0");
+            error!("invalid CONNACK fixed header flags: {}", header.flags());
             return Err(RxError::MalformedPacket);
         }
         let r = &mut reader;
 
-        trace!("reading connack flags");
+        verbose!("reading CONNACK flags field");
         let connack_flags = u8::read(r).await?;
 
-        trace!("reading connect reason code");
+        verbose!("reading reason code field");
         let connect_reason_code = ReasonCode::read(r).await?;
         if !matches!(
             connect_reason_code,
@@ -86,13 +86,13 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
                 | ReasonCode::ServerMoved
                 | ReasonCode::ConnectionRateExceeded
         ) {
-            error!("invalid reason code: {:?}", connect_reason_code);
+            error!("invalid CONNACK reason code: {:?}", connect_reason_code);
             return Err(RxError::ProtocolError);
         }
 
         // first 7 bits have to be set to 0
         if connack_flags & 0xFE > 0 {
-            error!("invalid connack flags");
+            error!("invalid CONNACK variable header flags: {}", connack_flags);
             return Err(RxError::ProtocolError);
         }
 
@@ -118,25 +118,25 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
             authentication_data: None,
         };
 
-        trace!("reading properties length");
+        verbose!("reading property length field");
         let properties_length = VarByteInt::read(r).await?.size();
 
-        trace!("properties length = {}", properties_length);
+        verbose!("property length: {} bytes", properties_length);
 
         if r.remaining_len() != properties_length {
-            error!("properties length is not equal to remaining packet length");
+            error!("invalid CONNACK property length for remaining packet length");
             return Err(RxError::MalformedPacket);
         }
 
         while r.remaining_len() > 0 {
-            trace!(
-                "reading property type with remaining len = {}",
+            verbose!(
+                "reading property identifier (remaining length: {} bytes)",
                 r.remaining_len()
             );
             let property_type = PropertyType::read(r).await?;
 
-            trace!(
-                "reading property body of {:?} with remaining len = {}",
+            verbose!(
+                "reading {:?} property body (remaining length: {} bytes)",
                 property_type,
                 r.remaining_len()
             );
@@ -166,7 +166,7 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
                 },
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
-                    error!("packet contains unexpected property {:?}", p);
+                    error!("invalid CONNACK property: {:?}", p);
                     return Err(RxError::MalformedPacket)
                 },
             };

@@ -25,7 +25,7 @@ pub enum KeepAlive {
 }
 
 impl KeepAlive {
-    pub(crate) fn as_u16(&self) -> u16 {
+    pub(crate) fn as_u16(self) -> u16 {
         match self {
             KeepAlive::Infinite => 0,
             KeepAlive::Seconds(s) => s.get(),
@@ -62,7 +62,7 @@ pub enum MaximumPacketSize {
 }
 
 impl MaximumPacketSize {
-    pub(crate) fn as_u32(&self) -> u32 {
+    pub(crate) fn as_u32(self) -> u32 {
         match self {
             Self::Unlimited => u32::MAX,
             Self::Limit(l) => l.get(),
