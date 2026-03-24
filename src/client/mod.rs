@@ -430,6 +430,8 @@ impl<
 
             self.raw.close_with(None);
 
+            info!("disconnected from server");
+
             Err(MqttError::Disconnect {
                 reason: reason_code,
                 reason_string: reason_string.map(Property::into_inner),
@@ -987,6 +989,7 @@ impl<
                 if Self::remove_packet_identifier_if_exists(&mut self.pending_suback, pid) {
                     // We only send SUBSCRIBE packets with exactly 1 topic
                     if suback.reason_codes.len() != 1 {
+                        error!("received mismatched SUBACK");
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
                     }
@@ -1012,6 +1015,7 @@ impl<
                 if Self::remove_packet_identifier_if_exists(&mut self.pending_unsuback, pid) {
                     // We only send UNSUBSCRIBE packets with exactly 1 topic
                     if unsuback.reason_codes.len() != 1 {
+                        error!("received mismatched UNSUBACK");
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
                     }
@@ -1035,6 +1039,7 @@ impl<
 
                 // Our topic alias maximum is always 0, the moment we receive a topic alias, this is an error.
                 let TopicReference::Name(topic) = publish.topic else {
+                    error!("received disallowed topic alias");
                     self.raw.close_with(Some(ReasonCode::TopicAliasInvalid));
                     return Err(MqttError::Server);
                 };
@@ -1152,6 +1157,7 @@ impl<
                         // removing a cpublish frees space to add a new in flight entry.
                         unsafe { self.session.r#await(pid, s) };
 
+                        error!("received mismatched PUBACK");
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
                     }
@@ -1212,6 +1218,7 @@ impl<
                         // removing a cpublish frees space to add a new in flight entry.
                         unsafe { self.session.r#await(pid, s) };
 
+                        error!("received mismatched PUBREC");
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
                     }
@@ -1314,6 +1321,7 @@ impl<
                         // removing a cpublish frees space to add a new in flight entry.
                         unsafe { self.session.r#await(pid, s) };
 
+                        error!("received mismatched PUBCOMP");
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
                     }

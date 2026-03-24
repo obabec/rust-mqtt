@@ -7,11 +7,12 @@ mod net;
 pub(crate) use err::Error as RawError;
 pub(crate) use net::Error as NetStateError;
 
+#[cfg(debug_assertions)]
+use crate::fmt::unreachable;
 use crate::{
     buffer::BufferProvider,
     client::raw::{header::HeaderState, net::NetState},
-    eio::{Error, ErrorKind},
-    fmt::{debug_assert, unreachable},
+    fmt::{debug, debug_assert, error, warn},
     header::FixedHeader,
     io::{Transport, err::WriteError, read::BodyReader},
     packet::{RxError, RxPacket, TxError, TxPacket},
@@ -56,7 +57,8 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
         match reason_code {
             Some(r) => self.n.fail(r),
             None => {
-                self.n.terminate();
+                drop(self.n.terminate());
+                debug!("closed network connection");
             }
         }
     }
@@ -70,25 +72,30 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
             "Network must not be in Ok() state to disconnect due to an error."
         );
 
-        let r = self.n.get_reason_code();
-        let mut n = self.n.terminate();
+        match &mut self.n {
+            NetState::Faulted(n, r) => {
+                let packet = DisconnectPacket::new(*r);
 
-        match (&mut n, r) {
-            (Some(n), Some(r)) => {
-                let packet = DisconnectPacket::new(r);
+                debug!("sending DISCONNECT packet with reason code: {:?}", r);
 
                 // Don't check whether length exceeds servers maximum packet size because we don't
                 // add a reason string to the DISCONNECT packet -> length is always in the 4..=6 range in bytes.
                 // The server really shouldn't reject this.
-                packet.send(n).await.map_err(|e| match e {
-                    TxError::Write(e) => RawError::Network(Error::kind(&e)),
-                    TxError::WriteZero => RawError::Network(ErrorKind::WriteZero),
-                })
+                let r = packet
+                    .send(n)
+                    .await
+                    .map_err(Into::into)
+                    .inspect_err(|e| error!("I/O error during send: {:?}", e));
+
+                self.close_with(None);
+
+                r
             }
-            (None, Some(_)) => unreachable!(
-                "Netstate never contains a reason code when terminated and therefore not holding a network connection"
-            ),
-            (_, _) => Ok(()),
+            NetState::Ok(_) => {
+                self.close_with(None);
+                Ok(())
+            }
+            NetState::Terminated => Ok(()),
         }
     }
 
@@ -98,12 +105,23 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
     ) -> RawError<B::ProvisionError> {
         let (e, r) = e.into();
 
-        match r {
-            Some(r) => self.n.fail(r),
-            None => {
-                self.n.terminate();
+        match e {
+            RawError::Network(ref e) => error!("I/O error during receive: {:?}", e),
+            RawError::Disconnected => {
+                #[cfg(debug_assertions)]
+                unreachable!(
+                    "only instantiated from `NetStateError` which is not handled with `handle_rx` and logged separately"
+                );
+                #[cfg(not(debug_assertions))]
+                error!(
+                    "unreachable: only instantiated from `NetStateError` which is not handled with `handle_rx` and logged separately"
+                );
             }
+            RawError::Alloc(ref e) => error!("buffer provision failed: {:?}", e),
+            RawError::Server => error!("server protocol violation"),
         }
+
+        self.close_with(r);
 
         e
     }
@@ -111,15 +129,51 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
         &mut self,
         e: E,
     ) -> RawError<B::ProvisionError> {
-        // Terminate right away because if send fails, sending another (DISCONNECT) packet doesn't make sense
-        self.n.terminate();
+        let e = e.into();
 
-        e.into()
+        match e {
+            RawError::Network(ref e) => error!("I/O error during send: {:?}", e),
+            RawError::Disconnected => {
+                #[cfg(debug_assertions)]
+                unreachable!(
+                    "only instantiated from `NetStateError` which is not handled with `handle_tx` and logged separately"
+                );
+                #[cfg(not(debug_assertions))]
+                error!(
+                    "unreachable: only instantiated from `NetStateError` which is not handled with `handle_tx` and logged separately"
+                );
+            }
+            RawError::Alloc(_) => {
+                #[cfg(debug_assertions)]
+                unreachable!("writing cannot trigger allocation");
+                #[cfg(not(debug_assertions))]
+                error!("unreachable: writing cannot trigger allocation");
+            }
+            RawError::Server => {
+                #[cfg(debug_assertions)]
+                unreachable!("server error cannot be caused by sending");
+                #[cfg(not(debug_assertions))]
+                error!("unreachable: server error cannot be caused by sending");
+            }
+        }
+
+        // Terminate right away because if send fails, sending another (DISCONNECT) packet doesn't make sense
+        drop(self.n.terminate());
+        debug!("closed network connection");
+
+        e
     }
 
     /// Cancel-safe method to receive the fixed header of a packet
     pub async fn recv_header(&mut self) -> Result<FixedHeader, RawError<B::ProvisionError>> {
-        let net = self.n.get()?;
+        let net = self.n.get().inspect_err(|e| match e {
+            NetStateError::Faulted => {
+                warn!("attempted to receive from a faulted mqtt connection")
+            }
+            NetStateError::Terminated => {
+                warn!("attempted to receive from a closed network connection")
+            }
+        })?;
 
         loop {
             match self.header.update(net).await {
@@ -141,7 +195,12 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
         &mut self,
         header: &FixedHeader,
     ) -> Result<P, RawError<B::ProvisionError>> {
-        let net = self.n.get()?;
+        let net = self.n.get().inspect_err(|e| match e {
+            NetStateError::Faulted => warn!("attempted to receive from a faulted mqtt connection"),
+            NetStateError::Terminated => {
+                warn!("attempted to receive from a closed network connection")
+            }
+        })?;
         let reader = BodyReader::new(net, self.buf, header.remaining_len.size());
 
         P::receive(header, reader)
@@ -167,14 +226,21 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
         &mut self,
         packet: &P,
     ) -> Result<(), RawError<B::ProvisionError>> {
-        let net = self.n.get()?;
-
+        let net = self.n.get().inspect_err(|e| match e {
+            NetStateError::Faulted => warn!("attempted to send on a faulted mqtt connection"),
+            NetStateError::Terminated => warn!("attempted to send on a closed network connection"),
+        })?;
         packet.send(net).await.map_err(|e| self.handle_tx(e))
     }
 
     /// Cancel-safe if `N::flush()` is cancel-safe
     pub async fn flush(&mut self) -> Result<(), RawError<B::ProvisionError>> {
-        self.n.get()?.flush().await.map_err(|e| {
+        let net = self.n.get().inspect_err(|e| match e {
+            NetStateError::Faulted => warn!("attempted to flush a faulted mqtt connection"),
+            NetStateError::Terminated => warn!("attempted to flush a closed network connection"),
+        })?;
+
+        net.flush().await.map_err(|e| {
             let e: WriteError<_> = e.into();
             let e: TxError<_> = e.into();
             self.handle_tx(e)

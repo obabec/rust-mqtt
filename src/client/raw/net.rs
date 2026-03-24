@@ -43,13 +43,6 @@ impl<N: Transport> NetState<N> {
             Self::Terminated => Err(Error::Terminated),
         }
     }
-    pub fn get_reason_code(&mut self) -> Option<ReasonCode> {
-        match self {
-            Self::Ok(_) => None,
-            Self::Faulted(_, r) => Some(*r),
-            Self::Terminated => None,
-        }
-    }
 
     pub fn fail(&mut self, reason_code: ReasonCode) {
         *self = match mem::take(self) {
