@@ -5,7 +5,7 @@ use heapless::Vec;
 use crate::{
     buffer::BufferProvider,
     eio::Read,
-    fmt::{error, trace, verbose},
+    fmt::{trace, verbose},
     header::{FixedHeader, PacketType},
     io::{
         read::{BodyReader, Readable},
@@ -51,7 +51,7 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
         trace!("decoding {:?} packet", T::PACKET_TYPE);
 
         if header.flags() != 0 {
-            error!(
+            trace!(
                 "invalid {:?} fixed header flags: {}",
                 T::PACKET_TYPE,
                 header.flags()
@@ -69,14 +69,14 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
         verbose!("property length: {} bytes", properties_length);
 
         if properties_length > r.remaining_len() {
-            error!(
+            trace!(
                 "invalid {:?} property length for remaining packet length",
                 T::PACKET_TYPE
             );
             return Err(RxError::MalformedPacket);
         }
         if properties_length == r.remaining_len() {
-            error!("{:?} packet does not contain a reason code", T::PACKET_TYPE);
+            trace!("{:?} packet does not contain a reason code", T::PACKET_TYPE);
             return Err(RxError::ProtocolError);
         }
 
@@ -120,7 +120,7 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
                 },
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
-                    error!("invalid {:?} property: {:?}", T::PACKET_TYPE, p);
+                    trace!("invalid {:?} property: {:?}", T::PACKET_TYPE, p);
                     return Err(RxError::MalformedPacket)
                 },
             };
@@ -134,7 +134,7 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
             let reason_code = ReasonCode::read(r).await?;
 
             if !T::reason_code_allowed(reason_code) {
-                error!(
+                trace!(
                     "invalid {:?} reason code: {:?}",
                     T::PACKET_TYPE,
                     reason_code

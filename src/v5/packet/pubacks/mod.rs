@@ -7,7 +7,7 @@ use core::marker::PhantomData;
 use crate::{
     buffer::BufferProvider,
     eio::{Read, Write},
-    fmt::{error, trace, verbose},
+    fmt::{trace, verbose},
     header::{FixedHeader, PacketType},
     io::{
         read::{BodyReader, Readable},
@@ -49,7 +49,7 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
         trace!("decoding {:?} packet", T::PACKET_TYPE);
 
         if header.flags() != T::FLAGS {
-            error!(
+            trace!(
                 "invalid {:?} fixed header flags: {}",
                 T::PACKET_TYPE,
                 header.flags()
@@ -68,7 +68,7 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
             verbose!("reading reason code field");
             let c = ReasonCode::read(r).await?;
             if !T::reason_code_allowed(c) {
-                error!("invalid {:?} reason code: {:?}", T::PACKET_TYPE, c);
+                trace!("invalid {:?} reason code: {:?}", T::PACKET_TYPE, c);
                 return Err(RxError::ProtocolError);
             }
             c
@@ -86,7 +86,7 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
         verbose!("property length: {} bytes", properties_length);
 
         if r.remaining_len() != properties_length {
-            error!(
+            trace!(
                 "invalid {:?} property length for remaining packet length",
                 T::PACKET_TYPE
             );
@@ -124,7 +124,7 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
                 },
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
-                    error!("invalid packet {:?} property: {:?}", T::PACKET_TYPE, p);
+                    trace!("invalid packet {:?} property: {:?}", T::PACKET_TYPE, p);
                     return Err(RxError::MalformedPacket)
                 },
             };

@@ -5,7 +5,7 @@ use crate::{
     bytes::Bytes,
     client::options::TopicReference,
     eio::{Read, Write},
-    fmt::{error, trace, verbose},
+    fmt::{trace, verbose},
     header::{FixedHeader, PacketType},
     io::{
         read::{BodyReader, Readable, Store},
@@ -175,7 +175,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> RxPacket<'p>
                 }
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
-                    error!("invalid PUBLISH property: {:?}", p);
+                    trace!("invalid PUBLISH property: {:?}", p);
                     return Err(RxError::MalformedPacket);
                 }
             }

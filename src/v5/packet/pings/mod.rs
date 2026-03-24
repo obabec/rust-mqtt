@@ -3,7 +3,7 @@ use core::marker::PhantomData;
 use crate::{
     buffer::BufferProvider,
     eio::{Read, Write},
-    fmt::{error, trace},
+    fmt::trace,
     header::{FixedHeader, PacketType},
     io::{read::BodyReader, write::Writable},
     packet::{Packet, RxError, RxPacket, TxError, TxPacket},
@@ -37,7 +37,7 @@ impl<'p, T: PingPacketType> RxPacket<'p> for GenericPingPacket<T> {
                 phantom_data: PhantomData,
             })
         } else {
-            error!(
+            trace!(
                 "invalid {:?} fixed header flags: {}",
                 T::PACKET_TYPE,
                 header.flags()
