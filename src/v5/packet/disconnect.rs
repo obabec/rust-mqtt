@@ -131,8 +131,10 @@ impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
                 PropertyType::ServerReference => packet.server_reference.try_set(r).await?,
                 PropertyType::UserProperty => {
                     let len = u16::read(r).await? as usize;
+                    verbose!("skipping user property name ({} bytes)", len);
                     r.skip(len).await?;
                     let len = u16::read(r).await? as usize;
+                    verbose!("skipping user property value ({} bytes)", len);
                     r.skip(len).await?;
                 },
                 // Protocol error according to [MQTT-3.14.2-2]

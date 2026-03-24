@@ -17,7 +17,7 @@ use crate::{
     types::{PacketIdentifier, ReasonCode, VarByteInt},
     v5::{
         packet::pubacks::types::{Ack, Comp, PubackPacketType, Rec, Rel},
-        property::{AtMostOnceProperty, PropertyType, ReasonString},
+        property::PropertyType,
     },
 };
 
@@ -33,8 +33,9 @@ pub type PubcompPacket<'p> = GenericPubackPacket<'p, Comp>;
 pub struct GenericPubackPacket<'p, T: PubackPacketType> {
     pub packet_identifier: PacketIdentifier,
     pub reason_code: ReasonCode,
-    pub reason_string: Option<ReasonString<'p>>,
-    _phantom_data: PhantomData<T>,
+    // reason string is currently unused and does not have to be read into memory.
+    // reason_string: Option<ReasonString<'p>>,
+    _phantom_data: PhantomData<&'p T>,
 }
 
 impl<T: PubackPacketType> Packet for GenericPubackPacket<'_, T> {
@@ -73,7 +74,7 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
             c
         };
 
-        let mut reason_string = None;
+        let mut seen_reason_string = false;
 
         let properties_length = if header.remaining_len.value() < 4 {
             0
@@ -106,11 +107,19 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
             );
             #[rustfmt::skip]
             match property_type {
-                PropertyType::ReasonString => reason_string.try_set(r).await?,
+                PropertyType::ReasonString if seen_reason_string => return Err(RxError::ProtocolError),
+                PropertyType::ReasonString => {
+                    seen_reason_string = true;
+                    let len = u16::read(r).await? as usize;
+                    verbose!("skipping reason string ({} bytes)", len);
+                    r.skip(len).await?;
+                },
                 PropertyType::UserProperty => {
                     let len = u16::read(r).await? as usize;
+                    verbose!("skipping user property name ({} bytes)", len);
                     r.skip(len).await?;
                     let len = u16::read(r).await? as usize;
+                    verbose!("skipping user property value ({} bytes)", len);
                     r.skip(len).await?;
                 },
                 p => {
@@ -124,7 +133,6 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
         Ok(Self {
             packet_identifier,
             reason_code,
-            reason_string,
             _phantom_data: PhantomData,
         })
     }
@@ -152,17 +160,24 @@ impl<T: PubackPacketType> TxPacket for GenericPubackPacket<'_, T> {
 
         self.packet_identifier.write(write).await?;
         self.reason_code.write(write).await?;
-        match &self.reason_string {
-            // Invariant: reason string length 65537 < VarByteInt::MAX_ENCODABLE
-            Some(r) => {
-                VarByteInt::new_unchecked(r.written_len() as u32)
-                    .write(write)
-                    .await?;
-                r.write(write).await?;
-            }
-            // Invariant: 0 < VarByteInt::MAX_ENCODABLE
-            None => VarByteInt::new_unchecked(0).write(write).await?,
-        }
+
+        // FIXME(reason string)
+        // match &self.reason_string {
+        //     // Invariant: reason string length 65537 < VarByteInt::MAX_ENCODABLE
+        //     Some(r) => {
+        //         VarByteInt::new_unchecked(r.written_len() as u32)
+        //             .write(write)
+        //             .await?;
+        //         r.write(write).await?;
+        //     }
+        //     // Invariant: 0 < VarByteInt::MAX_ENCODABLE
+        //     None => VarByteInt::new_unchecked(0).write(write).await?,
+        // }
+
+        // FIXME(reason string)
+        // write empty property length
+        // Invariant: 0 < VarByteInt::MAX_ENCODABLE
+        VarByteInt::new_unchecked(0).write(write).await?;
 
         Ok(())
     }
@@ -173,16 +188,16 @@ impl<T: PubackPacketType> GenericPubackPacket<'_, T> {
         Self {
             packet_identifier,
             reason_code,
-            reason_string: None,
             _phantom_data: PhantomData,
         }
     }
 
     fn properties_length(&self) -> VarByteInt {
-        let len = self.reason_string.written_len();
-
         // Invariant: Max length of reason string is 65538 < VarByteInt::MAX_ENCODABLE
-        VarByteInt::new_unchecked(len as u32)
+        // VarByteInt::new_unchecked(len as u32)
+
+        // Invariant: Max length = 0 < VarByteInt::MAX_ENCODABLE
+        VarByteInt::new_unchecked(0)
     }
 }
 
@@ -193,8 +208,8 @@ mod unit {
 
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{MqttString, PacketIdentifier, ReasonCode},
-            v5::{packet::PubackPacket, property::ReasonString},
+            types::{PacketIdentifier, ReasonCode},
+            v5::packet::PubackPacket,
         };
 
         #[tokio::test]
@@ -224,7 +239,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(9769).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::NoMatchingSubscribers);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -237,7 +252,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(29017).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::UnspecifiedError);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -250,7 +265,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(35125).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -274,10 +289,10 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(4660).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::PayloadFormatInvalid);
-            assert_eq!(
-                packet.reason_string,
-                Some(ReasonString(MqttString::try_from("test reason").unwrap()))
-            );
+            // assert_eq!(
+            //     packet.reason_string,
+            //     Some(ReasonString(MqttString::try_from("test reason").unwrap()))
+            // );
         }
     }
 
@@ -286,8 +301,8 @@ mod unit {
 
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{MqttString, PacketIdentifier, ReasonCode},
-            v5::{packet::PubrecPacket, property::ReasonString},
+            types::{PacketIdentifier, ReasonCode},
+            v5::packet::PubrecPacket,
         };
 
         #[tokio::test]
@@ -317,7 +332,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(9876).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierInUse);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -330,7 +345,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(17865).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::ImplementationSpecificError);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -343,7 +358,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(23487).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -370,10 +385,10 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(9786).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::TopicNameInvalid);
-            assert_eq!(
-                packet.reason_string,
-                Some(ReasonString(MqttString::try_from("test reason").unwrap()))
-            );
+            // assert_eq!(
+            //     packet.reason_string,
+            //     Some(ReasonString(MqttString::try_from("test reason").unwrap()))
+            // );
         }
     }
 
@@ -382,8 +397,8 @@ mod unit {
 
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{MqttString, PacketIdentifier, ReasonCode},
-            v5::{packet::PubrelPacket, property::ReasonString},
+            types::{PacketIdentifier, ReasonCode},
+            v5::packet::PubrelPacket,
         };
 
         #[tokio::test]
@@ -413,7 +428,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(9876).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -426,7 +441,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(17865).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierNotFound);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -439,7 +454,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(23487).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -473,10 +488,10 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(9786).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierNotFound);
-            assert_eq!(
-                packet.reason_string,
-                Some(ReasonString(MqttString::try_from("test reason").unwrap()))
-            );
+            // assert_eq!(
+            //     packet.reason_string,
+            //     Some(ReasonString(MqttString::try_from("test reason").unwrap()))
+            // );
         }
     }
 
@@ -485,8 +500,8 @@ mod unit {
 
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{MqttString, PacketIdentifier, ReasonCode},
-            v5::{packet::PubcompPacket, property::ReasonString},
+            types::{PacketIdentifier, ReasonCode},
+            v5::packet::PubcompPacket,
         };
 
         #[tokio::test]
@@ -516,7 +531,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(9876).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -529,7 +544,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(17865).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierNotFound);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -542,7 +557,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(23487).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
-            assert!(packet.reason_string.is_none());
+            // assert!(packet.reason_string.is_none());
         }
 
         #[tokio::test]
@@ -570,10 +585,10 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(9786).unwrap())
             );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierNotFound);
-            assert_eq!(
-                packet.reason_string,
-                Some(ReasonString(MqttString::try_from("test reason").unwrap()))
-            );
+            // assert_eq!(
+            //     packet.reason_string,
+            //     Some(ReasonString(MqttString::try_from("test reason").unwrap()))
+            // );
         }
     }
 }

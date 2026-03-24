@@ -182,7 +182,7 @@ impl<'r, 'b, R: Read, B: BufferProvider<'b>> BodyReader<'r, 'b, R, B> {
         self.remaining_len -= len;
         let mut missing = len;
 
-        const CHUNK_SIZE: usize = 16;
+        const CHUNK_SIZE: usize = 64;
         let mut buf = [0; CHUNK_SIZE];
         while missing > 0 {
             let buf = &mut buf[0..min(CHUNK_SIZE, missing)];

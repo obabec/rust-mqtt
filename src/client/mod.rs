@@ -367,8 +367,6 @@ impl<
             server_keep_alive,
             response_information,
             server_reference,
-            authentication_method: _,
-            authentication_data: _,
         } = self.raw.recv_body(&header).await?;
 
         if reason_code.is_success() {
