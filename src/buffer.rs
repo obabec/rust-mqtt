@@ -21,7 +21,11 @@ pub trait BufferProvider<'a> {
     type Buffer: AsMut<[u8]> + Into<Bytes<'a>>;
 
     /// The error type returned from a failed buffer provision.
+    #[cfg(not(feature = "defmt"))]
     type ProvisionError: core::fmt::Debug;
+    /// The error type returned from a failed buffer provision.
+    #[cfg(feature = "defmt")]
+    type ProvisionError: core::fmt::Debug + defmt::Format;
 
     /// If successful, returns contiguous memory with a size in bytes of the `len` argument.
     ///
