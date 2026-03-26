@@ -4,7 +4,7 @@ use crate::{
     buffer::BufferProvider,
     config::SessionExpiryInterval,
     eio::{Read, Write},
-    fmt::{error, trace, verbose},
+    fmt::{trace, verbose},
     header::{FixedHeader, PacketType},
     io::{
         read::{BodyReader, Readable},
@@ -37,7 +37,7 @@ impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
         trace!("decoding DISCONNECT packet");
 
         if header.flags() != 0 {
-            error!("invalid DISCONNECT fixed header flags: {}", header.flags());
+            trace!("invalid DISCONNECT fixed header flags: {}", header.flags());
             return Err(RxError::MalformedPacket);
         }
 
@@ -84,7 +84,7 @@ impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
                 | ReasonCode::SubscriptionIdentifiersNotSupported
                 | ReasonCode::WildcardSubscriptionsNotSupported
         ) {
-            error!(
+            trace!(
                 "invalid DISCONNECT reason code: {:?}",
                 disconnect_reason_code
             );
@@ -109,7 +109,7 @@ impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
         verbose!("property length: {} bytes", properties_length);
 
         if r.remaining_len() != properties_length {
-            error!("invalid DISCONNECT property length for remaining packet length");
+            trace!("invalid DISCONNECT property length for remaining packet length");
             return Err(RxError::MalformedPacket);
         }
 
@@ -141,7 +141,7 @@ impl<'p> RxPacket<'p> for DisconnectPacket<'p> {
                 PropertyType::SessionExpiryInterval => return Err(RxError::ProtocolError),
                 // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
                 p => {
-                    error!("invalid DISCONNECT property: {:?}", p);
+                    trace!("invalid DISCONNECT property: {:?}", p);
                     return Err(RxError::MalformedPacket)
                 },
             };

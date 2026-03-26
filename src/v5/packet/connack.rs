@@ -2,7 +2,7 @@ use crate::{
     buffer::BufferProvider,
     config::{MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
     eio::Read,
-    fmt::{error, trace, verbose},
+    fmt::{trace, verbose},
     header::{FixedHeader, PacketType},
     io::read::{BodyReader, Readable},
     packet::{Packet, RxError, RxPacket},
@@ -53,7 +53,7 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
         trace!("decoding CONNACK packet");
 
         if header.flags() != 0 {
-            error!("invalid CONNACK fixed header flags: {}", header.flags());
+            trace!("invalid CONNACK fixed header flags: {}", header.flags());
             return Err(RxError::MalformedPacket);
         }
         let r = &mut reader;
@@ -88,13 +88,13 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
                 | ReasonCode::ServerMoved
                 | ReasonCode::ConnectionRateExceeded
         ) {
-            error!("invalid CONNACK reason code: {:?}", connect_reason_code);
+            trace!("invalid CONNACK reason code: {:?}", connect_reason_code);
             return Err(RxError::ProtocolError);
         }
 
         // first 7 bits have to be set to 0
         if connack_flags & 0xFE > 0 {
-            error!("invalid CONNACK variable header flags: {}", connack_flags);
+            trace!("invalid CONNACK variable header flags: {}", connack_flags);
             return Err(RxError::ProtocolError);
         }
 
@@ -124,7 +124,7 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
         verbose!("property length: {} bytes", properties_length);
 
         if r.remaining_len() != properties_length {
-            error!("invalid CONNACK property length for remaining packet length");
+            trace!("invalid CONNACK property length for remaining packet length");
             return Err(RxError::MalformedPacket);
         }
 
@@ -183,7 +183,7 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
                 },
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
-                    error!("invalid CONNACK property: {:?}", p);
+                    trace!("invalid CONNACK property: {:?}", p);
                     return Err(RxError::MalformedPacket)
                 },
             };
