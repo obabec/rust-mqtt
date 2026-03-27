@@ -31,18 +31,19 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 - Message expiry interval
 - Topic alias
 - Request/Response
+- Reason String in CONNACK & DISCONNECT packets
 
 ### Currently unsupported MQTT features & limitations
 
 - AUTH packet
-- User properties
+- Properties: Authentication Method, Authentication Data, Request Problem Information, Reason String (PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, UNSUBACK), User Property
 - Subscribing to multiple topics in a single packet
 
 ### Extension plans (more or less by priority)
 
-- Read complete packets with cancel-safe implementation
-- MQTT version 3.1.1
+- More versatile IO model allowing for more cancel-safety
 - Sync implementation
+- MQTT version 3.1.1
 
 ### Feature flags
 
@@ -57,6 +58,8 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
   - `log-verbose`: Enables high-overhead IO traces at the trace log level and enables `log-level-trace`
 
 ## Usage
+
+It is recommended to use a buffering `Write` implementation, as the current IO model makes fragmented `Write::write` calls. The client also calls `Read::read` frequently; if your underlying implementation involves expensive syscalls, consider using a buffering reader as well.
 
 ### Illustrative API example
 
@@ -153,9 +156,9 @@ mosquitto -c .ci/mosquitto-tls.conf -v
 Then you can run the examples with different logging configs and the bump/alloc features:
 
 ```bash
-RUST_LOG=debug cargo run --example demo
+RUST_LOG=info cargo run --example demo
 RUST_LOG=info cargo run --example tls
-RUST_LOG=trace cargo run --example demo --no-default-features --features "v5 log bump"
+RUST_LOG=trace cargo run --example demo --no-default-features --features "v5 log bump log-level-trace"
 ```
 
 ### Tests
@@ -187,9 +190,9 @@ cargo test integration
 It can be helpful to see logging output when running tests.
 
 ```bash
-RUST_LOG=trace cargo test unit --no-default-features --features "v5 bump" -- --show-output
+RUST_LOG=trace cargo test unit --no-default-features --features "v5 bump log-verbose log" -- --show-output
 RUST_LOG=warn cargo test -- --show-output
-RUST_LOG=info cargo test integration -- --show-output
+RUST_LOG=info cargo test integration --features "log" -- --show-output
 ```
 
 The full test suite can run with the alloc feature, just make sure a fresh broker is up and running.
