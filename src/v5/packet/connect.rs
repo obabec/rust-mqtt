@@ -1,5 +1,7 @@
 use core::num::NonZero;
 
+use heapless::Vec;
+
 use crate::{
     config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
     eio::Write,
@@ -9,13 +11,13 @@ use crate::{
     types::{MqttBinary, MqttString, QoS, VarByteInt, Will},
     v5::property::{
         AuthenticationData, AuthenticationMethod, RequestProblemInformation,
-        RequestResponseInformation, TopicAliasMaximum,
+        RequestResponseInformation, TopicAliasMaximum, UserProperty,
     },
 };
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct ConnectPacket<'p> {
+pub struct ConnectPacket<'p, const MAX_USER_PROPERTIES: usize> {
     // CONNECT connect flags (will flag is implicit due to `will` being an Option<T>)
     will_retain: bool,
     will_qos: QoS,
@@ -31,6 +33,7 @@ pub struct ConnectPacket<'p> {
     topic_alias_maximum: Option<TopicAliasMaximum>,
     request_response_information: Option<RequestResponseInformation>,
     request_problem_information: Option<RequestProblemInformation>,
+    user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
     authentication_method: Option<AuthenticationMethod<'p>>,
     authentication_data: Option<AuthenticationData<'p>>,
 
@@ -39,17 +42,17 @@ pub struct ConnectPacket<'p> {
     client_identifier: MqttString<'p>,
 
     /// Has to be present if `will_flag` is set
-    will: Option<Will<'p>>,
+    will: Option<Will<'p, MAX_USER_PROPERTIES>>,
 
     /// Has to be present if `user_name` flag is set
     user_name: Option<MqttString<'p>>,
     /// Has to be present if `password` flag is set
     password: Option<MqttBinary<'p>>,
 }
-impl Packet for ConnectPacket<'_> {
+impl<const MAX_USER_PROPERTIES: usize> Packet for ConnectPacket<'_, MAX_USER_PROPERTIES> {
     const PACKET_TYPE: PacketType = PacketType::Connect;
 }
-impl TxPacket for ConnectPacket<'_> {
+impl<const MAX_USER_PROPERTIES: usize> TxPacket for ConnectPacket<'_, MAX_USER_PROPERTIES> {
     fn remaining_len(&self) -> VarByteInt {
         let variable_header_length = wlen!([u8; 7]) + wlen!(u8) + wlen!(u16);
 
@@ -63,11 +66,14 @@ impl TxPacket for ConnectPacket<'_> {
 
         let total_length = variable_header_length + total_properties_length + body_length;
 
-        // Invariant: Max length = 393253 < VarByteInt::MAX_ENCODABLE
-        // variable header: 8
+        // max length: MAX_USER_PROPERTIES * 2 * 131077 + 654882
+        // Invariant: MAX_USER_PROPERTIES <= 1021 => max length <= VarByteInt::MAX_ENCODABLE
+        //
+        // variable header: 10
         // property length: 4
-        // properties: 131093
-        // will: 2 * 65537 (will topic & will payload)
+        // properties: MAX_USER_PROPERTIES * 131077 + 131093
+        // will: MAX_USER_PROPERTIES * 131077 + 327704
+        // client identifier: 65357
         // username: 65537
         // password: 65537
         VarByteInt::new_unchecked(total_length as u32)
@@ -103,6 +109,11 @@ impl TxPacket for ConnectPacket<'_> {
         self.topic_alias_maximum.write(write).await?;
         self.request_response_information.write(write).await?;
         self.request_problem_information.write(write).await?;
+
+        for user_property in &self.user_properties {
+            user_property.write(write).await?;
+        }
+
         self.authentication_method.write(write).await?;
         self.authentication_data.write(write).await?;
 
@@ -115,7 +126,8 @@ impl TxPacket for ConnectPacket<'_> {
     }
 }
 
-impl<'p> ConnectPacket<'p> {
+impl<'p, const MAX_USER_PROPERTIES: usize> ConnectPacket<'p, MAX_USER_PROPERTIES> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client_identifier: MqttString<'p>,
         clean_start: bool,
@@ -124,6 +136,7 @@ impl<'p> ConnectPacket<'p> {
         session_expiry_interval: SessionExpiryInterval,
         receive_maximum: NonZero<u16>,
         request_response_information: bool,
+        user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
     ) -> Self {
         Self {
             will_retain: false,
@@ -138,6 +151,7 @@ impl<'p> ConnectPacket<'p> {
                 .then_some(true)
                 .map(Into::into),
             request_problem_information: None,
+            user_properties,
             authentication_method: None,
             authentication_data: None,
             client_identifier,
@@ -161,15 +175,23 @@ impl<'p> ConnectPacket<'p> {
             + self.topic_alias_maximum.written_len()
             + self.request_response_information.written_len()
             + self.request_problem_information.written_len()
+            + self
+                .user_properties
+                .iter()
+                .map(Writable::written_len)
+                .sum::<usize>()
             + self.authentication_method.written_len()
             + self.authentication_data.written_len();
 
-        // Invariant: Max length = 131093 < VarByteInt::MAX_ENCODABLE
+        // max length = MAX_USER_PROPERTIES * 131077 + 131093
+        // Invariant: MAX_USER_PROPERTIES <= 2046 => max length <= VarByteInt::MAX_ENCODABLE
+        //
         // session expiry interval: 5
         // maximum packet size: 5
         // topic alias maximum: 3
         // request response information: 2
         // request problem information: 2
+        // user properties: MAX_USER_PROPERTIES * 131077
         // authentication method: 65538
         // authentication data: 65538
         VarByteInt::new_unchecked(len as u32)
@@ -182,7 +204,12 @@ impl<'p> ConnectPacket<'p> {
         self.password = Some(password);
     }
 
-    pub fn add_will(&mut self, will: Will<'p>, will_qos: QoS, will_retain: bool) {
+    pub fn add_will(
+        &mut self,
+        will: Will<'p, MAX_USER_PROPERTIES>,
+        will_qos: QoS,
+        will_retain: bool,
+    ) {
         self.will_retain = will_retain;
         self.will_qos = will_qos;
         self.will = Some(will);
@@ -193,14 +220,17 @@ impl<'p> ConnectPacket<'p> {
 mod unit {
     use core::num::NonZero;
 
+    use heapless::Vec;
+
     use crate::{
         config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
         test::tx::encode,
-        types::{MqttBinary, MqttString, QoS, TopicName, Will},
+        types::{MqttBinary, MqttString, MqttStringPair, QoS, TopicName, Will},
         v5::{
             packet::ConnectPacket,
             property::{
-                ContentType, MessageExpiryInterval, PayloadFormatIndicator, WillDelayInterval,
+                ContentType, MessageExpiryInterval, PayloadFormatIndicator, UserProperty,
+                WillDelayInterval,
             },
         },
     };
@@ -208,7 +238,7 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_simple() {
-        let packet = ConnectPacket::new(
+        let packet = ConnectPacket::<16>::new(
             MqttString::try_from("a").unwrap(),
             true,
             KeepAlive::Seconds(NonZero::new(7439).unwrap()),
@@ -216,6 +246,7 @@ mod unit {
             SessionExpiryInterval::EndOnDisconnect,
             NonZero::new(u16::MAX).unwrap(),
             false,
+            Vec::new(),
         );
 
         #[rustfmt::skip]
@@ -242,7 +273,7 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_properties() {
-        let packet = ConnectPacket::new(
+        let packet = ConnectPacket::<16>::new(
             MqttString::try_from("a").unwrap(),
             false,
             KeepAlive::Infinite,
@@ -250,12 +281,27 @@ mod unit {
             SessionExpiryInterval::Seconds(8136391),
             NonZero::new(63543).unwrap(),
             true,
+            [
+                UserProperty(MqttStringPair::new(
+                    MqttString::from_str("triple 1").unwrap(),
+                    MqttString::from_str("tick").unwrap(),
+                )),
+                UserProperty(MqttStringPair::new(
+                    MqttString::from_str("triple 2").unwrap(),
+                    MqttString::from_str("trick").unwrap(),
+                )),
+                UserProperty(MqttStringPair::new(
+                    MqttString::from_str("triple 3").unwrap(),
+                    MqttString::from_str("track").unwrap(),
+                )),
+            ]
+            .into(),
         );
 
         #[rustfmt::skip]
         encode!(packet, [
             0x10,       //
-            0x1D,       // remaining length
+            0x52,       // remaining length
             0x00,       // ---
             0x04,       //
             b'M',       //
@@ -266,7 +312,7 @@ mod unit {
             0b00000000, // Connect flags
             0x00,       // Keep alive MSB
             0x00,       // Keep alive LSB
-            0x0F,       // Property length
+            0x44,       // Property length
 
             0x11,       // Session expiry interval
             0x00, 0x7C, 0x26, 0xC7,
@@ -280,6 +326,16 @@ mod unit {
             0x19,       // Request response information
             0x01,
 
+            0x26,       // User property
+            0x00, 0x08, b't', b'r', b'i', b'p', b'l', b'e', b' ', b'1', 
+            0x00, 0x04, b't', b'i', b'c', b'k',
+            0x26,       // User property
+            0x00, 0x08, b't', b'r', b'i', b'p', b'l', b'e', b' ', b'2', 
+            0x00, 0x05, b't', b'r', b'i', b'c', b'k',
+            0x26,       // User property
+            0x00, 0x08, b't', b'r', b'i', b'p', b'l', b'e', b' ', b'3', 
+            0x00, 0x05, b't', b'r', b'a', b'c', b'k',
+
             0x00,       // Client identifier len MSB
             0x01,       // Client identifier len LSB
             b'a',       // Client identifier
@@ -289,7 +345,7 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_payload() {
-        let mut packet = ConnectPacket::new(
+        let mut packet = ConnectPacket::<16>::new(
             MqttString::try_from("giuqen").unwrap(),
             false,
             KeepAlive::Seconds(NonZero::new(6789).unwrap()),
@@ -297,6 +353,7 @@ mod unit {
             SessionExpiryInterval::EndOnDisconnect,
             NonZero::new(u16::MAX).unwrap(),
             false,
+            Vec::new(),
         );
 
         packet.add_user_name(MqttString::try_from("Franz").unwrap());
@@ -351,7 +408,7 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_will() {
-        let mut packet = ConnectPacket::new(
+        let mut packet = ConnectPacket::<16>::new(
             MqttString::try_from("cba").unwrap(),
             false,
             KeepAlive::Seconds(NonZero::new(6789).unwrap()),
@@ -359,6 +416,7 @@ mod unit {
             SessionExpiryInterval::Seconds(893475),
             NonZero::new(u16::MAX).unwrap(),
             true,
+            Vec::new(),
         );
 
         packet.add_user_name(MqttString::try_from("Franz").unwrap());
@@ -372,6 +430,7 @@ mod unit {
                 content_type: Some(ContentType(MqttString::try_from("text/plain").unwrap())),
                 response_topic: None,
                 correlation_data: None,
+                user_properties: Vec::new(),
                 will_message: MqttBinary::try_from([12, 8, 98].as_slice()).unwrap(),
             },
             QoS::ExactlyOnce,
