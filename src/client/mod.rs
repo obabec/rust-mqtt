@@ -23,7 +23,7 @@ use crate::{
     packet::{Packet, TxPacket},
     session::{CPublishFlightState, SPublishFlightState, Session},
     types::{
-        IdentifiedQoS, MqttBinary, MqttString, PacketIdentifier, QoS, ReasonCode,
+        IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, PacketIdentifier, QoS, ReasonCode,
         SubscriptionFilter, TopicFilter, TopicName, VarByteInt,
     },
     v5::{
@@ -55,6 +55,8 @@ pub use err::Error as MqttError;
 ///   can further limit this with its receive maximum. The client will use the minimum of this value and [`Self::server_config`].
 /// - `MAX_SUBSCRIPTION_IDENTIFIERS`: The maximum amount of subscription identifier properties the client can receive within a
 ///   single PUBLISH packet. If a packet with more subscription identifiers is received, the later identifers will be discarded.
+/// - `MAX_USER_PROPERTIES`: The maximum amount of user properties that the client can send and receive in one packet. Must not
+///   be greater than 1021. This limitation currently exists to easily rule out any variable byte integer overflows.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Client<
@@ -65,6 +67,7 @@ pub struct Client<
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
+    const MAX_USER_PROPERTIES: usize,
 > {
     client_config: ClientConfig,
     shared_config: SharedConfig,
@@ -89,7 +92,18 @@ impl<
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
-> Client<'c, N, B, MAX_SUBSCRIBES, RECEIVE_MAXIMUM, SEND_MAXIMUM, MAX_SUBSCRIPTION_IDENTIFIERS>
+    const MAX_USER_PROPERTIES: usize,
+>
+    Client<
+        'c,
+        N,
+        B,
+        MAX_SUBSCRIBES,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_SUBSCRIPTION_IDENTIFIERS,
+        MAX_USER_PROPERTIES,
+    >
 {
     /// Creates a new, disconnected MQTT client using a buffer provider to store
     /// dynamically sized fields of received packets.
@@ -103,6 +117,10 @@ impl<
         assert!(
             RECEIVE_MAXIMUM > 0,
             "RECEIVE_MAXIMUM must be greater than 0"
+        );
+        assert!(
+            MAX_USER_PROPERTIES <= 1021,
+            "MAX_USER_PROPERTIES must be less than or equal to 1021"
         );
 
         Self {
@@ -241,6 +259,12 @@ impl<
     /// * [`MqttError::Disconnect`] if the CONNACK packet's reason code is not successful (>= 0x80)
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
     /// * [`MqttError::Alloc`] if the underlying [`BufferProvider`] returned an error
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`ConnectOptions`]
+    /// or the length of the `user_properties` slice in the will in [`ConnectOptions`] is greater
+    /// than `MAX_USER_PROPERTIES`.
     pub async fn connect<'d>(
         &mut self,
         net: N,
@@ -250,6 +274,21 @@ impl<
     where
         'c: 'd,
     {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to send CONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+        if let Some(ref will) = options.will {
+            assert!(
+                will.user_properties.len() <= MAX_USER_PROPERTIES,
+                "Attempted to send Will with {} > {} (MAX_USER_PROPERTIES) properties",
+                will.user_properties.len(),
+                MAX_USER_PROPERTIES
+            );
+        }
+
         if options.clean_start {
             self.session.clear();
         }
@@ -299,7 +338,7 @@ impl<
                 .map(MqttString::as_borrowed)
                 .unwrap_or_default();
 
-            let mut packet = ConnectPacket::new(
+            let mut packet = ConnectPacket::<MAX_USER_PROPERTIES>::new(
                 packet_client_identifier,
                 options.clean_start,
                 options.keep_alive,
@@ -309,6 +348,12 @@ impl<
                 // code is only reached when `RECEIVE_MAXIMUM` is greater than 0.
                 unsafe { NonZero::new_unchecked(RECEIVE_MAXIMUM as u16) },
                 options.request_response_information,
+                options
+                    .user_properties
+                    .iter()
+                    .map(MqttStringPair::as_borrowed)
+                    .map(Into::into)
+                    .collect(),
             );
 
             if let Some(ref user_name) = options.user_name {
