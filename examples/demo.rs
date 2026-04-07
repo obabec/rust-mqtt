@@ -14,7 +14,7 @@ use rust_mqtt::{
         event::{Event, Puback, Suback},
         options::{
             ConnectOptions, DisconnectOptions, PublicationOptions, RetainHandling,
-            SubscriptionOptions, TopicReference, WillOptions,
+            SubscriptionOptions, TopicReference, UnsubscriptionOptions, WillOptions,
         },
     },
     config::{KeepAlive, SessionExpiryInterval},
@@ -190,7 +190,10 @@ async fn main() {
         }
     }
 
-    match client.unsubscribe(topic.clone().into()).await {
+    match client
+        .unsubscribe(topic.clone().into(), &UnsubscriptionOptions::new())
+        .await
+    {
         Ok(_) => info!("Sent Unsubscribe"),
         Err(e) => {
             error!("Failed to unsubscribe: {e:?}");

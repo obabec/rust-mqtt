@@ -12,7 +12,7 @@ use crate::{
         info::ConnectInfo,
         options::{
             ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions,
-            TopicReference,
+            TopicReference, UnsubscriptionOptions,
         },
         raw::Raw,
     },
@@ -601,10 +601,23 @@ impl<
     /// * [`MqttError::SessionBuffer`] if the buffer for outgoing UNSUBSCRIBE packet identifiers is full
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this UNSUBSCRIBE packet
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`UnsubscriptionOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
     pub async fn unsubscribe(
         &mut self,
         topic_filter: TopicFilter<'_>,
+        options: &UnsubscriptionOptions<'_>,
     ) -> Result<PacketIdentifier, MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to send UNSUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         if self.pending_unsuback.len() == MAX_SUBSCRIBES {
             info!("maximum concurrent unsubscriptions reached");
             return Err(MqttError::SessionBuffer);
@@ -613,8 +626,17 @@ impl<
         let pid = self.packet_identifier();
         let mut topic_filters = Vec::<_, 1>::new();
         let _ = topic_filters.push(topic_filter);
-        let packet = UnsubscribePacket::new(pid, topic_filters)
-            .expect("UNSUBSCRIBE with a single topic cannot exceed VarByteInt::MAX_ENCODABLE");
+        let packet = UnsubscribePacket::<1, MAX_USER_PROPERTIES>::new(
+            pid,
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+            topic_filters,
+        )
+        .expect("UNSUBSCRIBE with a single topic cannot exceed VarByteInt::MAX_ENCODABLE");
 
         if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
