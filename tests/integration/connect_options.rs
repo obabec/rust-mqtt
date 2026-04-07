@@ -5,7 +5,7 @@ use rust_mqtt::{
     client::{
         MqttError,
         event::Event,
-        options::{PublicationOptions, SubscriptionOptions, TopicReference, WillOptions},
+        options::{PublicationOptions, TopicReference, WillOptions},
     },
     config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
     types::{MqttBinary, MqttString, ReasonCode, TopicFilter, TopicName},
@@ -58,7 +58,7 @@ async fn maximum_packet_size_not_exceeded() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             topic_filter.clone()
         );
 
@@ -107,7 +107,7 @@ async fn maximum_packet_size_barely_exceeded() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             topic_filter.clone()
         );
 
@@ -160,7 +160,7 @@ async fn maximum_packet_size_decently_exceeded() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             topic_filter.clone()
         );
 
@@ -214,7 +214,7 @@ async fn maximum_packet_size_at_varbyteint_boundary_not_exceeded() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             topic_filter.clone()
         );
 
@@ -261,7 +261,7 @@ async fn maximum_packet_size_at_varbyteint_boundary_exceeded() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             topic_filter.clone()
         );
 
@@ -513,7 +513,7 @@ async fn keep_alive_via_incoming_qos1() {
     };
 
     let receiver = async {
-        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS.at_least_once(), topic_filter);
+        assert_subscribe!(rx, &DEFAULT_QOS0_SUB_OPTIONS.at_least_once(), topic_filter);
 
         for _ in 0..10 {
             assert_recv_excl!(rx, topic_name);
@@ -529,7 +529,6 @@ async fn keep_alive_via_incoming_qos1() {
 #[test_log::test]
 async fn keep_alive_via_subscribe() {
     let topic_filter = unique_topic().1;
-    let subscribe_options = SubscriptionOptions::new();
 
     let mut c = assert_ok!(
         connected_client(
@@ -549,7 +548,7 @@ async fn keep_alive_via_subscribe() {
     for _ in 0..10 {
         sleep(Duration::from_millis(950)).await;
         assert_ok!(
-            c.subscribe(topic_filter.as_borrowed(), subscribe_options)
+            c.subscribe(topic_filter.as_borrowed(), DEFAULT_QOS0_SUB_OPTIONS)
                 .await
         );
         let event = assert_ok!(c.poll().await);
@@ -592,6 +591,7 @@ async fn keep_alive_not_kept_alive_idle_network() {
         MqttError::Disconnect {
             reason: ReasonCode::KeepAliveTimeout,
             reason_string: _,
+            user_properties: _,
             server_reference: _,
         } | MqttError::Network(_)
     ));
@@ -691,6 +691,7 @@ async fn keep_alive_not_kept_alive_will_timing() {
         MqttError::Disconnect {
             reason: ReasonCode::KeepAliveTimeout,
             reason_string: _,
+            user_properties: _,
             server_reference: _,
         } | MqttError::Network(_)
     ));

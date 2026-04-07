@@ -65,7 +65,7 @@ async fn outgoing_qos1_retry() {
         connect_options.clean_start = false;
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-        let mut tx: Client<'_, _, _, 1, 1, 1, 1> = Client::with_session(session, ALLOC.get());
+        let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
         let info = assert_ok!(warn_inspect!(
             tx.connect(tcp, &connect_options, Some(tx_id.as_borrowed()))
                 .await,
@@ -82,6 +82,7 @@ async fn outgoing_qos1_retry() {
                         Event::PublishAcknowledged(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         }) if packet_identifier == pid => break,
                         _ => {}
                     }
@@ -94,9 +95,8 @@ async fn outgoing_qos1_retry() {
     };
 
     let receiver = async {
-        let mut sub_options = DEFAULT_QOS0_SUB_OPTIONS;
-        sub_options.qos = QoS::AtLeastOnce;
-        assert_subscribe!(rx, sub_options, topic_filter.clone());
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+        assert_subscribe!(rx, &sub_options, topic_filter.clone());
         let p = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
         ));
@@ -152,7 +152,7 @@ async fn outgoing_qos2_retry_publish() {
         connect_options.clean_start = false;
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-        let mut tx: Client<'_, _, _, 1, 1, 1, 1> = Client::with_session(session, ALLOC.get());
+        let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
         let info = assert_ok!(warn_inspect!(
             tx.connect(tcp, &connect_options, Some(tx_id.as_borrowed()))
                 .await,
@@ -169,6 +169,7 @@ async fn outgoing_qos2_retry_publish() {
                         Event::PublishComplete(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         }) if packet_identifier == pid => break,
                         _ => {}
                     }
@@ -181,9 +182,8 @@ async fn outgoing_qos2_retry_publish() {
     };
 
     let receiver = async {
-        let mut sub_options = DEFAULT_QOS0_SUB_OPTIONS;
-        sub_options.qos = QoS::ExactlyOnce;
-        assert_subscribe!(rx, sub_options, topic_filter.clone());
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
+        assert_subscribe!(rx, &sub_options, topic_filter.clone());
         let p = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
         ));
@@ -234,6 +234,7 @@ async fn outgoing_qos2_retry_pubrel() {
                         Event::PublishReceived(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         }) if packet_identifier == pid => break,
                         _ => {}
                     }
@@ -251,7 +252,7 @@ async fn outgoing_qos2_retry_pubrel() {
         connect_options.clean_start = false;
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-        let mut tx: Client<'_, _, _, 1, 1, 1, 1> = Client::with_session(session, ALLOC.get());
+        let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
         let info = assert_ok!(warn_inspect!(
             tx.connect(tcp, &connect_options, Some(tx_id.as_borrowed()))
                 .await,
@@ -268,6 +269,7 @@ async fn outgoing_qos2_retry_pubrel() {
                         Event::PublishComplete(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         }) if packet_identifier == pid => break,
                         _ => {}
                     }
@@ -280,9 +282,8 @@ async fn outgoing_qos2_retry_pubrel() {
     };
 
     let receiver = async {
-        let mut sub_options = DEFAULT_QOS0_SUB_OPTIONS;
-        sub_options.qos = QoS::ExactlyOnce;
-        assert_subscribe!(rx, sub_options, topic_filter.clone());
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
+        assert_subscribe!(rx, &sub_options, topic_filter.clone());
         let p = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
         ));
@@ -329,9 +330,8 @@ async fn incoming_qos2_retry_pubcomp() {
     };
 
     let receiver = async {
-        let mut sub_options = DEFAULT_QOS0_SUB_OPTIONS;
-        sub_options.qos = QoS::ExactlyOnce;
-        assert_subscribe!(rx, sub_options, topic_filter.clone());
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
+        assert_subscribe!(rx, &sub_options, topic_filter.clone());
 
         let publish = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
@@ -354,7 +354,7 @@ async fn incoming_qos2_retry_pubcomp() {
         connect_options.clean_start = false;
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-        let mut rx: Client<'_, _, _, 1, 1, 1, 1> = Client::with_session(session, ALLOC.get());
+        let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
         let info = assert_ok!(warn_inspect!(
             rx.connect(tcp, &connect_options, Some(rx_id.as_borrowed()))
                 .await,
@@ -369,6 +369,7 @@ async fn incoming_qos2_retry_pubcomp() {
                         Event::PublishReleased(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         }) if packet_identifier == pid => {
                             break;
                         }
@@ -446,6 +447,7 @@ async fn outgoing_qos1_write_fail_retry() {
                         Event::PublishAcknowledged(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         }) if pid == packet_identifier => {}
                         _ => panic!("Should only receive a PUBACK"),
                     }
@@ -458,7 +460,7 @@ async fn outgoing_qos1_write_fail_retry() {
 
                 let pid = session.pending_client_publishes.first().copied();
 
-                let mut tx: Client<'_, _, _, 1, 1, 1, 1> =
+                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -489,6 +491,7 @@ async fn outgoing_qos1_write_fail_retry() {
                     Event::PublishAcknowledged(Puback {
                         packet_identifier,
                         reason_code: _,
+                        user_properties: _,
                     }) if pid == packet_identifier => {}
                     _ => panic!("Should only receive a PUBACK"),
                 }
@@ -559,6 +562,7 @@ async fn outgoing_qos1_read_fail_retry() {
                         Ok(Event::PublishAcknowledged(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         })) if pid == packet_identifier => {}
                         Ok(_) => panic!("Should only receive a PUBACK"),
                         Err(_) => {
@@ -579,7 +583,7 @@ async fn outgoing_qos1_read_fail_retry() {
                     .unwrap()
                     .packet_identifier;
 
-                let mut tx: Client<'_, _, _, 1, 1, 1, 1> =
+                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -596,6 +600,7 @@ async fn outgoing_qos1_read_fail_retry() {
                     Event::PublishAcknowledged(Puback {
                         packet_identifier,
                         reason_code: _,
+                        user_properties: _,
                     }) if pid == packet_identifier => {}
                     _ => panic!("Should only receive a PUBACK"),
                 }
@@ -669,6 +674,7 @@ async fn outgoing_qos2_write_fail_retry() {
                         Ok(Event::PublishReceived(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         })) if pid == packet_identifier => {}
                         Ok(_) => panic!("Should only receive a PUBREC"),
                         Err(_) => {
@@ -682,6 +688,7 @@ async fn outgoing_qos2_write_fail_retry() {
                         Event::PublishComplete(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         }) if pid == packet_identifier => {}
                         _ => panic!("Should only receive a PUBCOMP"),
                     }
@@ -694,7 +701,7 @@ async fn outgoing_qos2_write_fail_retry() {
 
                 let pid = session.pending_client_publishes.first().copied();
 
-                let mut tx: Client<'_, _, _, 1, 1, 1, 1> =
+                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -737,6 +744,7 @@ async fn outgoing_qos2_write_fail_retry() {
                         Event::PublishReceived(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         }) if pid == packet_identifier => {}
                         _ => panic!("Should only receive a PUBREC"),
                     }
@@ -746,6 +754,7 @@ async fn outgoing_qos2_write_fail_retry() {
                     Event::PublishComplete(Puback {
                         packet_identifier,
                         reason_code: _,
+                        user_properties: _,
                     }) if pid == packet_identifier => {}
                     _ => panic!("Should only receive a PUBCOMP"),
                 }
@@ -815,6 +824,7 @@ async fn outgoing_qos2_read_fail_retry() {
                         Ok(Event::PublishReceived(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         })) if pid == packet_identifier => {}
                         Ok(_) => panic!("Should only receive a PUBREC"),
                         Err(_) => {
@@ -827,6 +837,7 @@ async fn outgoing_qos2_read_fail_retry() {
                         Ok(Event::PublishComplete(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         })) if pid == packet_identifier => {}
                         Ok(_) => panic!("Should only receive a PUBCOMP"),
                         Err(_) => {
@@ -843,7 +854,7 @@ async fn outgoing_qos2_read_fail_retry() {
 
                 let pid = session.pending_client_publishes.first().copied();
 
-                let mut tx: Client<'_, _, _, 1, 1, 1, 1> =
+                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -886,6 +897,7 @@ async fn outgoing_qos2_read_fail_retry() {
                         Event::PublishReceived(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         }) if pid == packet_identifier => {}
                         _ => panic!("Should only receive a PUBREC"),
                     }
@@ -895,6 +907,7 @@ async fn outgoing_qos2_read_fail_retry() {
                     Event::PublishComplete(Puback {
                         packet_identifier,
                         reason_code: _,
+                        user_properties: _,
                     }) if pid == packet_identifier => {}
                     _ => panic!("Should only receive a PUBCOMP"),
                 }
@@ -948,14 +961,14 @@ async fn incoming_qos1_write_fail_retry() {
     let tx = publisher_task(topic_name, QoS::AtLeastOnce, tx_messages, tx_received);
 
     let rx = async move {
-        let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+        let connect_options = NO_SESSION_CONNECT_OPTIONS
+            .clone()
+            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let mut sub_options = DEFAULT_QOS0_SUB_OPTIONS;
-        sub_options.qos = QoS::AtLeastOnce;
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -983,7 +996,7 @@ async fn incoming_qos1_write_fail_retry() {
                         continue 'outer;
                     };
 
-                    let Ok(pid) = rx.subscribe(topic_filter.as_borrowed(), sub_options).await
+                    let Ok(pid) = rx.subscribe(topic_filter.as_borrowed(), &sub_options).await
                     else {
                         failed = true;
                         continue 'outer;
@@ -993,6 +1006,7 @@ async fn incoming_qos1_write_fail_retry() {
                     match assert_ok!(rx.poll().await) {
                         Event::Suback(Suback {
                             packet_identifier,
+                            user_properties: _,
                             reason_code: _,
                         }) if pid == packet_identifier => {}
                         _ => panic!("Should only receive a SUBACK"),
@@ -1020,7 +1034,7 @@ async fn incoming_qos1_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1> =
+                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -1060,14 +1074,14 @@ async fn incoming_qos1_read_fail_retry() {
     let tx = publisher_task(topic_name, QoS::AtLeastOnce, tx_messages, tx_received);
 
     let rx = async move {
-        let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+        let connect_options = NO_SESSION_CONNECT_OPTIONS
+            .clone()
+            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let mut sub_options = DEFAULT_QOS0_SUB_OPTIONS;
-        sub_options.qos = QoS::AtLeastOnce;
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -1097,11 +1111,12 @@ async fn incoming_qos1_read_fail_retry() {
 
                     // Cannot fail because subscribing only sends
                     let pid =
-                        assert_ok!(rx.subscribe(topic_filter.as_borrowed(), sub_options).await);
+                        assert_ok!(rx.subscribe(topic_filter.as_borrowed(), &sub_options).await);
 
                     match rx.poll().await {
                         Ok(Event::Suback(Suback {
                             packet_identifier,
+                            user_properties: _,
                             reason_code: _,
                         })) if pid == packet_identifier => {}
                         Ok(_) => panic!("Should only receive a SUBACK"),
@@ -1133,7 +1148,7 @@ async fn incoming_qos1_read_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1> =
+                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -1172,14 +1187,14 @@ async fn incoming_qos2_write_fail_retry() {
     let tx = publisher_task(topic_name, QoS::ExactlyOnce, tx_messages, tx_received);
 
     let rx = async move {
-        let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+        let connect_options = NO_SESSION_CONNECT_OPTIONS
+            .clone()
+            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let mut sub_options = DEFAULT_QOS0_SUB_OPTIONS;
-        sub_options.qos = QoS::ExactlyOnce;
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -1207,7 +1222,7 @@ async fn incoming_qos2_write_fail_retry() {
                         continue 'outer;
                     };
 
-                    let Ok(pid) = rx.subscribe(topic_filter.as_borrowed(), sub_options).await
+                    let Ok(pid) = rx.subscribe(topic_filter.as_borrowed(), &sub_options).await
                     else {
                         failed = true;
                         continue 'outer;
@@ -1217,6 +1232,7 @@ async fn incoming_qos2_write_fail_retry() {
                     match assert_ok!(rx.poll().await) {
                         Event::Suback(Suback {
                             packet_identifier,
+                            user_properties: _,
                             reason_code: _,
                         }) if pid == packet_identifier => {}
                         _ => panic!("Should only receive a SUBACK"),
@@ -1243,6 +1259,7 @@ async fn incoming_qos2_write_fail_retry() {
                         Ok(Event::PublishReleased(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         })) if packet_identifier == pid => {}
                         Ok(Event::PublishReleased(_)) => panic!("Received non-matching PUBREL"),
                         Ok(_) => panic!("Should only receive a PUBREL"),
@@ -1262,7 +1279,7 @@ async fn incoming_qos2_write_fail_retry() {
                     .first()
                     .map(|c| c.packet_identifier);
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1> =
+                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -1277,6 +1294,7 @@ async fn incoming_qos2_write_fail_retry() {
                             Event::PublishReleased(Puback {
                                 packet_identifier,
                                 reason_code: _,
+                                user_properties: _,
                             }) if packet_identifier == pid => break,
                             Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
                             e => panic!("Should only receive PUBLISH or PUBREL: {:?}", e),
@@ -1309,14 +1327,14 @@ async fn incoming_qos2_read_fail_retry() {
     let tx = publisher_task(topic_name, QoS::ExactlyOnce, tx_messages, tx_received);
 
     let rx = async move {
-        let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+        let connect_options = NO_SESSION_CONNECT_OPTIONS
+            .clone()
+            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
 
-        let mut sub_options = DEFAULT_QOS0_SUB_OPTIONS;
-        sub_options.qos = QoS::ExactlyOnce;
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
 
         let mut i = 0;
         let mut failed = true;
@@ -1346,11 +1364,12 @@ async fn incoming_qos2_read_fail_retry() {
 
                     // Cannot fail because subscribing only sends
                     let pid =
-                        assert_ok!(rx.subscribe(topic_filter.as_borrowed(), sub_options).await);
+                        assert_ok!(rx.subscribe(topic_filter.as_borrowed(), &sub_options).await);
 
                     match rx.poll().await {
                         Ok(Event::Suback(Suback {
                             packet_identifier,
+                            user_properties: _,
                             reason_code: _,
                         })) if pid == packet_identifier => {}
                         Ok(_) => panic!("Should only receive a SUBACK"),
@@ -1381,6 +1400,7 @@ async fn incoming_qos2_read_fail_retry() {
                         Ok(Event::PublishReleased(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         })) if packet_identifier == pid => {}
                         Ok(Event::PublishReleased(_)) => panic!("Received non-matching PUBREL"),
                         Ok(_) => panic!("Should only receive a PUBREL"),
@@ -1400,7 +1420,7 @@ async fn incoming_qos2_read_fail_retry() {
                     .first()
                     .map(|c| c.packet_identifier);
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1> =
+                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -1415,6 +1435,7 @@ async fn incoming_qos2_read_fail_retry() {
                         Event::PublishReleased(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         }) if packet_identifier == pid.unwrap() => break 'complete,
                         Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
                         Event::Publish(Publish {
@@ -1430,6 +1451,7 @@ async fn incoming_qos2_read_fail_retry() {
                         Event::PublishReleased(Puback {
                             packet_identifier,
                             reason_code: _,
+                            user_properties: _,
                         }) if packet_identifier == pid => break 'complete,
                         Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
                         e => panic!("Should only receive PUBREL: {:?}", e),

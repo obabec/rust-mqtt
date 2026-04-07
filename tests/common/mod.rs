@@ -5,10 +5,10 @@ use rust_mqtt::{
     buffer::AllocBuffer,
     client::{
         Client,
-        options::{ConnectOptions, DisconnectOptions, RetainHandling, SubscriptionOptions},
+        options::{ConnectOptions, DisconnectOptions, SubscriptionOptions},
     },
     config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
-    types::{MqttBinary, MqttString, QoS},
+    types::{MqttBinary, MqttString},
 };
 use tokio::net::TcpStream;
 
@@ -19,7 +19,7 @@ pub mod failing;
 pub mod fmt;
 pub mod utils;
 
-type DefaultClient<'a, T> = Client<'a, T, AllocBuffer, 1, 1, 1, 1>;
+type DefaultClient<'a, T> = Client<'a, T, AllocBuffer, 1, 1, 1, 1, 16>;
 
 pub type TestClient<'a> = DefaultClient<'a, FromTokio<TcpStream>>;
 pub type FailingClient<'a> = DefaultClient<'a, FromTokio<FailingTcp>>;
@@ -36,17 +36,12 @@ pub const NO_SESSION_CONNECT_OPTIONS: &ConnectOptions<'static> = &ConnectOptions
     maximum_packet_size: MaximumPacketSize::Unlimited,
     session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
     request_response_information: false,
+    user_properties: &[],
     user_name: Some(USERNAME),
     password: Some(PASSWORD),
     will: None,
 };
 
-pub const DEFAULT_QOS0_SUB_OPTIONS: SubscriptionOptions = SubscriptionOptions {
-    retain_handling: RetainHandling::AlwaysSend,
-    retain_as_published: false,
-    no_local: false,
-    qos: QoS::AtMostOnce,
-    subscription_identifier: None,
-};
+pub const DEFAULT_QOS0_SUB_OPTIONS: &SubscriptionOptions = &SubscriptionOptions::new();
 
 pub const DEFAULT_DC_OPTIONS: &DisconnectOptions = &DisconnectOptions::new().publish_will();

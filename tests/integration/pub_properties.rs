@@ -5,7 +5,7 @@ use rust_mqtt::{
         event::Publish,
         options::{PublicationOptions, TopicReference},
     },
-    types::{MqttString, QoS},
+    types::MqttString,
 };
 use tokio::{
     join,
@@ -41,9 +41,8 @@ async fn message_expiry_interval_basic() {
     };
 
     let receiver = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::AtLeastOnce;
-        assert_subscribe!(rx, options, topic_filter.clone());
+        let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+        assert_subscribe!(rx, &options, topic_filter.clone());
 
         let Publish {
             message_expiry_interval,
@@ -85,9 +84,8 @@ async fn message_expiry_interval_partially_expired() {
     let receiver = async {
         sleep(Duration::from_secs(5)).await;
 
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::AtLeastOnce;
-        assert_subscribe!(rx, options, topic_filter.clone());
+        let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+        assert_subscribe!(rx, &options, topic_filter.clone());
 
         let Publish {
             message_expiry_interval,
@@ -128,9 +126,8 @@ async fn message_expiry_interval_completely_expired() {
     let receiver = async {
         sleep(Duration::from_secs(6)).await;
 
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::AtLeastOnce;
-        assert_subscribe!(rx, options, topic_filter.clone());
+        let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+        assert_subscribe!(rx, &options, topic_filter.clone());
 
         assert_err!(
             timeout(Duration::from_secs(4), async {
@@ -175,9 +172,8 @@ async fn topic_alias_basic() {
     };
 
     let receiver = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::AtLeastOnce;
-        assert_subscribe!(rx, options, topic_filter.clone());
+        let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+        assert_subscribe!(rx, &options, topic_filter.clone());
 
         assert_recv!(rx);
         assert_recv!(rx);
@@ -227,9 +223,8 @@ async fn topic_alias_remap() {
     };
 
     let receiver1 = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::AtLeastOnce;
-        assert_subscribe!(rx1, options, topic_filter1.clone());
+        let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+        assert_subscribe!(rx1, &options, topic_filter1.clone());
 
         assert_recv!(rx1);
         assert_err!(
@@ -244,9 +239,8 @@ async fn topic_alias_remap() {
     };
 
     let receiver2 = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::AtLeastOnce;
-        assert_subscribe!(rx2, options, topic_filter2.clone());
+        let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+        assert_subscribe!(rx2, &options, topic_filter2.clone());
 
         assert_recv!(rx2);
         assert_recv!(rx2);
