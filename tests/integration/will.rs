@@ -7,7 +7,7 @@ use rust_mqtt::{
         options::{DisconnectOptions, WillOptions},
     },
     config::SessionExpiryInterval,
-    types::{IdentifiedQoS, MqttBinary, MqttString, ReasonCode},
+    types::{IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, ReasonCode},
 };
 use tokio::{
     join,
@@ -254,6 +254,20 @@ async fn properties() {
     let will_content_type = MqttString::from_str("application/json").unwrap();
     let will_correlation_data = MqttBinary::from_slice(b"ask3n028cnc+wscuw c09qn").unwrap();
     let will_response_topic = unique_topic().0;
+    let will_user_properties = Box::leak(Box::new([
+        MqttStringPair::new(
+            MqttString::from_str("Magic smoke").unwrap(),
+            MqttString::from_str("escaped").unwrap(),
+        ),
+        MqttStringPair::new(
+            MqttString::from_str("Sensor accuracy").unwrap(),
+            MqttString::from_str("roughly 50/50").unwrap(),
+        ),
+        MqttStringPair::new(
+            MqttString::from_str("Deep sleep").unwrap(),
+            MqttString::from_str("no alarm set").unwrap(),
+        ),
+    ]));
 
     let will = WillOptions::new(
         will_topic_name.clone(),
@@ -263,7 +277,8 @@ async fn properties() {
     .correlation_data(will_correlation_data.clone())
     .payload_format_indicator(true)
     .message_expiry_interval(1234)
-    .response_topic(will_response_topic.clone());
+    .response_topic(will_response_topic.clone())
+    .user_properties(will_user_properties);
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS.clone().will(will);
 
@@ -301,6 +316,7 @@ async fn properties() {
         assert_eq!(message_expiry_interval, Some(1234));
         assert_eq!(response_topic, Some(will_response_topic));
         assert_eq!(correlation_data, Some(will_correlation_data));
+        assert_eq!(user_properties.as_slice(), will_user_properties);
         assert!(subscription_identifiers.is_empty());
         assert_eq!(content_type, Some(will_content_type));
         assert_eq!(&*message, will_msg.as_bytes());
