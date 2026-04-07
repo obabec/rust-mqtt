@@ -6,22 +6,28 @@ use crate::{
     io::write::Writable,
     packet::{Packet, TxError, TxPacket},
     types::{PacketIdentifier, SubscriptionFilter, TooLargeToEncode, VarByteInt},
-    v5::property::SubscriptionIdentifier,
+    v5::property::{SubscriptionIdentifier, UserProperty},
 };
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct SubscribePacket<'p, const MAX_TOPIC_FILTERS: usize> {
+pub struct SubscribePacket<'p, const MAX_TOPIC_FILTERS: usize, const MAX_USER_PROPERTIES: usize> {
     packet_identifier: PacketIdentifier,
 
     subscription_identifier: Option<SubscriptionIdentifier>,
+    user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
+
     subscribe_filters: Vec<SubscriptionFilter<'p>, MAX_TOPIC_FILTERS>,
 }
 
-impl<const MAX_TOPIC_FILTERS: usize> Packet for SubscribePacket<'_, MAX_TOPIC_FILTERS> {
+impl<const MAX_TOPIC_FILTERS: usize, const MAX_USER_PROPERTIES: usize> Packet
+    for SubscribePacket<'_, MAX_TOPIC_FILTERS, MAX_USER_PROPERTIES>
+{
     const PACKET_TYPE: PacketType = PacketType::Subscribe;
 }
-impl<const MAX_TOPIC_FILTERS: usize> TxPacket for SubscribePacket<'_, MAX_TOPIC_FILTERS> {
+impl<const MAX_TOPIC_FILTERS: usize, const MAX_USER_PROPERTIES: usize> TxPacket
+    for SubscribePacket<'_, MAX_TOPIC_FILTERS, MAX_USER_PROPERTIES>
+{
     fn remaining_len(&self) -> VarByteInt {
         // Safety: SUBSCRIBE packets that are too long to encode cannot be created
         unsafe { self.remaining_len_raw().unwrap_unchecked() }
@@ -36,30 +42,38 @@ impl<const MAX_TOPIC_FILTERS: usize> TxPacket for SubscribePacket<'_, MAX_TOPIC_
         self.packet_identifier.write(write).await?;
         self.properties_length().write(write).await?;
         self.subscription_identifier.write(write).await?;
+
+        for user_property in &self.user_properties {
+            user_property.write(write).await?;
+        }
+
         self.subscribe_filters.write(write).await?;
 
         Ok(())
     }
 }
 
-impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> {
+impl<'p, const MAX_TOPIC_FILTERS: usize, const MAX_USER_PROPERTIES: usize>
+    SubscribePacket<'p, MAX_TOPIC_FILTERS, MAX_USER_PROPERTIES>
+{
     pub fn new(
         packet_identifier: PacketIdentifier,
-        subscription_identifier: Option<VarByteInt>,
+        subscription_identifier: Option<SubscriptionIdentifier>,
+        user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
         subscribe_filters: Vec<SubscriptionFilter<'p>, MAX_TOPIC_FILTERS>,
     ) -> Result<Self, TooLargeToEncode> {
         let p = Self {
             packet_identifier,
-            subscription_identifier: subscription_identifier.map(Into::into),
+            subscription_identifier,
+            user_properties,
             subscribe_filters,
         };
 
-        const GUARANTEED_ENCODABLE_TOPIC_FILTERS: usize = 4095;
-
-        if MAX_TOPIC_FILTERS > GUARANTEED_ENCODABLE_TOPIC_FILTERS {
-            p.remaining_len_raw().map(|_| p)
-        } else {
+        // Reference to `SubscribePacket::remaining_len_raw` as to why this is true.
+        if MAX_USER_PROPERTIES <= 1021 && MAX_TOPIC_FILTERS <= 2053 {
             Ok(p)
+        } else {
+            p.remaining_len_raw().map(|_| p)
         }
     }
 
@@ -73,20 +87,41 @@ impl<'p, const MAX_TOPIC_FILTERS: usize> SubscribePacket<'p, MAX_TOPIC_FILTERS> 
 
         let total_length = variable_header_length + total_properties_length + body_length;
 
-        // MAX_TOPIC_FILTERS has to be less than or equal to 4095 to guarantee:
-        //   Max length = 11 + MAX_TOPIC_FILTERS * 65538 <= VarByteInt::MAX_ENCODABLE
+        // max length = MAX_USER_PROPERTIES * 131077 + MAX_TOPIC_FILTERS * 65538 + 11
+        // Invariant: The following inequation must be fulfilled to guarantee
+        // max length <= VarByteInt::MAX_ENCODABLE:
+        //
+        // MAX_USER_PROPERTIES * 131077 + MAX_TOPIC_FILTERS * 65538 + 11 <= VarByteInt::MAX_ENCODABLE
+        //
+        // Given the maximum allowed value of MAX_USER_PROPERTIES = 1021 in the client, the following
+        // inequation must be fulfilled:
+        //
+        // 1021 * 131077 + MAX_TOPIC_FILTERS * 65538 + 11 <= VarByteInt::MAX_ENCODABLE
+        //
+        // This results in the statement:
+        //
+        // MAX_TOPIC_FILTERS <= 2053 => max length <= VarByteInt::MAX_ENCODABLE
+        //
         // packet identifier: 2
         // property length: 4
-        // properties: 5
+        // properties: MAX_USER_PROPERTIES * 131077 + 5
         // topic filters: MAX_TOPIC_FILTERS * 65538
         VarByteInt::try_from(total_length as u32)
     }
 
     pub fn properties_length(&self) -> VarByteInt {
-        let len = self.subscription_identifier.written_len();
+        let len = self.subscription_identifier.written_len()
+            + self
+                .user_properties
+                .iter()
+                .map(Writable::written_len)
+                .sum::<usize>();
 
-        // Invariant: Max length = 5 < VarByteInt::MAX_ENCODABLE
+        // max length = MAX_USER_PROPERTIES * 131077 + 5
+        // Invariant: MAX_USER_PROPERTIES <= 2047 => max length <= VarByteInt::MAX_ENCODABLE
+        //
         // subscription identifier: 5
+        // user properties: MAX_USER_PROPERTIES * 131077
         VarByteInt::new_unchecked(len as u32)
     }
 }
@@ -100,44 +135,37 @@ mod unit {
     use crate::{
         client::options::{RetainHandling, SubscriptionOptions},
         test::tx::encode,
-        types::{MqttString, PacketIdentifier, QoS, SubscriptionFilter, TopicFilter, VarByteInt},
-        v5::packet::SubscribePacket,
+        types::{
+            MqttString, MqttStringPair, PacketIdentifier, SubscriptionFilter, TopicFilter,
+            VarByteInt,
+        },
+        v5::{
+            packet::SubscribePacket,
+            property::{SubscriptionIdentifier, UserProperty},
+        },
     };
 
     #[tokio::test]
     #[test_log::test]
     async fn encode_payload() {
-        let mut topics = Vec::new();
-
-        topics
-            .push(SubscriptionFilter::new(
+        let topics = [
+            SubscriptionFilter::new(
                 TopicFilter::new(MqttString::try_from("test/hello").unwrap()).unwrap(),
-                &SubscriptionOptions {
-                    retain_handling: RetainHandling::AlwaysSend,
-                    retain_as_published: false,
-                    no_local: true,
-                    qos: QoS::AtMostOnce,
-                    subscription_identifier: None,
-                },
-            ))
-            .unwrap();
-
-        topics
-            .push(SubscriptionFilter::new(
+                &SubscriptionOptions::new().no_local(),
+            ),
+            SubscriptionFilter::new(
                 TopicFilter::new(MqttString::try_from("asdfjklo/#").unwrap()).unwrap(),
-                &SubscriptionOptions {
-                    retain_handling: RetainHandling::NeverSend,
-                    retain_as_published: true,
-                    no_local: false,
-                    qos: QoS::ExactlyOnce,
-                    subscription_identifier: None,
-                },
-            ))
-            .unwrap();
-        let packet: SubscribePacket<'_, 2> = SubscribePacket::new(
+                &SubscriptionOptions::new()
+                    .retain_handling(RetainHandling::NeverSend)
+                    .retain_as_published()
+                    .exactly_once(),
+            ),
+        ];
+        let packet: SubscribePacket<'_, 2, 0> = SubscribePacket::new(
             PacketIdentifier::new(NonZero::new(23197).unwrap()),
             None,
-            topics,
+            Vec::new(),
+            topics.into(),
         )
         .unwrap();
 
@@ -181,36 +209,57 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_properties() {
-        let mut topics = Vec::new();
-        topics
-            .push(SubscriptionFilter::new(
-                TopicFilter::new(MqttString::try_from("abc/+/y").unwrap()).unwrap(),
-                &SubscriptionOptions {
-                    retain_handling: RetainHandling::SendIfNotSubscribedBefore,
-                    retain_as_published: true,
-                    no_local: false,
-                    qos: QoS::AtMostOnce,
-                    subscription_identifier: Some(VarByteInt::from(23459u16)),
-                },
-            ))
-            .unwrap();
+        let topics = [SubscriptionFilter::new(
+            TopicFilter::new(MqttString::try_from("abc/+/y").unwrap()).unwrap(),
+            &SubscriptionOptions::new()
+                .retain_handling(RetainHandling::SendIfNotSubscribedBefore)
+                .retain_as_published()
+                .subscription_identifier(VarByteInt::from(23459u16)),
+        )];
 
-        let packet: SubscribePacket<'_, 10> = SubscribePacket::new(
+        let user_properties = [
+            UserProperty(MqttStringPair::new(
+                MqttString::from_str("answer").unwrap(),
+                MqttString::from_str("42").unwrap(),
+            )),
+            UserProperty(MqttStringPair::new(
+                MqttString::from_str("chaos").unwrap(),
+                MqttString::from_str("maximum").unwrap(),
+            )),
+        ];
+
+        let packet: SubscribePacket<'_, 10, 16> = SubscribePacket::new(
             PacketIdentifier::new(NonZero::new(23197).unwrap()),
-            Some(VarByteInt::new(87986078u32).unwrap()),
-            topics,
+            Some(SubscriptionIdentifier(
+                VarByteInt::new(87986078u32).unwrap(),
+            )),
+            user_properties.into(),
+            topics.into(),
         )
         .unwrap();
 
         #[rustfmt::skip]
         encode!(packet, [
                 0x82, //
-                0x12, // remaining length
+                0x30, // remaining length
                 0x5A, // Packet identifier MSB
                 0x9D, // Packet identifier LSB
-                0x05, // Property length
-                // Property - Subscription Identifier
-                0x0B, 0x9E, 0x9F, 0xFA, 0x29, // Payload - Topic Filter
+                0x23, // Property length
+
+                // Subscription Identifier
+                0x0B, 0x9E, 0x9F, 0xFA, 0x29,
+
+                // User Property
+                0x26,
+                0x00, 0x06, b'a', b'n', b's', b'w', b'e', b'r',
+                0x00, 0x02, b'4', b'2',
+
+                // User Property
+                0x26,
+                0x00, 0x05, b'c', b'h', b'a', b'o', b's',
+                0x00, 0x07, b'm', b'a', b'x', b'i', b'm', b'u', b'm',
+                
+                // Payload - Topic Filter
                 0x00, 0x07, b'a', b'b', b'c', b'/', b'+', b'/', b'y', 0x18,
             ]
         );

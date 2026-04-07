@@ -92,7 +92,7 @@ async fn main() {
 
     let topic = TopicName::new(MqttString::from_str("rust-mqtt/is/great").unwrap()).unwrap();
 
-    match client.subscribe(topic.clone().into(), sub_options).await {
+    match client.subscribe(topic.clone().into(), &sub_options).await {
         Ok(_) => info!("Sent Subscribe"),
         Err(e) => {
             error!("Failed to subscribe: {e:?}");
