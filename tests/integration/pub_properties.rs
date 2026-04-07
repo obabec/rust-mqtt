@@ -5,7 +5,7 @@ use rust_mqtt::{
         event::Publish,
         options::{PublicationOptions, TopicReference},
     },
-    types::MqttString,
+    types::{MqttString, MqttStringPair},
 };
 use tokio::{
     join,
@@ -295,6 +295,75 @@ async fn payload_format_indicator() {
             ..
         } = assert_recv_excl!(rx, topic_name);
         assert_eq!(payload_format_indicator, Some(true));
+
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn user_properties() {
+    let publish_user_properties = vec![
+        MqttStringPair::new(
+            MqttString::from_str("last_will").unwrap(),
+            MqttString::from_str("delete_my_browser_history").unwrap(),
+        ),
+        MqttStringPair::new(
+            MqttString::from_str("qos_level").unwrap(),
+            MqttString::from_str("thoughts_and_prayers").unwrap(),
+        ),
+        MqttStringPair::new(
+            MqttString::from_str("retry_strategy").unwrap(),
+            MqttString::from_str("aggressive_procrastination").unwrap(),
+        ),
+        MqttStringPair::new(
+            MqttString::from_str("latency_source").unwrap(),
+            MqttString::from_str("cat_on_the_router").unwrap(),
+        ),
+        MqttStringPair::new(
+            MqttString::from_str("link_type").unwrap(),
+            MqttString::from_str("carrier_pigeon_with_rfc_1149").unwrap(),
+        ),
+    ];
+    let (topic_name, topic_filter) = unique_topic();
+    let msg = "The good thing about reinventing the wheel is that you can get a round one.";
+
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        sleep(Duration::from_secs(1)).await;
+
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()));
+        assert_published!(tx, pub_options, msg.into());
+
+        let pub_options = pub_options.user_properties(&publish_user_properties);
+        assert_published!(tx, pub_options, msg.into());
+
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter.clone());
+
+        let Publish {
+            user_properties, ..
+        } = assert_recv_excl!(rx, topic_name);
+        assert_eq!(user_properties, &[]);
+
+        let Publish {
+            user_properties, ..
+        } = assert_recv_excl!(rx, topic_name);
+
+        // The Server MUST maintain the order of User Properties when forwarding the Application Message [MQTT-3.3.2-18]
+        assert_eq!(
+            user_properties.as_slice(),
+            publish_user_properties.as_slice()
+        );
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
