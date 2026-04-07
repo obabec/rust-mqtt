@@ -9,7 +9,8 @@ use crate::{
     types::{
         IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, PacketIdentifier, ReasonCode,
         TopicName, VarByteInt,
-    }, v5::{packet::GenericPubackPacket, property::Property},
+    },
+    v5::{packet::GenericPubackPacket, property::Property},
 };
 
 /// Events emitted by the client when receiving an MQTT packet.
