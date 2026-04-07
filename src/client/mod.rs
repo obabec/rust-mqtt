@@ -931,7 +931,7 @@ impl<
             .filter(|s| s.state == CPublishFlightState::AwaitingPubcomp)
             .map(|p| p.packet_identifier)
         {
-            let pubrel = PubrelPacket::new(packet_identifier, ReasonCode::Success);
+            let pubrel = PubrelPacket::<0>::new(packet_identifier, ReasonCode::Success);
 
             // Don't check whether length exceeds servers maximum packet size because we don't
             // add properties to PUBREL packets -> length is always minimal at 6 bytes.
@@ -1263,7 +1263,7 @@ impl<
                         // We could disconnect here using ReasonCode::ReceiveMaximumExceeded, but incoming QoS 1 publications
                         // don't require resources outside of this scope which means we can just accept these packets.
 
-                        let puback = PubackPacket::new(pid, ReasonCode::Success);
+                        let puback = PubackPacket::<0>::new(pid, ReasonCode::Success);
 
                         debug!("sending PUBACK packet");
 
@@ -1293,7 +1293,7 @@ impl<
                             }
                         };
 
-                        let pubrec = PubrecPacket::new(pid, ReasonCode::Success);
+                        let pubrec = PubrecPacket::<0>::new(pid, ReasonCode::Success);
 
                         debug!("sending PUBREC packet");
 
@@ -1308,7 +1308,7 @@ impl<
                 }
             }
             PacketType::Puback => {
-                let puback = self.raw.recv_body::<PubackPacket>(&header).await?;
+                let puback = self.raw.recv_body::<PubackPacket<_>>(&header).await?;
                 let pid = puback.packet_identifier;
                 let reason_code = puback.reason_code;
 
@@ -1316,18 +1316,12 @@ impl<
                     Some(CPublishFlightState::AwaitingPuback) if reason_code.is_success() => {
                         debug!("publication with packet identifier {} complete", pid);
 
-                        Event::PublishAcknowledged(Puback {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishAcknowledged(Puback::from(puback))
                     }
                     Some(CPublishFlightState::AwaitingPuback) => {
                         debug!("publication with packet identifier {} aborted", pid);
 
-                        Event::PublishRejected(Pubrej {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishRejected(Pubrej::from(puback))
                     }
                     Some(
                         s @ CPublishFlightState::AwaitingPubrec
@@ -1353,7 +1347,7 @@ impl<
                 }
             }
             PacketType::Pubrec => {
-                let pubrec = self.raw.recv_body::<PubrecPacket>(&header).await?;
+                let pubrec = self.raw.recv_body::<PubrecPacket<_>>(&header).await?;
                 let pid = pubrec.packet_identifier;
                 let reason_code = pubrec.reason_code;
 
@@ -1363,7 +1357,7 @@ impl<
                         // removing a cpublish frees space to add a new in flight entry.
                         unsafe { self.session.await_pubcomp(pid) };
 
-                        let pubrel = PubrelPacket::new(pid, ReasonCode::Success);
+                        let pubrel = PubrelPacket::<0>::new(pid, ReasonCode::Success);
 
                         debug!("sending PUBREL packet");
 
@@ -1373,10 +1367,7 @@ impl<
                         self.raw.send(&pubrel).await?;
                         self.raw.flush().await?;
 
-                        Event::PublishReceived(Puback {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishReceived(Puback::from(pubrec))
                     }
                     Some(CPublishFlightState::AwaitingPubrec) => {
                         // After receiving an erroneous PUBREC, we have to treat any subsequent PUBLISH packet
@@ -1385,10 +1376,7 @@ impl<
 
                         debug!("publication with packet identifier {} aborted", pid);
 
-                        Event::PublishRejected(Pubrej {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishRejected(Pubrej::from(pubrec))
                     }
                     Some(
                         s @ CPublishFlightState::AwaitingPuback
@@ -1410,7 +1398,8 @@ impl<
                     None => {
                         debug!("packet identifier {} in PUBREC not in use", pid);
 
-                        let pubrel = PubrelPacket::new(pid, ReasonCode::PacketIdentifierNotFound);
+                        let pubrel =
+                            PubrelPacket::<0>::new(pid, ReasonCode::PacketIdentifierNotFound);
 
                         debug!("sending PUBREL packet");
 
@@ -1425,13 +1414,13 @@ impl<
                 }
             }
             PacketType::Pubrel => {
-                let pubrel = self.raw.recv_body::<PubrelPacket>(&header).await?;
+                let pubrel = self.raw.recv_body::<PubrelPacket<_>>(&header).await?;
                 let pid = pubrel.packet_identifier;
                 let reason_code = pubrel.reason_code;
 
                 match self.session.remove_spublish(pid) {
                     Some(SPublishFlightState::AwaitingPubrel) if reason_code.is_success() => {
-                        let pubcomp = PubcompPacket::new(pid, ReasonCode::Success);
+                        let pubcomp = PubcompPacket::<0>::new(pid, ReasonCode::Success);
 
                         debug!("sending PUBCOMP packet");
 
@@ -1441,23 +1430,18 @@ impl<
                         self.raw.send(&pubcomp).await?;
                         self.raw.flush().await?;
 
-                        Event::PublishReleased(Puback {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishReleased(Puback::from(pubrel))
                     }
                     Some(SPublishFlightState::AwaitingPubrel) => {
                         debug!("publication with packet identifier {} aborted", pid);
 
-                        Event::PublishRejected(Pubrej {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishRejected(Pubrej::from(pubrel))
                     }
                     None => {
                         debug!("packet identifier {} in PUBREL not in use", pid);
 
-                        let pubcomp = PubcompPacket::new(pid, ReasonCode::PacketIdentifierNotFound);
+                        let pubcomp =
+                            PubcompPacket::<0>::new(pid, ReasonCode::PacketIdentifierNotFound);
 
                         debug!("sending PUBCOMP packet");
 
@@ -1472,7 +1456,7 @@ impl<
                 }
             }
             PacketType::Pubcomp => {
-                let pubcomp = self.raw.recv_body::<PubcompPacket>(&header).await?;
+                let pubcomp = self.raw.recv_body::<PubcompPacket<_>>(&header).await?;
                 let pid = pubcomp.packet_identifier;
                 let reason_code = pubcomp.reason_code;
 
@@ -1480,18 +1464,12 @@ impl<
                     Some(CPublishFlightState::AwaitingPubcomp) if reason_code.is_success() => {
                         debug!("publication with packet identifier {} complete", pid);
 
-                        Event::PublishComplete(Puback {
-                            packet_identifier: pid,
-                            reason_code: pubcomp.reason_code,
-                        })
+                        Event::PublishComplete(Puback::from(pubcomp))
                     }
                     Some(CPublishFlightState::AwaitingPubcomp) => {
                         debug!("publication with packet identifier {} aborted", pid);
 
-                        Event::PublishRejected(Pubrej {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishRejected(Pubrej::from(pubcomp))
                     }
                     Some(
                         s @ CPublishFlightState::AwaitingPuback
