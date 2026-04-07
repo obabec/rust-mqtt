@@ -242,7 +242,7 @@ mod unit {
                 h,
                 FixedHeader {
                     type_and_flags: 0x89,
-                    remaining_len: VarByteInt::from(110u8),
+                    remaining_len: VarByteInt::from(110u8)
                 }
             );
 
@@ -257,7 +257,7 @@ mod unit {
                 h,
                 FixedHeader {
                     type_and_flags: 0xA0,
-                    remaining_len: VarByteInt::from(16_383u16),
+                    remaining_len: VarByteInt::from(16_383u16)
                 }
             );
         };
