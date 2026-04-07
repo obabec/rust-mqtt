@@ -54,7 +54,7 @@ impl defmt::Format for PacketIdentifier {
 }
 
 impl<R: Read> Readable<R> for PacketIdentifier {
-    async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
+    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         u16::read(read)
             .await
             .map(NonZero::new)?
