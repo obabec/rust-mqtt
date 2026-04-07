@@ -310,6 +310,7 @@ async fn main() {
             Ok(Event::PublishComplete(Puback {
                 packet_identifier,
                 reason_code: _,
+                user_properties: _,
             })) if packet_identifier == incomplete_publish_packet_identifier => {
                 info!("Completed republish of packet identifier {packet_identifier}");
                 break;
