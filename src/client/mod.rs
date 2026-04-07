@@ -532,23 +532,45 @@ impl<
     /// * [`MqttError::SessionBuffer`] if the buffer for outgoing SUBSCRIBE packet identifiers is full
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this SUBSCRIBE packet
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`SubscriptionOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
     pub async fn subscribe(
         &mut self,
         topic_filter: TopicFilter<'_>,
-        options: SubscriptionOptions,
+        options: &SubscriptionOptions<'_>,
     ) -> Result<PacketIdentifier, MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to send SUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         if self.pending_suback.len() == MAX_SUBSCRIBES {
             info!("maximum concurrent subscriptions reached");
             return Err(MqttError::SessionBuffer);
         }
 
-        let subscribe_filter = SubscriptionFilter::new(topic_filter, &options);
+        let subscribe_filter = SubscriptionFilter::new(topic_filter, options);
 
         let pid = self.packet_identifier();
         let mut subscribe_filters = Vec::<_, 1>::new();
         let _ = subscribe_filters.push(subscribe_filter);
-        let packet = SubscribePacket::new(pid, options.subscription_identifier, subscribe_filters)
-            .expect("SUBSCRIBE with a single topic can not exceed VarByteInt::MAX_ENCODABLE");
+        let packet = SubscribePacket::<1, MAX_USER_PROPERTIES>::new(
+            pid,
+            options.subscription_identifier.map(Into::into),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+            subscribe_filters,
+        )
+        .expect("SUBSCRIBE with a single topic can not exceed VarByteInt::MAX_ENCODABLE");
 
         if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
