@@ -2,7 +2,7 @@ use crate::{
     eio::Write,
     fmt::unreachable,
     io::err::WriteError,
-    types::{MqttBinary, MqttString, TopicFilter, TopicName, VarByteInt},
+    types::{MqttBinary, MqttString, MqttStringPair, TopicFilter, TopicName, VarByteInt},
 };
 
 pub trait Writable {
@@ -125,6 +125,16 @@ impl Writable for MqttString<'_> {
 
     async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
         self.0.write(write).await
+    }
+}
+impl Writable for MqttStringPair<'_> {
+    fn written_len(&self) -> usize {
+        self.name.written_len() + self.value.written_len()
+    }
+
+    async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
+        self.name.write(write).await?;
+        self.value.write(write).await
     }
 }
 impl Writable for TopicName<'_> {
