@@ -270,7 +270,7 @@ impl<
         net: N,
         options: &ConnectOptions<'_>,
         client_identifier: Option<MqttString<'d>>,
-    ) -> Result<ConnectInfo<'d>, MqttError<'c>>
+    ) -> Result<ConnectInfo<'d, MAX_USER_PROPERTIES>, MqttError<'c, MAX_USER_PROPERTIES>>
     where
         'c: 'd,
     {
@@ -378,7 +378,7 @@ impl<
         let header = self.raw.recv_header().await?;
 
         match header.packet_type() {
-            Ok(ConnackPacket::PACKET_TYPE) => debug!(
+            Ok(ConnackPacket::<MAX_USER_PROPERTIES>::PACKET_TYPE) => debug!(
                 "received CONNACK packet header (remaining length: {})",
                 header.remaining_len.value()
             ),
@@ -395,7 +395,7 @@ impl<
             }
         }
 
-        let ConnackPacket {
+        let ConnackPacket::<MAX_USER_PROPERTIES> {
             session_present,
             reason_code,
             session_expiry_interval,
@@ -406,6 +406,7 @@ impl<
             assigned_client_identifier,
             topic_alias_maximum,
             reason_string,
+            user_properties,
             wildcard_subscription_available,
             subscription_identifier_available,
             shared_subscription_available,
@@ -466,6 +467,10 @@ impl<
             Ok(ConnectInfo {
                 session_present,
                 client_identifier,
+                user_properties: user_properties
+                    .into_iter()
+                    .map(Property::into_inner)
+                    .collect(),
                 response_information: response_information.map(Property::into_inner),
                 server_reference: server_reference.map(Property::into_inner),
             })
@@ -480,6 +485,10 @@ impl<
             Err(MqttError::Disconnect {
                 reason: reason_code,
                 reason_string: reason_string.map(Property::into_inner),
+                user_properties: user_properties
+                    .into_iter()
+                    .map(Property::into_inner)
+                    .collect(),
                 server_reference: server_reference.map(Property::into_inner),
             })
         }
@@ -491,7 +500,7 @@ impl<
     ///
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
-    pub async fn ping(&mut self) -> Result<(), MqttError<'c>> {
+    pub async fn ping(&mut self) -> Result<(), MqttError<'c, 0>> {
         debug!("sending PINGREQ packet");
 
         // PINGREQ has length 2 which really shouldn't exceed server's max packet size.
@@ -527,7 +536,7 @@ impl<
         &mut self,
         topic_filter: TopicFilter<'_>,
         options: SubscriptionOptions,
-    ) -> Result<PacketIdentifier, MqttError<'c>> {
+    ) -> Result<PacketIdentifier, MqttError<'c, 0>> {
         if self.pending_suback.len() == MAX_SUBSCRIBES {
             info!("maximum concurrent subscriptions reached");
             return Err(MqttError::SessionBuffer);
@@ -573,7 +582,7 @@ impl<
     pub async fn unsubscribe(
         &mut self,
         topic_filter: TopicFilter<'_>,
-    ) -> Result<PacketIdentifier, MqttError<'c>> {
+    ) -> Result<PacketIdentifier, MqttError<'c, 0>> {
         if self.pending_unsuback.len() == MAX_SUBSCRIBES {
             info!("maximum concurrent unsubscriptions reached");
             return Err(MqttError::SessionBuffer);
@@ -622,7 +631,7 @@ impl<
         &mut self,
         options: &PublicationOptions<'_>,
         message: Bytes<'_>,
-    ) -> Result<Option<PacketIdentifier>, MqttError<'c>> {
+    ) -> Result<Option<PacketIdentifier>, MqttError<'c, 0>> {
         if options.qos > QoS::AtMostOnce {
             if self.remaining_send_quota() == 0 {
                 info!("server receive maximum reached");
@@ -737,7 +746,7 @@ impl<
         packet_identifier: PacketIdentifier,
         options: &PublicationOptions<'_>,
         message: Bytes<'_>,
-    ) -> Result<(), MqttError<'c>> {
+    ) -> Result<(), MqttError<'c, 0>> {
         if options.qos == QoS::AtMostOnce {
             panic!("QoS 0 packets cannot be republished");
         }
@@ -837,7 +846,7 @@ impl<
     ///
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
-    pub async fn rerelease(&mut self) -> Result<(), MqttError<'c>> {
+    pub async fn rerelease(&mut self) -> Result<(), MqttError<'c, 0>> {
         for packet_identifier in self
             .session
             .pending_client_publishes
@@ -885,7 +894,22 @@ impl<
     /// * [`MqttError::IllegalDisconnectSessionExpiryInterval`] if the session expiry interval in the
     ///   CONNECT packet was zero and the session expiry interval in the [`DisconnectOptions`] is [`Some`]
     ///   and not [`SessionExpiryInterval::EndOnDisconnect`].
-    pub async fn disconnect(&mut self, options: &DisconnectOptions) -> Result<(), MqttError<'c>> {
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`DisconnectOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
+    pub async fn disconnect(
+        &mut self,
+        options: &DisconnectOptions<'_>,
+    ) -> Result<(), MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to send DISCONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         let connect_session_expiry_interval_was_zero =
             self.client_config.session_expiry_interval == SessionExpiryInterval::EndOnDisconnect;
         let disconnect_session_expiry_interval_is_non_zero = options
@@ -904,7 +928,15 @@ impl<
             ReasonCode::Success
         };
 
-        let mut packet = DisconnectPacket::new(reason_code);
+        let mut packet = DisconnectPacket::<0>::new(
+            reason_code,
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+        );
         if let Some(s) = options.session_expiry_interval {
             packet.add_session_expiry_interval(s);
         }
@@ -940,8 +972,10 @@ impl<
     ///
     /// Returns the errors that [`Client::poll_header`] and [`Client::poll_body`] return.
     /// For further information view their docs.
-    pub async fn poll(&mut self) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c>> {
-        let header = self.poll_header().await?;
+    pub async fn poll(
+        &mut self,
+    ) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c, MAX_USER_PROPERTIES>> {
+        let header = self.poll_header().await.map_err(MqttError::inflate)?;
         self.poll_body(header).await
     }
 
@@ -963,7 +997,7 @@ impl<
     /// * [`MqttError::Server`] if:
     ///   * the server sends a malformed packet header
     ///   * the packet following this header exceeds the client's maximum packet size
-    pub async fn poll_header(&mut self) -> Result<FixedHeader, MqttError<'c>> {
+    pub async fn poll_header(&mut self) -> Result<FixedHeader, MqttError<'c, 0>> {
         let header = self.raw.recv_header().await?;
 
         if let Ok(p) = header.packet_type() {
@@ -1018,7 +1052,7 @@ impl<
     pub async fn poll_body(
         &mut self,
         header: FixedHeader,
-    ) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c>> {
+    ) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c, MAX_USER_PROPERTIES>> {
         let event = match header.packet_type()? {
             PacketType::Pingresp => {
                 self.raw.recv_body::<PingrespPacket>(&header).await?;
@@ -1377,11 +1411,19 @@ impl<
                 }
             }
             PacketType::Disconnect => {
-                let disconnect = self.raw.recv_body::<DisconnectPacket>(&header).await?;
+                let disconnect = self
+                    .raw
+                    .recv_body::<DisconnectPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
 
                 return Err(MqttError::Disconnect {
                     reason: disconnect.reason_code,
                     reason_string: disconnect.reason_string.map(Property::into_inner),
+                    user_properties: disconnect
+                        .user_properties
+                        .into_iter()
+                        .map(Property::into_inner)
+                        .collect(),
                     server_reference: disconnect.server_reference.map(Property::into_inner),
                 });
             }
