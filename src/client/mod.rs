@@ -1308,7 +1308,10 @@ impl<
                 }
             }
             PacketType::Puback => {
-                let puback = self.raw.recv_body::<PubackPacket<_>>(&header).await?;
+                let puback = self
+                    .raw
+                    .recv_body::<PubackPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = puback.packet_identifier;
                 let reason_code = puback.reason_code;
 
@@ -1347,7 +1350,10 @@ impl<
                 }
             }
             PacketType::Pubrec => {
-                let pubrec = self.raw.recv_body::<PubrecPacket<_>>(&header).await?;
+                let pubrec = self
+                    .raw
+                    .recv_body::<PubrecPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = pubrec.packet_identifier;
                 let reason_code = pubrec.reason_code;
 
@@ -1414,7 +1420,10 @@ impl<
                 }
             }
             PacketType::Pubrel => {
-                let pubrel = self.raw.recv_body::<PubrelPacket<_>>(&header).await?;
+                let pubrel = self
+                    .raw
+                    .recv_body::<PubrelPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = pubrel.packet_identifier;
                 let reason_code = pubrel.reason_code;
 
@@ -1456,7 +1465,10 @@ impl<
                 }
             }
             PacketType::Pubcomp => {
-                let pubcomp = self.raw.recv_body::<PubcompPacket<_>>(&header).await?;
+                let pubcomp = self
+                    .raw
+                    .recv_body::<PubcompPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = pubcomp.packet_identifier;
                 let reason_code = pubcomp.reason_code;
 
