@@ -671,11 +671,23 @@ impl<
     ///   with MQTT's [`VarByteInt`]
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this PUBLISH packet
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`PublicationOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
     pub async fn publish(
         &mut self,
         options: &PublicationOptions<'_>,
         message: Bytes<'_>,
     ) -> Result<Option<PacketIdentifier>, MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         if options.qos > QoS::AtMostOnce {
             if self.remaining_send_quota() == 0 {
                 info!("server receive maximum reached");
@@ -701,7 +713,7 @@ impl<
             return Err(MqttError::InvalidTopicAlias);
         }
 
-        let packet: PublishPacket<'_, 0> = PublishPacket::new(
+        let packet = PublishPacket::<0, MAX_USER_PROPERTIES>::new(
             false,
             identified_qos,
             options.retain,
@@ -713,6 +725,12 @@ impl<
                 .correlation_data
                 .as_ref()
                 .map(MqttBinary::as_borrowed),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
             options
                 .content_type
                 .as_ref()
@@ -785,12 +803,21 @@ impl<
     /// # Panics
     ///
     /// This function may panic if the [`QoS`] in the `options` is [`QoS::AtMostOnce`].
+    /// This function panics if the length of the `user_properties` slice in the [`PublicationOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
     pub async fn republish(
         &mut self,
         packet_identifier: PacketIdentifier,
         options: &PublicationOptions<'_>,
         message: Bytes<'_>,
     ) -> Result<(), MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         if options.qos == QoS::AtMostOnce {
             panic!("QoS 0 packets cannot be republished");
         }
@@ -838,7 +865,7 @@ impl<
             return Err(MqttError::InvalidTopicAlias);
         }
 
-        let packet: PublishPacket<'_, 0> = PublishPacket::new(
+        let packet = PublishPacket::<0, MAX_USER_PROPERTIES>::new(
             true,
             identified_qos,
             options.retain,
@@ -850,6 +877,12 @@ impl<
                 .correlation_data
                 .as_ref()
                 .map(MqttBinary::as_borrowed),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
             options
                 .content_type
                 .as_ref()
@@ -1179,7 +1212,9 @@ impl<
             PacketType::Publish => {
                 let publish = self
                     .raw
-                    .recv_body::<PublishPacket<'_, MAX_SUBSCRIPTION_IDENTIFIERS>>(&header)
+                    .recv_body::<PublishPacket<MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>>(
+                        &header,
+                    )
                     .await?;
 
                 // Our topic alias maximum is always 0, the moment we receive a topic alias, this is an error.
@@ -1202,6 +1237,11 @@ impl<
                         .map(Property::into_inner),
                     response_topic: publish.response_topic.map(Property::into_inner),
                     correlation_data: publish.correlation_data.map(Property::into_inner),
+                    user_properties: publish
+                        .user_properties
+                        .into_iter()
+                        .map(Property::into_inner)
+                        .collect(),
                     subscription_identifiers: publish
                         .subscription_identifiers
                         .into_iter()

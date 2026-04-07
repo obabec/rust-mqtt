@@ -1,6 +1,6 @@
 use const_fn::const_fn;
 
-use crate::types::{MqttBinary, MqttString, QoS, TopicName};
+use crate::types::{MqttBinary, MqttString, MqttStringPair, QoS, TopicName};
 
 /// Options for a publication.
 #[derive(Debug, Clone)]
@@ -40,6 +40,10 @@ pub struct Options<'p> {
     /// their response with this request.
     pub correlation_data: Option<MqttBinary<'p>>,
 
+    /// Arbitrary key-value pairs of strings. Note that this slice's length must be less than
+    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    pub user_properties: &'p [MqttStringPair<'p>],
+
     /// The custom content type of the message.
     pub content_type: Option<MqttString<'p>>,
 }
@@ -57,6 +61,7 @@ impl<'p> Options<'p> {
             message_expiry_interval: None,
             response_topic: None,
             correlation_data: None,
+            user_properties: &[],
             content_type: None,
         }
     }
@@ -107,6 +112,13 @@ impl<'p> Options<'p> {
     #[must_use]
     pub const fn correlation_data(mut self, data: MqttBinary<'p>) -> Self {
         self.correlation_data = Some(data);
+        self
+    }
+    /// Sets the user properties. Note that this slice's length must be less than
+    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    #[must_use]
+    pub const fn user_properties(mut self, user_properties: &'p [MqttStringPair<'p>]) -> Self {
+        self.user_properties = user_properties;
         self
     }
     /// Sets the content type property.
