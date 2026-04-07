@@ -2,20 +2,20 @@
 
 use heapless::Vec;
 
+#[allow(unused_imports)]
+use crate::types::QoS;
 use crate::{
     bytes::Bytes,
     types::{
-        IdentifiedQoS, MqttBinary, MqttString, PacketIdentifier, ReasonCode, TopicName, VarByteInt,
+        IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, PacketIdentifier, ReasonCode,
+        TopicName, VarByteInt,
     },
 };
-
-#[allow(unused_imports)]
-use crate::types::QoS;
 
 /// Events emitted by the client when receiving an MQTT packet.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
+pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PROPERTIES: usize> {
     /// The server sent a PINGRESP packet.
     Pingresp,
 
@@ -31,13 +31,13 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     ///
     /// The subscription process is complete and was successful if the reason code indicates success.
     /// The SUBSCRIBE packet won't have to be resent.
-    Suback(Suback),
+    Suback(Suback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent an UNSUBACK packet matching an UNSUBSCRIBE packet.
     ///
     /// The unsubscription process is complete and was successful if the reason code indicates success.
     /// The UNSUBSCRIBE packet won't have to be resent.
-    Unsuback(Suback),
+    Unsuback(Suback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a PUBACK or PUBREC with an erroneous reason code,
     /// therefore rejecting the publication.
@@ -103,9 +103,14 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
 /// Content of [`Event::Suback`].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Suback {
+pub struct Suback<'s, const MAX_USER_PROPERTIES: usize> {
     /// Packet identifier of the acknowledged SUBSCRIBE packet.
     pub packet_identifier: PacketIdentifier,
+
+    /// The user property entries in the SUBACK/UNSUBACK packet.
+    /// If the vector is full, this list might not be exhaustive.
+    pub user_properties: Vec<MqttStringPair<'s>, MAX_USER_PROPERTIES>,
+
     /// Reason code returned for the subscription.
     pub reason_code: ReasonCode,
 }

@@ -1018,7 +1018,10 @@ impl<
     /// For further information view their docs.
     pub async fn poll(
         &mut self,
-    ) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c, MAX_USER_PROPERTIES>> {
+    ) -> Result<
+        Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>,
+        MqttError<'c, MAX_USER_PROPERTIES>,
+    > {
         let header = self.poll_header().await.map_err(MqttError::inflate)?;
         self.poll_body(header).await
     }
@@ -1096,7 +1099,10 @@ impl<
     pub async fn poll_body(
         &mut self,
         header: FixedHeader,
-    ) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c, MAX_USER_PROPERTIES>> {
+    ) -> Result<
+        Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>,
+        MqttError<'c, MAX_USER_PROPERTIES>,
+    > {
         let event = match header.packet_type()? {
             PacketType::Pingresp => {
                 self.raw.recv_body::<PingrespPacket>(&header).await?;
@@ -1106,7 +1112,10 @@ impl<
                 // We only send SUBSCRIBE packets with exactly 1 topic
                 // -> Packets with more than 1 reason code are currently rejected by the RxPacket::receive implementation
                 //    with RxError::Protocol error. This is correct as long as we only send SUBSCRIBE packets with 1 topic.
-                let suback = self.raw.recv_body::<SubackPacket<'_, 1>>(&header).await?;
+                let suback = self
+                    .raw
+                    .recv_body::<SubackPacket<1, MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = suback.packet_identifier;
 
                 if Self::remove_packet_identifier_if_exists(&mut self.pending_suback, pid) {
@@ -1121,6 +1130,11 @@ impl<
 
                     Event::Suback(Suback {
                         packet_identifier: pid,
+                        user_properties: suback
+                            .user_properties
+                            .into_iter()
+                            .map(Property::into_inner)
+                            .collect(),
                         reason_code: *r,
                     })
                 } else {
@@ -1132,7 +1146,10 @@ impl<
                 // We only send UNSUBSCRIBE packets with exactly 1 topic
                 // -> Packets with more than 1 reason code are currently rejected by the RxPacket::receive implementation
                 //    with RxError::Protocol error. This is correct as long as we only send UNSUBSCRIBE packets with 1 topic.
-                let unsuback = self.raw.recv_body::<UnsubackPacket<'_, 1>>(&header).await?;
+                let unsuback = self
+                    .raw
+                    .recv_body::<UnsubackPacket<1, MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = unsuback.packet_identifier;
 
                 if Self::remove_packet_identifier_if_exists(&mut self.pending_unsuback, pid) {
@@ -1147,6 +1164,11 @@ impl<
 
                     Event::Unsuback(Suback {
                         packet_identifier: pid,
+                        user_properties: unsuback
+                            .user_properties
+                            .into_iter()
+                            .map(Property::into_inner)
+                            .collect(),
                         reason_code: *r,
                     })
                 } else {
