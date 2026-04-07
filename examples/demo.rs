@@ -103,8 +103,11 @@ async fn main() {
     match client.poll().await {
         Ok(Event::Suback(Suback {
             packet_identifier: _,
+            user_properties: _,
             reason_code,
-        })) => info!("Subscribed with reason code {reason_code:?}"),
+        })) => {
+            info!("Subscribed with reason code {reason_code:?}")
+        }
         Ok(e) => {
             error!("Expected Suback but received event {e:?}");
             return;
@@ -204,8 +207,11 @@ async fn main() {
     match client.poll().await {
         Ok(Event::Unsuback(Suback {
             packet_identifier: _,
+            user_properties: _,
             reason_code,
-        })) => info!("Unsubscribed with reason code {reason_code:?}"),
+        })) => {
+            info!("Unsubscribed with reason code {reason_code:?}")
+        }
         Ok(e) => {
             info!("Expected Unsuback but received event {e:?}");
             return;

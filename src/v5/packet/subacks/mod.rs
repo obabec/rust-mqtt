@@ -15,34 +15,42 @@ use crate::{
     types::{PacketIdentifier, ReasonCode, VarByteInt},
     v5::{
         packet::subacks::types::{Suback, SubackPacketType, Unsuback},
-        property::PropertyType,
+        property::{PropertyType, UserProperty},
     },
 };
 
 mod types;
 
-pub type SubackPacket<'p, const MAX_TOPIC_FILTERS: usize> =
-    GenericSubackPacket<'p, Suback, MAX_TOPIC_FILTERS>;
-pub type UnsubackPacket<'p, const MAX_TOPIC_FILTERS: usize> =
-    GenericSubackPacket<'p, Unsuback, MAX_TOPIC_FILTERS>;
+pub type SubackPacket<'p, const MAX_TOPIC_FILTERS: usize, const MAX_USER_PROPERTIES: usize> =
+    GenericSubackPacket<'p, Suback, MAX_TOPIC_FILTERS, MAX_USER_PROPERTIES>;
+pub type UnsubackPacket<'p, const MAX_TOPIC_FILTERS: usize, const MAX_USER_PROPERTIES: usize> =
+    GenericSubackPacket<'p, Unsuback, MAX_TOPIC_FILTERS, MAX_USER_PROPERTIES>;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct GenericSubackPacket<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> {
+pub struct GenericSubackPacket<
+    'p,
+    T,
+    const MAX_TOPIC_FILTERS: usize,
+    const MAX_USER_PROPERTIES: usize,
+> {
     pub packet_identifier: PacketIdentifier,
+
     // reason string is currently unused and does not have to be read into memory.
     // reason_string: Option<ReasonString<'p>>,
+    pub user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
+
     pub reason_codes: Vec<ReasonCode, MAX_TOPIC_FILTERS>,
     _phantom_data: PhantomData<&'p T>,
 }
 
-impl<T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> Packet
-    for GenericSubackPacket<'_, T, MAX_TOPIC_FILTERS>
+impl<T: SubackPacketType, const MAX_TOPIC_FILTERS: usize, const MAX_USER_PROPERTIES: usize> Packet
+    for GenericSubackPacket<'_, T, MAX_TOPIC_FILTERS, MAX_USER_PROPERTIES>
 {
     const PACKET_TYPE: PacketType = T::PACKET_TYPE;
 }
-impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
-    for GenericSubackPacket<'static, T, MAX_TOPIC_FILTERS>
+impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize, const MAX_USER_PROPERTIES: usize>
+    RxPacket<'p> for GenericSubackPacket<'p, T, MAX_TOPIC_FILTERS, MAX_USER_PROPERTIES>
 {
     async fn receive<R: Read, B: BufferProvider<'p>>(
         header: &FixedHeader,
@@ -80,6 +88,9 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
             return Err(RxError::ProtocolError);
         }
 
+        let mut seen_reason_string = false;
+        let mut user_properties = Vec::new();
+
         while properties_length > 0 {
             verbose!(
                 "reading property identifier (remaining length: {} bytes)",
@@ -96,8 +107,6 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
                 r.remaining_len()
             );
 
-            let mut seen_reason_string = false;
-
             #[rustfmt::skip]
             match property_type {
                 PropertyType::ReasonString if seen_reason_string => return Err(RxError::ProtocolError),
@@ -106,18 +115,26 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
                     let len = u16::read(r).await? as usize;
                     verbose!("skipping reason string ({} bytes)", len);
                     r.skip(len).await?;
-                    properties_length = properties_length.checked_sub(wlen!(u16) + len).ok_or(RxError::MalformedPacket)?;
+                    properties_length = properties_length
+                        .checked_sub(wlen!(u16) + len)
+                        .ok_or(RxError::MalformedPacket)?;
                 },
+                PropertyType::UserProperty if !user_properties.is_full() => {
+                    let user_property = UserProperty::read(r).await?;
+
+                    properties_length = properties_length
+                        .checked_sub(user_property.0.written_len())
+                        .ok_or(RxError::MalformedPacket)?;
+
+                    // Safety: `!Vec::is_full` guarantees there is space
+                    unsafe { user_properties.push_unchecked(user_property) };
+                }
                 PropertyType::UserProperty => {
-                    let len = u16::read(r).await? as usize;
-                    verbose!("skipping user property name ({} bytes)", len);
-                    r.skip(len).await?;
-                    properties_length = properties_length.checked_sub(wlen!(u16) + len).ok_or(RxError::MalformedPacket)?;
-                    let len = u16::read(r).await? as usize;
-                    verbose!("skipping user property value ({} bytes)", len);
-                    r.skip(len).await?;
-                    properties_length = properties_length.checked_sub(wlen!(u16) + len).ok_or(RxError::MalformedPacket)?;
-                },
+                    let len = UserProperty::skip(r).await?;
+                    properties_length = properties_length
+                        .checked_sub(len)
+                        .ok_or(RxError::MalformedPacket)?;
+                }
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
                     trace!("invalid {:?} property: {:?}", T::PACKET_TYPE, p);
@@ -153,6 +170,7 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize> RxPacket<'p>
 
         let packet = Self {
             packet_identifier,
+            user_properties,
             reason_codes,
             _phantom_data: PhantomData,
         };
@@ -170,16 +188,16 @@ mod unit {
 
         use crate::{
             test::rx::decode,
-            types::{PacketIdentifier, ReasonCode},
-            v5::packet::SubackPacket,
+            types::{MqttString, MqttStringPair, PacketIdentifier, ReasonCode},
+            v5::{packet::SubackPacket, property::UserProperty},
         };
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_payload() {
             #[rustfmt::skip]
-            let packet: SubackPacket<'_, 12> = decode!(
-                SubackPacket<12>,
+            let packet = decode!(
+                SubackPacket<12, 16>,
                 15,
                 [
                     0x90,
@@ -198,6 +216,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(6025).unwrap())
             );
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
 
             let mut reason_codes: Vec<_, 12> = Vec::new();
             reason_codes.push(ReasonCode::Success).unwrap();
@@ -229,8 +248,8 @@ mod unit {
         #[test_log::test]
         async fn decode_properties() {
             #[rustfmt::skip]
-            let packet: SubackPacket<'_, 1> = decode!(
-                SubackPacket<1>,
+            let packet = decode!(
+                SubackPacket<1, 16>,
                 61,
                 [
                     0x90,
@@ -261,6 +280,19 @@ mod unit {
             //     packet.reason_string,
             //     Some(ReasonString(MqttString::try_from("crazy things").unwrap()))
             // );
+            assert_eq!(
+                packet.user_properties,
+                [
+                    UserProperty(MqttStringPair::new(
+                        MqttString::from_str("some name").unwrap(),
+                        MqttString::from_str("any value").unwrap()
+                    )),
+                    UserProperty(MqttStringPair::new(
+                        MqttString::from_str("any key").unwrap(),
+                        MqttString::from_str("a value").unwrap()
+                    ))
+                ]
+            );
 
             let mut reason_codes: Vec<_, 1> = Vec::new();
             reason_codes.push(ReasonCode::Success).unwrap();
@@ -275,16 +307,16 @@ mod unit {
 
         use crate::{
             test::rx::decode,
-            types::{PacketIdentifier, ReasonCode},
-            v5::packet::UnsubackPacket,
+            types::{MqttString, MqttStringPair, PacketIdentifier, ReasonCode},
+            v5::{packet::UnsubackPacket, property::UserProperty},
         };
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_payload() {
             #[rustfmt::skip]
-            let packet: UnsubackPacket<'_, 7> = decode!(
-                UnsubackPacket<7>,
+            let packet = decode!(
+                UnsubackPacket<7, 16>,
                 10,
                 [
                     0xB0,
@@ -302,6 +334,7 @@ mod unit {
                 PacketIdentifier::new(NonZero::new(41972).unwrap())
             );
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
 
             let mut reason_codes: Vec<_, 7> = Vec::new();
 
@@ -326,8 +359,8 @@ mod unit {
         #[test_log::test]
         async fn decode_properties() {
             #[rustfmt::skip]
-            let packet: UnsubackPacket<'_, 1> = decode!(
-                UnsubackPacket<1>,
+            let packet = decode!(
+                UnsubackPacket<1, 16>,
                 78,
                 [
                     0xB0, 
@@ -361,6 +394,19 @@ mod unit {
             //     packet.reason_string,
             //     Some(ReasonString(MqttString::try_from("get outta here").unwrap()))
             // );
+            assert_eq!(
+                packet.user_properties,
+                [
+                    UserProperty(MqttStringPair::new(
+                        MqttString::from_str("imagine").unwrap(),
+                        MqttString::from_str("all the people").unwrap()
+                    )),
+                    UserProperty(MqttStringPair::new(
+                        MqttString::from_str("pride").unwrap(),
+                        MqttString::from_str("(in the name of love)").unwrap()
+                    ))
+                ]
+            );
 
             let mut reason_codes: Vec<_, 1> = Vec::new();
             reason_codes.push(ReasonCode::Success).unwrap();
