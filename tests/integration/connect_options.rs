@@ -58,7 +58,7 @@ async fn maximum_packet_size_not_exceeded() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             topic_filter.clone()
         );
 
@@ -107,7 +107,7 @@ async fn maximum_packet_size_barely_exceeded() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             topic_filter.clone()
         );
 
@@ -160,7 +160,7 @@ async fn maximum_packet_size_decently_exceeded() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             topic_filter.clone()
         );
 
@@ -214,7 +214,7 @@ async fn maximum_packet_size_at_varbyteint_boundary_not_exceeded() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             topic_filter.clone()
         );
 
@@ -261,7 +261,7 @@ async fn maximum_packet_size_at_varbyteint_boundary_exceeded() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             topic_filter.clone()
         );
 
@@ -513,7 +513,7 @@ async fn keep_alive_via_incoming_qos1() {
     };
 
     let receiver = async {
-        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS.at_least_once(), topic_filter);
+        assert_subscribe!(rx, &DEFAULT_QOS0_SUB_OPTIONS.at_least_once(), topic_filter);
 
         for _ in 0..10 {
             assert_recv_excl!(rx, topic_name);
@@ -529,7 +529,6 @@ async fn keep_alive_via_incoming_qos1() {
 #[test_log::test]
 async fn keep_alive_via_subscribe() {
     let topic_filter = unique_topic().1;
-    let subscribe_options = SubscriptionOptions::new();
 
     let mut c = assert_ok!(
         connected_client(
@@ -549,7 +548,7 @@ async fn keep_alive_via_subscribe() {
     for _ in 0..10 {
         sleep(Duration::from_millis(950)).await;
         assert_ok!(
-            c.subscribe(topic_filter.as_borrowed(), subscribe_options)
+            c.subscribe(topic_filter.as_borrowed(), DEFAULT_QOS0_SUB_OPTIONS)
                 .await
         );
         let event = assert_ok!(c.poll().await);
@@ -592,6 +591,7 @@ async fn keep_alive_not_kept_alive_idle_network() {
         MqttError::Disconnect {
             reason: ReasonCode::KeepAliveTimeout,
             reason_string: _,
+            user_properties: _,
             server_reference: _,
         } | MqttError::Network(_)
     ));
@@ -691,6 +691,7 @@ async fn keep_alive_not_kept_alive_will_timing() {
         MqttError::Disconnect {
             reason: ReasonCode::KeepAliveTimeout,
             reason_string: _,
+            user_properties: _,
             server_reference: _,
         } | MqttError::Network(_)
     ));
@@ -702,8 +703,8 @@ async fn keep_alive_not_kept_alive_will_timing() {
 #[test_log::test]
 async fn receive_maximum() {
     let (topic_name, topic_filter) = unique_topic();
-    let mut rx: Client<'_, _, _, 1, 2, 0, 0> = Client::new(ALLOC.get());
-    let mut tx: Client<'_, _, _, 1, 1, 10, 0> = Client::new(ALLOC.get());
+    let mut rx: Client<'_, _, _, 1, 2, 0, 0, 16> = Client::new(ALLOC.get());
+    let mut tx: Client<'_, _, _, 1, 1, 10, 0, 16> = Client::new(ALLOC.get());
 
     let tcp_rx = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
     let tcp_tx = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -712,7 +713,7 @@ async fn receive_maximum() {
     assert_ok!(tx.connect(tcp_tx, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let pid = assert_ok!(
-        rx.subscribe(topic_filter, SubscriptionOptions::new().exactly_once())
+        rx.subscribe(topic_filter, &SubscriptionOptions::new().exactly_once())
             .await
     );
     let e = assert_ok!(assert_ok!(
@@ -768,7 +769,7 @@ async fn send_maximum_buffer_exceeded() {
     let topic = unique_topic().0;
     const SEND_MAXIMUM_BUFFER_SIZE: usize = 2;
 
-    let mut c: Client<'_, _, _, 1, 1, SEND_MAXIMUM_BUFFER_SIZE, 0> = Client::new(ALLOC.get());
+    let mut c: Client<'_, _, _, 1, 1, SEND_MAXIMUM_BUFFER_SIZE, 0, 16> = Client::new(ALLOC.get());
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
 
@@ -805,7 +806,7 @@ async fn send_maximum_buffer_exceeded() {
 #[test_log::test]
 async fn server_receive_maximum_exceeded() {
     let topic_name = unique_topic().0;
-    let mut c: Client<'_, _, _, 1, 1, 256, 0> = Client::new(ALLOC.get());
+    let mut c: Client<'_, _, _, 1, 1, 256, 0, 16> = Client::new(ALLOC.get());
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
 

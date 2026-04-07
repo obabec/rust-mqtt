@@ -4,7 +4,7 @@ use log::info;
 use rust_mqtt::{
     client::{
         event::Publish,
-        options::{PublicationOptions, TopicReference},
+        options::{PublicationOptions, TopicReference, UnsubscriptionOptions},
     },
     types::{IdentifiedQoS, QoS},
 };
@@ -89,10 +89,9 @@ async fn publish_recv_qos1() {
     };
 
     let receiver = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::AtLeastOnce;
+        let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
 
-        assert_subscribe!(rx, options, topic_filter.clone());
+        assert_subscribe!(rx, &options, topic_filter.clone());
         let Publish {
             identified_qos,
             dup,
@@ -137,10 +136,9 @@ async fn publish_recv_qos2() {
     };
 
     let receiver = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::ExactlyOnce;
+        let options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
 
-        assert_subscribe!(rx, options, topic_filter.clone());
+        assert_subscribe!(rx, &options, topic_filter.clone());
         let Publish {
             identified_qos,
             dup,
@@ -257,11 +255,10 @@ async fn publish_recv_multiple_qos1() {
     };
 
     let receiver = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::AtLeastOnce;
+        let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
 
-        assert_subscribe!(rx, options, topic_filter1.clone());
-        assert_subscribe!(rx, options, topic_filter2.clone());
+        assert_subscribe!(rx, &options, topic_filter1.clone());
+        assert_subscribe!(rx, &options, topic_filter2.clone());
 
         let mut messages = vec![(topic_name1.clone(), msg), (topic_name2.clone(), msg)];
 
@@ -326,11 +323,10 @@ async fn publish_recv_multiple_qos2() {
     };
 
     let receiver = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::ExactlyOnce;
+        let options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
 
-        assert_subscribe!(rx, options, topic_filter1.clone());
-        assert_subscribe!(rx, options, topic_filter2.clone());
+        assert_subscribe!(rx, &options, topic_filter1.clone());
+        assert_subscribe!(rx, &options, topic_filter2.clone());
 
         let mut messages = vec![(topic_name1.clone(), msg), (topic_name2.clone(), msg)];
 
@@ -402,10 +398,10 @@ async fn unsub_no_recv() {
     };
 
     let receiver = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::AtLeastOnce;
-        assert_subscribe!(rx, options, topic_filter1.clone());
-        assert_subscribe!(rx, options, topic_filter2.clone());
+        let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+
+        assert_subscribe!(rx, &options, topic_filter1.clone());
+        assert_subscribe!(rx, &options, topic_filter2.clone());
 
         let m = assert_recv_excl!(rx, topic_name1);
         assert_eq!(&*m.message, msg1.as_bytes());
@@ -413,7 +409,7 @@ async fn unsub_no_recv() {
         let m = assert_recv_excl!(rx, topic_name2);
         assert_eq!(&*m.message, msg2.as_bytes());
 
-        assert_unsubscribe!(rx, topic_filter2.clone());
+        assert_unsubscribe!(rx, &UnsubscriptionOptions::new(), topic_filter2.clone());
 
         let m = assert_recv_excl!(rx, topic_name1);
         assert_eq!(&*m.message, msg1.as_bytes());
@@ -499,10 +495,9 @@ async fn recv_min_sub_qos1() {
     };
 
     let receiver = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::AtLeastOnce;
+        let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
 
-        assert_subscribe!(rx, options, topic_filter.clone());
+        assert_subscribe!(rx, &options, topic_filter.clone());
         let Publish {
             identified_qos,
             dup,
@@ -546,10 +541,9 @@ async fn recv_min_pub_qos0() {
     };
 
     let receiver = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::ExactlyOnce;
+        let options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
 
-        assert_subscribe!(rx, options, topic_filter.clone());
+        assert_subscribe!(rx, &options, topic_filter.clone());
         let Publish {
             identified_qos,
             dup,
@@ -594,10 +588,9 @@ async fn recv_min_pub_qos1() {
     };
 
     let receiver = async {
-        let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-        options.qos = QoS::ExactlyOnce;
+        let options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
 
-        assert_subscribe!(rx, options, topic_filter.clone());
+        assert_subscribe!(rx, &options, topic_filter.clone());
         let Publish {
             identified_qos,
             dup,

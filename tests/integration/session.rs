@@ -89,7 +89,7 @@ async fn session_continue_connection_dropped() {
     connect_options.clean_start = false;
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-    let mut c: Client<'_, _, _, 1, 1, 1, 1> = Client::with_session(session, ALLOC.get());
+    let mut c: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
     let info = assert_ok!(warn_inspect!(
         c.connect(tcp, &connect_options, Some(id.as_borrowed()))
             .await,
@@ -145,7 +145,7 @@ async fn session_discontinued_clean_start() {
     drop(c);
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-    let mut c: Client<'_, _, _, 1, 1, 1, 1> = Client::with_session(session, ALLOC.get());
+    let mut c: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
     let info = assert_ok!(warn_inspect!(
         c.connect(tcp, &connect_options, Some(id.as_borrowed()))
             .await,
@@ -192,7 +192,7 @@ async fn session_expired() {
     sleep(Duration::from_secs(5)).await;
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-    let mut c: Client<'_, _, _, 1, 1, 1, 1> = Client::with_session(session, ALLOC.get());
+    let mut c: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
     let info = assert_ok!(warn_inspect!(
         c.connect(tcp, &connect_options, Some(id.as_borrowed()))
             .await,

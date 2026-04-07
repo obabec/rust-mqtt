@@ -56,6 +56,7 @@ async fn network_failure() {
             message_expiry_interval,
             response_topic,
             correlation_data,
+            user_properties,
             subscription_identifiers,
             content_type,
             message,
@@ -68,6 +69,7 @@ async fn network_failure() {
         assert_eq!(message_expiry_interval, None);
         assert_eq!(response_topic, None);
         assert_eq!(correlation_data, None);
+        assert!(user_properties.is_empty());
         assert!(subscription_identifiers.is_empty());
         assert_eq!(content_type, None);
         assert_eq!(&*message, will_msg.as_bytes());
@@ -112,6 +114,7 @@ async fn disconnect_with_will_message() {
             message_expiry_interval,
             response_topic,
             correlation_data,
+            user_properties,
             subscription_identifiers,
             content_type,
             message,
@@ -124,6 +127,7 @@ async fn disconnect_with_will_message() {
         assert_eq!(message_expiry_interval, None);
         assert_eq!(response_topic, None);
         assert_eq!(correlation_data, None);
+        assert!(user_properties.is_empty());
         assert!(subscription_identifiers.is_empty());
         assert_eq!(content_type, None);
         assert_eq!(&*message, will_msg.as_bytes());
@@ -284,6 +288,7 @@ async fn properties() {
             message_expiry_interval,
             response_topic,
             correlation_data,
+            user_properties,
             subscription_identifiers,
             content_type,
             message,
@@ -332,7 +337,7 @@ async fn qos0() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             will_topic_filter
         );
 
@@ -373,7 +378,7 @@ async fn qos1() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             will_topic_filter
         );
 
@@ -414,7 +419,7 @@ async fn qos2() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             will_topic_filter
         );
 
@@ -797,6 +802,7 @@ async fn will_existing_session_taken_over_with_session_expiry() {
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
                 reason_string: _,
+                user_properties: _,
                 server_reference: _,
             }
         ));
@@ -863,6 +869,7 @@ async fn will_existing_session_taken_over_with_will_delay() {
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
                 reason_string: _,
+                user_properties: _,
                 server_reference: _,
             }
         ));
@@ -925,6 +932,7 @@ async fn will_existing_session_taken_over_with_clean_start() {
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
                 reason_string: _,
+                user_properties: _,
                 server_reference: _,
             }
         ));
@@ -988,6 +996,7 @@ async fn no_will_existing_session_taken_over() {
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
                 reason_string: _,
+                user_properties: _,
                 server_reference: _,
             }
         ));
@@ -1160,7 +1169,7 @@ async fn retain() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.retain_as_published(),
+            &DEFAULT_QOS0_SUB_OPTIONS.retain_as_published(),
             will_topic_filter.clone()
         );
 
