@@ -25,7 +25,7 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PRO
     /// - [`QoS`] 0: No action
     /// - [`QoS`] 1: A PUBACK packet has been sent to the server.
     /// - [`QoS`] 2: A PUBREC packet has been sent to the server and the packet identifier is tracked as in flight
-    Publish(Publish<'e, MAX_SUBSCRIPTION_IDENTIFIERS>),
+    Publish(Publish<'e, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>),
 
     /// The server sent a SUBACK packet matching a SUBSCRIBE packet.
     ///
@@ -118,7 +118,8 @@ pub struct Suback<'s, const MAX_USER_PROPERTIES: usize> {
 /// Content of [`Event::Publish`].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
+pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PROPERTIES: usize>
+{
     /// The DUP flag in the PUBLISH packet. If set to false, it indicates that this is the first occasion
     /// the server has attempted to send this publication.
     pub dup: bool,
@@ -157,6 +158,10 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// associating either the following response with this specific request or in case of a response,
     /// link back to the original request.
     pub correlation_data: Option<MqttBinary<'p>>,
+
+    /// The user property entries in the PUBLISH packet. If the vector is full, this list might not be
+    /// exhaustive.
+    pub user_properties: Vec<MqttStringPair<'p>, MAX_USER_PROPERTIES>,
 
     /// The subscription identifiers in the PUBLISH packet. If the vector is full, this list might not
     /// be exhaustive.
