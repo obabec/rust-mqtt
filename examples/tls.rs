@@ -107,11 +107,5 @@ async fn main() {
 
     sleep(Duration::from_secs(5)).await;
 
-    client
-        .disconnect(&DisconnectOptions {
-            publish_will: false,
-            session_expiry_interval: None,
-        })
-        .await
-        .unwrap();
+    client.disconnect(&DisconnectOptions::new()).await.unwrap();
 }
