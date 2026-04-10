@@ -5,7 +5,7 @@ use rust_mqtt::{
         Client,
         options::{PublicationOptions, RetainHandling, TopicReference},
     },
-    types::{MqttString, QoS, VarByteInt},
+    types::{MqttString, VarByteInt},
 };
 use tokio::time::{sleep, timeout};
 use tokio_test::assert_err;
@@ -26,10 +26,8 @@ async fn publish_no_local() {
     let mut c =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-    options.qos = QoS::ExactlyOnce;
-    options.no_local = true;
-    assert_subscribe!(c, options, topic_filter.clone());
+    let options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once().no_local();
+    assert_subscribe!(c, &options, topic_filter.clone());
 
     let pub_options =
         PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
@@ -76,17 +74,15 @@ async fn subscribe_retain_handling_default() {
     sleep(Duration::from_secs(1)).await;
 
     // Subscribe with RetainHandling::AlwaysSend (default) - should receive retained message
-    let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-    options.qos = QoS::AtLeastOnce;
-    options.retain_handling = RetainHandling::AlwaysSend;
-    assert_subscribe!(rx, options, topic_filter.clone());
+    let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+    assert_subscribe!(rx, &options, topic_filter.clone());
 
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());
     assert!(publish.retain);
 
     // Subscribe again - should receive retained message again with RetainHandling::AlwaysSend
-    assert_subscribe!(rx, options, topic_filter.clone());
+    assert_subscribe!(rx, &options, topic_filter.clone());
 
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());
@@ -103,7 +99,7 @@ async fn subscribe_retain_handling_default() {
         )
         .await
     );
-    assert_subscribe!(rx, options, topic_filter.clone());
+    assert_subscribe!(rx, &options, topic_filter.clone());
 
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());
@@ -135,10 +131,10 @@ async fn subscribe_retain_handling_never() {
     sleep(Duration::from_secs(1)).await;
 
     // Subscribe with NeverSend - should NOT receive retained message
-    let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-    options.qos = QoS::AtLeastOnce;
-    options.retain_handling = RetainHandling::NeverSend;
-    assert_subscribe!(rx, options, topic_filter.clone());
+    let options = DEFAULT_QOS0_SUB_OPTIONS
+        .at_least_once()
+        .retain_handling(RetainHandling::NeverSend);
+    assert_subscribe!(rx, &options, topic_filter.clone());
 
     assert_err!(
         timeout(Duration::from_secs(5), async {
@@ -149,7 +145,7 @@ async fn subscribe_retain_handling_never() {
     );
 
     // Subscribe again - should still NOT receive retained message
-    assert_subscribe!(rx, options, topic_filter.clone());
+    assert_subscribe!(rx, &options, topic_filter.clone());
 
     assert_err!(
         timeout(Duration::from_secs(5), async {
@@ -185,17 +181,17 @@ async fn subscribe_retain_handling_clean_only() {
     sleep(Duration::from_secs(1)).await;
 
     // Subscribe for the first time with RetainHandling::SendIfNotSubscribedBefore - should receive retained message
-    let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-    options.qos = QoS::AtLeastOnce;
-    options.retain_handling = RetainHandling::SendIfNotSubscribedBefore;
-    assert_subscribe!(rx, options, topic_filter.clone());
+    let options = DEFAULT_QOS0_SUB_OPTIONS
+        .at_least_once()
+        .retain_handling(RetainHandling::SendIfNotSubscribedBefore);
+    assert_subscribe!(rx, &options, topic_filter.clone());
 
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());
     assert!(publish.retain);
 
     // Subscribe again - should NOT receive retained message (already subscribed before)
-    assert_subscribe!(rx, options, topic_filter.clone());
+    assert_subscribe!(rx, &options, topic_filter.clone());
 
     assert_err!(
         timeout(Duration::from_secs(5), async {
@@ -269,9 +265,8 @@ async fn subscribe_retain_as_published_true() {
 
     sleep(Duration::from_secs(1)).await;
 
-    let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-    options.retain_as_published = true;
-    assert_subscribe!(rx, options, topic_filter.clone());
+    let options = DEFAULT_QOS0_SUB_OPTIONS.retain_as_published();
+    assert_subscribe!(rx, &options, topic_filter.clone());
 
     let publish = assert_recv!(rx);
     assert_eq!(&*publish.message, msg.as_bytes());
@@ -299,7 +294,7 @@ async fn subscription_identifier() {
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let mut rx: Client<'_, _, _, 1, 1, 1, 1> = {
+    let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> = {
         let mut client = Client::new(ALLOC.get());
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -313,10 +308,10 @@ async fn subscription_identifier() {
         )
     };
 
-    let mut options = DEFAULT_QOS0_SUB_OPTIONS;
-    options.qos = QoS::AtLeastOnce;
-    options.subscription_identifier = Some(VarByteInt::from(83u16));
-    assert_subscribe!(rx, options, topic_filter.clone());
+    let options = DEFAULT_QOS0_SUB_OPTIONS
+        .at_least_once()
+        .subscription_identifier(VarByteInt::from(83u16));
+    assert_subscribe!(rx, &options, topic_filter.clone());
 
     let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
         .retain()

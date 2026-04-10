@@ -3,7 +3,7 @@ use crate::{
     types::TooLargeToEncode,
 };
 
-/// MQTT's variable byte integer encoding. The value has to be less than
+/// MQTT's variable byte integer encoding. The value has to be less than or equal to
 /// [`VarByteInt::MAX_ENCODABLE`] (`268_435_455`). Exceeding this ultimately leads to
 /// panics or malformed packets.
 ///

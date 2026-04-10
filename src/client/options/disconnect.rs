@@ -1,9 +1,9 @@
-use crate::config::SessionExpiryInterval;
+use crate::{config::SessionExpiryInterval, types::MqttStringPair};
 
 /// Options for a disconnection to the server with a DISCONNECT packet.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Options {
+pub struct Options<'d> {
     /// If set to true, the server publishes the will message.
     pub publish_will: bool,
 
@@ -11,21 +11,27 @@ pub struct Options {
     /// if the session expiry interval property in the CONNECT packet has been 0.
     /// This value overrides the session expiry interval negotiated in the handshake.
     pub session_expiry_interval: Option<SessionExpiryInterval>,
+
+    /// Arbitrary key-value pairs of strings sent as the user property entries of the DISCONNECT
+    /// packet. Note that this slice's length must be less than [`crate::client::Client`]'s const
+    /// generic parameter `MAX_USER_PROPERTIES`.
+    pub user_properties: &'d [MqttStringPair<'d>],
 }
 
-impl Default for Options {
+impl Default for Options<'_> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Options {
+impl<'d> Options<'d> {
     /// Creates new disconnect options with will publication disabled and no session expiry interval.
     #[must_use]
     pub const fn new() -> Self {
         Self {
             publish_will: false,
             session_expiry_interval: None,
+            user_properties: &[],
         }
     }
 
@@ -39,6 +45,13 @@ impl Options {
     #[must_use]
     pub const fn session_expiry_interval(mut self, interval: SessionExpiryInterval) -> Self {
         self.session_expiry_interval = Some(interval);
+        self
+    }
+    /// Sets the user properties. Note that this slice's length must be less than
+    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    #[must_use]
+    pub const fn user_properties(mut self, user_properties: &'d [MqttStringPair<'d>]) -> Self {
+        self.user_properties = user_properties;
         self
     }
 }

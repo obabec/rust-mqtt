@@ -32,11 +32,12 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 - Topic alias
 - Request/Response
 - Reason String in CONNACK & DISCONNECT packets
+- User Property in CONNECT, CONNACK, PUBLISH, SUBSCRIBE, SUBACK, UNSUBSCRIBE, UNSUBACK and DISCONNECT packets as well as incoming PUBACK, PUBREC, PUBREL and PUBCOMP packets
 
 ### Currently unsupported MQTT features & limitations
 
 - AUTH packet
-- Properties: Authentication Method, Authentication Data, Request Problem Information, Reason String (PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, UNSUBACK), User Property
+- Properties: Authentication Method, Authentication Data, Request Problem Information, Reason String (PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, UNSUBACK), User Property (outgoing PUBACK, PUBREC, PUBREL and PUBCOMP)
 - Subscribing to multiple topics in a single packet
 
 ### Extension plans (more or less by priority)

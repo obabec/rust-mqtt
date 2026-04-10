@@ -1,4 +1,6 @@
-use crate::types::MqttString;
+use heapless::Vec;
+
+use crate::types::{MqttString, MqttStringPair};
 
 /// Information taken from a connection handshake the client does not have to store
 /// for correct operational behaviour and does not store for optimization purposes.
@@ -7,7 +9,7 @@ use crate::types::MqttString;
 /// if this is returned.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Info<'i> {
+pub struct Info<'i, const MAX_USER_PROPERTIES: usize> {
     /// If set to true, a previous session is continued by the server for this connection.
     pub session_present: bool,
 
@@ -15,6 +17,10 @@ pub struct Info<'i> {
     /// or must assign a client identifier if none was included in the CONNECT packet.
     /// This is the final client identifier value used for this session.
     pub client_identifier: MqttString<'i>,
+
+    /// The user property entries in the CONNACK packet. If the vector is full, this list might
+    /// not be exhaustive.
+    pub user_properties: Vec<MqttStringPair<'i>, MAX_USER_PROPERTIES>,
 
     /// Response information used to create response topics.
     pub response_information: Option<MqttString<'i>>,

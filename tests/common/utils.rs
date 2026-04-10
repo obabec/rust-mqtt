@@ -8,7 +8,10 @@ use rust_mqtt::{
     client::{
         Client, MqttError,
         event::{Event, Publish, Suback},
-        options::{ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions},
+        options::{
+            ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions,
+            UnsubscriptionOptions,
+        },
     },
     types::{
         IdentifiedQoS, MqttBinary, MqttString, PacketIdentifier, QoS, ReasonCode, TopicFilter,
@@ -55,7 +58,7 @@ impl StaticAlloc {
     }
 }
 
-pub async fn tcp_connection_raw(broker: SocketAddr) -> Result<TcpStream, MqttError<'static>> {
+pub async fn tcp_connection_raw(broker: SocketAddr) -> Result<TcpStream, MqttError<'static, 16>> {
     warn_inspect!(
         TcpStream::connect(broker).await,
         "Error while connecting TCP session"
@@ -65,7 +68,7 @@ pub async fn tcp_connection_raw(broker: SocketAddr) -> Result<TcpStream, MqttErr
 
 pub async fn tcp_connection(
     broker: SocketAddr,
-) -> Result<FromTokio<TcpStream>, MqttError<'static>> {
+) -> Result<FromTokio<TcpStream>, MqttError<'static, 16>> {
     tcp_connection_raw(broker).await.map(FromTokio::new)
 }
 
@@ -73,7 +76,7 @@ pub async fn connected_client(
     broker: SocketAddr,
     options: &ConnectOptions<'static>,
     client_identifier: Option<MqttString<'_>>,
-) -> Result<TestClient<'static>, MqttError<'static>> {
+) -> Result<TestClient<'static>, MqttError<'static, 16>> {
     let mut client = Client::new(ALLOC.get());
 
     let tcp = tcp_connection(broker).await?;
@@ -91,7 +94,7 @@ pub async fn connected_failing_client(
     client_identifier: Option<MqttString<'_>>,
     read_limit: ByteLimit,
     write_limit: ByteLimit,
-) -> Result<FailingClient<'static>, MqttError<'static>> {
+) -> Result<FailingClient<'static>, MqttError<'static, 16>> {
     let mut client = Client::new(ALLOC.get());
 
     let tcp = tcp_connection_raw(broker).await?;
@@ -105,7 +108,7 @@ pub async fn connected_failing_client(
     .map(|_| client)
 }
 
-pub async fn disconnect(client: &mut TestClient<'_>, options: &DisconnectOptions) {
+pub async fn disconnect(client: &mut TestClient<'_>, options: &DisconnectOptions<'_>) {
     let _ = warn_inspect!(
         client.disconnect(options).await,
         "Client::disconnect() failed"
@@ -114,18 +117,20 @@ pub async fn disconnect(client: &mut TestClient<'_>, options: &DisconnectOptions
 
 pub async fn subscribe<'c>(
     client: &mut TestClient<'c>,
-    options: SubscriptionOptions,
+    options: &SubscriptionOptions<'_>,
     topic: TopicFilter<'_>,
-) -> Result<QoS, MqttError<'c>> {
+) -> Result<QoS, MqttError<'c, 16>> {
     let pid = warn_inspect!(
         client.subscribe(topic, options).await,
         "Client::subscribe() failed"
-    )?;
+    )
+    .map_err(MqttError::inflate)?;
 
     loop {
         match warn_inspect!(client.poll().await, "Client::poll() failed")? {
             Event::Suback(Suback {
                 packet_identifier,
+                user_properties: _,
                 reason_code,
             }) if packet_identifier == pid => {
                 info!("Subscribed with reason code {:?}", reason_code);
@@ -138,11 +143,14 @@ pub async fn subscribe<'c>(
             }
             Event::Suback(Suback {
                 packet_identifier,
+                user_properties: _,
                 reason_code: _,
-            }) => warn!(
-                "Expected SUBACK for packet identifier {:?}, but received SUBACK for packet identifier {:?}",
-                pid, packet_identifier
-            ),
+            }) => {
+                warn!(
+                    "Expected SUBACK for packet identifier {:?}, but received SUBACK for packet identifier {:?}",
+                    pid, packet_identifier
+                )
+            }
             e => warn!("Expected Event::Suback, but received {:?}", e),
         }
     }
@@ -150,17 +158,20 @@ pub async fn subscribe<'c>(
 
 pub async fn unsubscribe<'c>(
     client: &mut TestClient<'c>,
+    options: &UnsubscriptionOptions<'_>,
     topic: TopicFilter<'_>,
-) -> Result<(), MqttError<'c>> {
+) -> Result<(), MqttError<'c, 16>> {
     let pid = warn_inspect!(
-        client.unsubscribe(topic).await,
+        client.unsubscribe(topic, options).await,
         "Client::unsubscribe() failed"
-    )?;
+    )
+    .map_err(MqttError::inflate)?;
 
     loop {
         match warn_inspect!(client.poll().await, "Client::poll() failed")? {
             Event::Unsuback(Suback {
                 packet_identifier,
+                user_properties: _,
                 reason_code,
             }) if packet_identifier == pid => {
                 info!("Unsubscribed with reason code {:?}", reason_code);
@@ -168,11 +179,14 @@ pub async fn unsubscribe<'c>(
             }
             Event::Unsuback(Suback {
                 packet_identifier,
+                user_properties: _,
                 reason_code: _,
-            }) => warn!(
-                "Expected UNSUBACK for packet identifier {:?}, but received UNSUBACK for packet identifier {:?}",
-                pid, packet_identifier
-            ),
+            }) => {
+                warn!(
+                    "Expected UNSUBACK for packet identifier {:?}, but received UNSUBACK for packet identifier {:?}",
+                    pid, packet_identifier
+                )
+            }
             e => warn!("Expected Event::Unsuback, but received {:?}", e),
         }
     }
@@ -180,7 +194,7 @@ pub async fn unsubscribe<'c>(
 
 pub async fn receive_publish<'c>(
     client: &mut TestClient<'c>,
-) -> Result<Publish<'c, 1>, MqttError<'c>> {
+) -> Result<Publish<'c, 1, 16>, MqttError<'c, 16>> {
     loop {
         match warn_inspect!(client.poll().await, "Client::poll() failed")? {
             Event::Publish(p) => break Ok(p),
@@ -191,7 +205,7 @@ pub async fn receive_publish<'c>(
 
 pub async fn receive_and_complete<'c>(
     client: &mut TestClient<'c>,
-) -> Result<Publish<'c, 1>, MqttError<'c>> {
+) -> Result<Publish<'c, 1, 16>, MqttError<'c, 16>> {
     let publish = receive_publish(client).await?;
 
     match publish.identified_qos {
@@ -218,11 +232,12 @@ pub async fn publish_and_complete<'c>(
     client: &mut TestClient<'c>,
     options: &PublicationOptions<'_>,
     message: Bytes<'_>,
-) -> Result<Option<PacketIdentifier>, MqttError<'c>> {
+) -> Result<Option<PacketIdentifier>, MqttError<'c, 16>> {
     let pid = warn_inspect!(
         client.publish(options, message).await,
         "Client::publish() failed"
-    )?;
+    )
+    .map_err(MqttError::inflate)?;
 
     match options.qos {
         QoS::AtMostOnce => {}

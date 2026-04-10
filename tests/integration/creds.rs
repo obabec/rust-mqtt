@@ -21,6 +21,7 @@ async fn connect_no_creds() {
         MqttError::Disconnect {
             reason: _,
             reason_string: _,
+            user_properties: _,
             server_reference: _,
         }
     ));
@@ -41,6 +42,7 @@ async fn connect_no_password() {
         MqttError::Disconnect {
             reason: _,
             reason_string: _,
+            user_properties: _,
             server_reference: _,
         }
     ));
@@ -63,6 +65,7 @@ async fn connect_wrong_password() {
         MqttError::Disconnect {
             reason: _,
             reason_string: _,
+            user_properties: _,
             server_reference: _,
         }
     ));

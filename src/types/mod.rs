@@ -17,7 +17,7 @@ pub use int::VarByteInt;
 pub use pid::PacketIdentifier;
 pub use qos::{IdentifiedQoS, QoS};
 pub use reason_code::ReasonCode;
-pub use string::{MqttString, MqttStringError};
+pub use string::{MqttString, MqttStringError, MqttStringPair};
 pub use topic::{TopicFilter, TopicName};
 
 /// The error returned when types are larger than what is representable according to the specification.

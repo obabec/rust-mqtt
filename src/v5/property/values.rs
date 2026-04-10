@@ -1,14 +1,17 @@
 use core::num::NonZero;
 
 use crate::{
+    buffer::BufferProvider,
     config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
     eio::{Read, Write},
+    fmt::verbose,
     io::{
         err::{ReadError, WriteError},
-        read::{Readable, Store},
+        read::{BodyReader, Readable, Store},
         write::{Writable, wlen},
     },
-    types::{MqttBinary, MqttString, QoS, TopicName, VarByteInt},
+    packet::RxError,
+    types::{MqttBinary, MqttString, MqttStringPair, QoS, TopicName, VarByteInt},
     v5::property::{Property, PropertyType},
 };
 
@@ -33,7 +36,7 @@ macro_rules! property {
         }
 
         impl<R: Read> Readable<R> for $name {
-            async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
+            async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
                 let content = <$ty as Readable<R>>::read(read).await?;
                 Ok(Self(content))
             }
@@ -72,7 +75,7 @@ macro_rules! property {
         }
 
         impl<$lt, R: Read + Store<$lt>> Readable<R> for $name<$lt> {
-            async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
+            async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
                 let content = <$ty as Readable<R>>::read(read).await?;
                 Ok(Self(content))
             }
@@ -122,7 +125,22 @@ property!(TopicAlias, u16);
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MaximumQoS(pub(crate) QoS);
 property!(RetainAvailable, bool);
-// Insert UserProperty here
+property!(UserProperty<'c>, MqttStringPair<'c>);
+
+impl UserProperty<'_> {
+    pub async fn skip<'b, R: Read, B: BufferProvider<'b>>(
+        read: &mut BodyReader<'_, 'b, R, B>,
+    ) -> Result<usize, RxError<R::Error, B::ProvisionError>> {
+        let name_len = u16::read(read).await? as usize;
+        verbose!("skipping user property name ({} bytes)", name_len);
+        read.skip(name_len).await?;
+        let value_len = u16::read(read).await? as usize;
+        verbose!("skipping user property value ({} bytes)", value_len);
+        read.skip(value_len).await?;
+        Ok(wlen!(u16) + name_len + wlen!(u16) + value_len)
+    }
+}
+
 property!(WildcardSubscriptionAvailable, bool);
 property!(SubscriptionIdentifierAvailable, bool);
 property!(SharedSubscriptionAvailable, bool);
@@ -137,7 +155,7 @@ impl Property for ServerKeepAlive {
 }
 
 impl<R: Read> Readable<R> for ServerKeepAlive {
-    async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
+    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         let value = u16::read(read).await?;
 
         Ok(Self(
@@ -178,7 +196,7 @@ impl Property for SessionExpiryInterval {
 }
 
 impl<R: Read> Readable<R> for SessionExpiryInterval {
-    async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
+    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         let value = u32::read(read).await?;
 
         Ok(match value {
@@ -216,7 +234,7 @@ impl Property for MaximumQoS {
     }
 }
 impl<R: Read> Readable<R> for MaximumQoS {
-    async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
+    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         let byte = u8::read(read).await?;
         let qos = QoS::try_from_bits(byte).ok_or(ReadError::MalformedPacket)?;
         Ok(Self(qos))
@@ -232,7 +250,7 @@ impl Property for MaximumPacketSize {
     }
 }
 impl<R: Read> Readable<R> for MaximumPacketSize {
-    async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
+    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         let max = u32::read(read).await?;
 
         NonZero::new(max)
@@ -267,7 +285,7 @@ impl Property for ReceiveMaximum {
     }
 }
 impl<R: Read> Readable<R> for ReceiveMaximum {
-    async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
+    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         let max = u16::read(read).await?;
 
         NonZero::new(max).map(Self).ok_or(ReadError::ProtocolError)

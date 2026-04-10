@@ -1,8 +1,10 @@
+use heapless::Vec;
+
 use crate::{
     client::raw::RawError,
     eio::ErrorKind,
     header::Reserved,
-    types::{MqttString, ReasonCode, TooLargeToEncode},
+    types::{MqttString, MqttStringPair, ReasonCode, TooLargeToEncode},
 };
 
 /// The main error returned by [`crate::client::Client`].
@@ -18,7 +20,7 @@ use crate::{
 /// - For recoverable errors, follow the error-specific behaviour.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Error<'e> {
+pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// An underlying Read/Write method returned an error.
     ///
     /// Unrecoverable error. [`crate::client::Client::abort`] should be called.
@@ -53,6 +55,10 @@ pub enum Error<'e> {
         /// The reason string property of the causing CONNACK or DISCONNECT packet if the server included
         /// a reason string.
         reason_string: Option<MqttString<'e>>,
+
+        /// The user property entries in the causing CONNACK or DISCONNECT packet. If the vector is full,
+        /// this list might not be exhaustive.
+        user_properties: Vec<MqttStringPair<'e>, MAX_USER_PROPERTIES>,
 
         /// The server reference property of the causing CONNACK or DISCONNCET packet if the server included
         /// a server reference. Identifies another server which can be used.
@@ -132,7 +138,7 @@ pub enum Error<'e> {
     IllegalDisconnectSessionExpiryInterval,
 }
 
-impl Error<'_> {
+impl<const MAX_USER_PROPERTIES: usize> Error<'_, MAX_USER_PROPERTIES> {
     /// Returns whether the client can recover from this error without closing the network connection.
     #[must_use]
     pub fn is_recoverable(&self) -> bool {
@@ -150,14 +156,53 @@ impl Error<'_> {
         )
     }
 }
+impl<'e> Error<'e, 0> {
+    /// Converts an [`Error<0>`] into an [`Error<N>`] with any N.
+    ///
+    /// This cannot be a [`From`] implementation because `From<Error<0>> for Error<N>` would
+    /// collide with the blanket implementation `From<T> for T`. The reason this function is
+    /// only implemented for `MAX_USER_PROPERTIES` = 0 is to prevent potentially surprisng
+    /// panics when converting from more user properties to less.
+    pub fn inflate<const MAX_USER_PROPERTIES: usize>(self) -> Error<'e, MAX_USER_PROPERTIES> {
+        match self {
+            Self::Network(error_kind) => Error::Network(error_kind),
+            Self::Server => Error::Server,
+            Self::Alloc => Error::Alloc,
+            Self::AuthPacketReceived => Error::AuthPacketReceived,
+            Self::Disconnect {
+                reason,
+                reason_string,
+                user_properties,
+                server_reference,
+            } => Error::Disconnect {
+                reason,
+                reason_string,
+                user_properties: user_properties.into_iter().collect(),
+                server_reference,
+            },
+            Self::RecoveryRequired => Error::RecoveryRequired,
+            Self::PacketIdentifierNotInFlight => Error::PacketIdentifierNotInFlight,
+            Self::RepublishQoSNotMatching => Error::RepublishQoSNotMatching,
+            Self::PacketIdentifierAwaitingPubcomp => Error::PacketIdentifierAwaitingPubcomp,
+            Self::PacketMaximumLengthExceeded => Error::PacketMaximumLengthExceeded,
+            Self::ServerMaximumPacketSizeExceeded => Error::ServerMaximumPacketSizeExceeded,
+            Self::InvalidTopicAlias => Error::InvalidTopicAlias,
+            Self::SessionBuffer => Error::SessionBuffer,
+            Self::SendQuotaExceeded => Error::SendQuotaExceeded,
+            Self::IllegalDisconnectSessionExpiryInterval => {
+                Error::IllegalDisconnectSessionExpiryInterval
+            }
+        }
+    }
+}
 
-impl From<Reserved> for Error<'_> {
+impl<const MAX_USER_PROPERTIES: usize> From<Reserved> for Error<'_, MAX_USER_PROPERTIES> {
     fn from(_: Reserved) -> Self {
         Self::Server
     }
 }
 
-impl<B> From<RawError<B>> for Error<'_> {
+impl<B, const MAX_USER_PROPERTIES: usize> From<RawError<B>> for Error<'_, MAX_USER_PROPERTIES> {
     fn from(e: RawError<B>) -> Self {
         match e {
             RawError::Disconnected => Self::RecoveryRequired,
@@ -168,7 +213,7 @@ impl<B> From<RawError<B>> for Error<'_> {
     }
 }
 
-impl From<TooLargeToEncode> for Error<'_> {
+impl<const MAX_USER_PROPERTIES: usize> From<TooLargeToEncode> for Error<'_, MAX_USER_PROPERTIES> {
     fn from(_: TooLargeToEncode) -> Self {
         Self::PacketMaximumLengthExceeded
     }

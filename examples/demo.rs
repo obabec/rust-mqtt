@@ -14,7 +14,7 @@ use rust_mqtt::{
         event::{Event, Puback, Suback},
         options::{
             ConnectOptions, DisconnectOptions, PublicationOptions, RetainHandling,
-            SubscriptionOptions, TopicReference, WillOptions,
+            SubscriptionOptions, TopicReference, UnsubscriptionOptions, WillOptions,
         },
     },
     config::{KeepAlive, SessionExpiryInterval},
@@ -33,7 +33,7 @@ async fn main() {
     #[cfg(feature = "bump")]
     let mut buffer = BumpBuffer::new(&mut buffer);
 
-    let mut client = Client::<'_, _, _, 1, 1, 1, 1>::new(&mut buffer);
+    let mut client = Client::<'_, _, _, 1, 1, 1, 1, 16>::new(&mut buffer);
 
     let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 1883);
     let connection = TcpStream::connect(addr).await.unwrap();
@@ -92,7 +92,7 @@ async fn main() {
 
     let topic = TopicName::new(MqttString::from_str("rust-mqtt/is/great").unwrap()).unwrap();
 
-    match client.subscribe(topic.clone().into(), sub_options).await {
+    match client.subscribe(topic.clone().into(), &sub_options).await {
         Ok(_) => info!("Sent Subscribe"),
         Err(e) => {
             error!("Failed to subscribe: {e:?}");
@@ -103,8 +103,11 @@ async fn main() {
     match client.poll().await {
         Ok(Event::Suback(Suback {
             packet_identifier: _,
+            user_properties: _,
             reason_code,
-        })) => info!("Subscribed with reason code {reason_code:?}"),
+        })) => {
+            info!("Subscribed with reason code {reason_code:?}")
+        }
         Ok(e) => {
             error!("Expected Suback but received event {e:?}");
             return;
@@ -190,7 +193,10 @@ async fn main() {
         }
     }
 
-    match client.unsubscribe(topic.clone().into()).await {
+    match client
+        .unsubscribe(topic.clone().into(), &UnsubscriptionOptions::new())
+        .await
+    {
         Ok(_) => info!("Sent Unsubscribe"),
         Err(e) => {
             error!("Failed to unsubscribe: {e:?}");
@@ -201,8 +207,11 @@ async fn main() {
     match client.poll().await {
         Ok(Event::Unsuback(Suback {
             packet_identifier: _,
+            user_properties: _,
             reason_code,
-        })) => info!("Unsubscribed with reason code {reason_code:?}"),
+        })) => {
+            info!("Unsubscribed with reason code {reason_code:?}")
+        }
         Ok(e) => {
             info!("Expected Unsuback but received event {e:?}");
             return;
@@ -249,7 +258,7 @@ async fn main() {
     let mut buffer = BumpBuffer::new(&mut buffer);
 
     // Continue the previous session
-    let mut client = Client::<'_, _, _, 1, 1, 1, 1>::with_session(session, &mut buffer);
+    let mut client = Client::<'_, _, _, 1, 1, 1, 1, 16>::with_session(session, &mut buffer);
 
     let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 1883);
     let connection = TcpStream::connect(addr).await.unwrap();
@@ -301,6 +310,7 @@ async fn main() {
             Ok(Event::PublishComplete(Puback {
                 packet_identifier,
                 reason_code: _,
+                user_properties: _,
             })) if packet_identifier == incomplete_publish_packet_identifier => {
                 info!("Completed republish of packet identifier {packet_identifier}");
                 break;

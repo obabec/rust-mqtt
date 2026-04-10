@@ -12,7 +12,7 @@ use crate::{
         info::ConnectInfo,
         options::{
             ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions,
-            TopicReference,
+            TopicReference, UnsubscriptionOptions,
         },
         raw::Raw,
     },
@@ -23,7 +23,7 @@ use crate::{
     packet::{Packet, TxPacket},
     session::{CPublishFlightState, SPublishFlightState, Session},
     types::{
-        IdentifiedQoS, MqttBinary, MqttString, PacketIdentifier, QoS, ReasonCode,
+        IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, PacketIdentifier, QoS, ReasonCode,
         SubscriptionFilter, TopicFilter, TopicName, VarByteInt,
     },
     v5::{
@@ -55,6 +55,8 @@ pub use err::Error as MqttError;
 ///   can further limit this with its receive maximum. The client will use the minimum of this value and [`Self::server_config`].
 /// - `MAX_SUBSCRIPTION_IDENTIFIERS`: The maximum amount of subscription identifier properties the client can receive within a
 ///   single PUBLISH packet. If a packet with more subscription identifiers is received, the later identifers will be discarded.
+/// - `MAX_USER_PROPERTIES`: The maximum amount of user properties that the client can send and receive in one packet. Must not
+///   be greater than 1021. This limitation currently exists to easily rule out any variable byte integer overflows.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Client<
@@ -65,6 +67,7 @@ pub struct Client<
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
+    const MAX_USER_PROPERTIES: usize,
 > {
     client_config: ClientConfig,
     shared_config: SharedConfig,
@@ -89,7 +92,18 @@ impl<
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
-> Client<'c, N, B, MAX_SUBSCRIBES, RECEIVE_MAXIMUM, SEND_MAXIMUM, MAX_SUBSCRIPTION_IDENTIFIERS>
+    const MAX_USER_PROPERTIES: usize,
+>
+    Client<
+        'c,
+        N,
+        B,
+        MAX_SUBSCRIBES,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_SUBSCRIPTION_IDENTIFIERS,
+        MAX_USER_PROPERTIES,
+    >
 {
     /// Creates a new, disconnected MQTT client using a buffer provider to store
     /// dynamically sized fields of received packets.
@@ -103,6 +117,10 @@ impl<
         assert!(
             RECEIVE_MAXIMUM > 0,
             "RECEIVE_MAXIMUM must be greater than 0"
+        );
+        assert!(
+            MAX_USER_PROPERTIES <= 1021,
+            "MAX_USER_PROPERTIES must be less than or equal to 1021"
         );
 
         Self {
@@ -241,15 +259,36 @@ impl<
     /// * [`MqttError::Disconnect`] if the CONNACK packet's reason code is not successful (>= 0x80)
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
     /// * [`MqttError::Alloc`] if the underlying [`BufferProvider`] returned an error
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`ConnectOptions`]
+    /// or the length of the `user_properties` slice in the will in [`ConnectOptions`] is greater
+    /// than `MAX_USER_PROPERTIES`.
     pub async fn connect<'d>(
         &mut self,
         net: N,
         options: &ConnectOptions<'_>,
         client_identifier: Option<MqttString<'d>>,
-    ) -> Result<ConnectInfo<'d>, MqttError<'c>>
+    ) -> Result<ConnectInfo<'d, MAX_USER_PROPERTIES>, MqttError<'c, MAX_USER_PROPERTIES>>
     where
         'c: 'd,
     {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to send CONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+        if let Some(ref will) = options.will {
+            assert!(
+                will.user_properties.len() <= MAX_USER_PROPERTIES,
+                "Attempted to send Will with {} > {} (MAX_USER_PROPERTIES) properties",
+                will.user_properties.len(),
+                MAX_USER_PROPERTIES
+            );
+        }
+
         if options.clean_start {
             self.session.clear();
         }
@@ -299,7 +338,7 @@ impl<
                 .map(MqttString::as_borrowed)
                 .unwrap_or_default();
 
-            let mut packet = ConnectPacket::new(
+            let mut packet = ConnectPacket::<MAX_USER_PROPERTIES>::new(
                 packet_client_identifier,
                 options.clean_start,
                 options.keep_alive,
@@ -309,6 +348,12 @@ impl<
                 // code is only reached when `RECEIVE_MAXIMUM` is greater than 0.
                 unsafe { NonZero::new_unchecked(RECEIVE_MAXIMUM as u16) },
                 options.request_response_information,
+                options
+                    .user_properties
+                    .iter()
+                    .map(MqttStringPair::as_borrowed)
+                    .map(Into::into)
+                    .collect(),
             );
 
             if let Some(ref user_name) = options.user_name {
@@ -333,7 +378,7 @@ impl<
         let header = self.raw.recv_header().await?;
 
         match header.packet_type() {
-            Ok(ConnackPacket::PACKET_TYPE) => debug!(
+            Ok(ConnackPacket::<MAX_USER_PROPERTIES>::PACKET_TYPE) => debug!(
                 "received CONNACK packet header (remaining length: {})",
                 header.remaining_len.value()
             ),
@@ -350,7 +395,7 @@ impl<
             }
         }
 
-        let ConnackPacket {
+        let ConnackPacket::<MAX_USER_PROPERTIES> {
             session_present,
             reason_code,
             session_expiry_interval,
@@ -361,6 +406,7 @@ impl<
             assigned_client_identifier,
             topic_alias_maximum,
             reason_string,
+            user_properties,
             wildcard_subscription_available,
             subscription_identifier_available,
             shared_subscription_available,
@@ -421,6 +467,10 @@ impl<
             Ok(ConnectInfo {
                 session_present,
                 client_identifier,
+                user_properties: user_properties
+                    .into_iter()
+                    .map(Property::into_inner)
+                    .collect(),
                 response_information: response_information.map(Property::into_inner),
                 server_reference: server_reference.map(Property::into_inner),
             })
@@ -435,6 +485,10 @@ impl<
             Err(MqttError::Disconnect {
                 reason: reason_code,
                 reason_string: reason_string.map(Property::into_inner),
+                user_properties: user_properties
+                    .into_iter()
+                    .map(Property::into_inner)
+                    .collect(),
                 server_reference: server_reference.map(Property::into_inner),
             })
         }
@@ -446,7 +500,7 @@ impl<
     ///
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
-    pub async fn ping(&mut self) -> Result<(), MqttError<'c>> {
+    pub async fn ping(&mut self) -> Result<(), MqttError<'c, 0>> {
         debug!("sending PINGREQ packet");
 
         // PINGREQ has length 2 which really shouldn't exceed server's max packet size.
@@ -478,23 +532,45 @@ impl<
     /// * [`MqttError::SessionBuffer`] if the buffer for outgoing SUBSCRIBE packet identifiers is full
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this SUBSCRIBE packet
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`SubscriptionOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
     pub async fn subscribe(
         &mut self,
         topic_filter: TopicFilter<'_>,
-        options: SubscriptionOptions,
-    ) -> Result<PacketIdentifier, MqttError<'c>> {
+        options: &SubscriptionOptions<'_>,
+    ) -> Result<PacketIdentifier, MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to send SUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         if self.pending_suback.len() == MAX_SUBSCRIBES {
             info!("maximum concurrent subscriptions reached");
             return Err(MqttError::SessionBuffer);
         }
 
-        let subscribe_filter = SubscriptionFilter::new(topic_filter, &options);
+        let subscribe_filter = SubscriptionFilter::new(topic_filter, options);
 
         let pid = self.packet_identifier();
         let mut subscribe_filters = Vec::<_, 1>::new();
         let _ = subscribe_filters.push(subscribe_filter);
-        let packet = SubscribePacket::new(pid, options.subscription_identifier, subscribe_filters)
-            .expect("SUBSCRIBE with a single topic can not exceed VarByteInt::MAX_ENCODABLE");
+        let packet = SubscribePacket::<1, MAX_USER_PROPERTIES>::new(
+            pid,
+            options.subscription_identifier.map(Into::into),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+            subscribe_filters,
+        )
+        .expect("SUBSCRIBE with a single topic can not exceed VarByteInt::MAX_ENCODABLE");
 
         if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
@@ -525,10 +601,23 @@ impl<
     /// * [`MqttError::SessionBuffer`] if the buffer for outgoing UNSUBSCRIBE packet identifiers is full
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this UNSUBSCRIBE packet
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`UnsubscriptionOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
     pub async fn unsubscribe(
         &mut self,
         topic_filter: TopicFilter<'_>,
-    ) -> Result<PacketIdentifier, MqttError<'c>> {
+        options: &UnsubscriptionOptions<'_>,
+    ) -> Result<PacketIdentifier, MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to send UNSUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         if self.pending_unsuback.len() == MAX_SUBSCRIBES {
             info!("maximum concurrent unsubscriptions reached");
             return Err(MqttError::SessionBuffer);
@@ -537,8 +626,17 @@ impl<
         let pid = self.packet_identifier();
         let mut topic_filters = Vec::<_, 1>::new();
         let _ = topic_filters.push(topic_filter);
-        let packet = UnsubscribePacket::new(pid, topic_filters)
-            .expect("UNSUBSCRIBE with a single topic cannot exceed VarByteInt::MAX_ENCODABLE");
+        let packet = UnsubscribePacket::<1, MAX_USER_PROPERTIES>::new(
+            pid,
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+            topic_filters,
+        )
+        .expect("UNSUBSCRIBE with a single topic cannot exceed VarByteInt::MAX_ENCODABLE");
 
         if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
@@ -573,11 +671,23 @@ impl<
     ///   with MQTT's [`VarByteInt`]
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this PUBLISH packet
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`PublicationOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
     pub async fn publish(
         &mut self,
         options: &PublicationOptions<'_>,
         message: Bytes<'_>,
-    ) -> Result<Option<PacketIdentifier>, MqttError<'c>> {
+    ) -> Result<Option<PacketIdentifier>, MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         if options.qos > QoS::AtMostOnce {
             if self.remaining_send_quota() == 0 {
                 info!("server receive maximum reached");
@@ -603,7 +713,7 @@ impl<
             return Err(MqttError::InvalidTopicAlias);
         }
 
-        let packet: PublishPacket<'_, 0> = PublishPacket::new(
+        let packet = PublishPacket::<0, MAX_USER_PROPERTIES>::new(
             false,
             identified_qos,
             options.retain,
@@ -615,6 +725,12 @@ impl<
                 .correlation_data
                 .as_ref()
                 .map(MqttBinary::as_borrowed),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
             options
                 .content_type
                 .as_ref()
@@ -687,12 +803,21 @@ impl<
     /// # Panics
     ///
     /// This function may panic if the [`QoS`] in the `options` is [`QoS::AtMostOnce`].
+    /// This function panics if the length of the `user_properties` slice in the [`PublicationOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
     pub async fn republish(
         &mut self,
         packet_identifier: PacketIdentifier,
         options: &PublicationOptions<'_>,
         message: Bytes<'_>,
-    ) -> Result<(), MqttError<'c>> {
+    ) -> Result<(), MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         if options.qos == QoS::AtMostOnce {
             panic!("QoS 0 packets cannot be republished");
         }
@@ -740,7 +865,7 @@ impl<
             return Err(MqttError::InvalidTopicAlias);
         }
 
-        let packet: PublishPacket<'_, 0> = PublishPacket::new(
+        let packet = PublishPacket::<0, MAX_USER_PROPERTIES>::new(
             true,
             identified_qos,
             options.retain,
@@ -752,6 +877,12 @@ impl<
                 .correlation_data
                 .as_ref()
                 .map(MqttBinary::as_borrowed),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
             options
                 .content_type
                 .as_ref()
@@ -792,7 +923,7 @@ impl<
     ///
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
-    pub async fn rerelease(&mut self) -> Result<(), MqttError<'c>> {
+    pub async fn rerelease(&mut self) -> Result<(), MqttError<'c, 0>> {
         for packet_identifier in self
             .session
             .pending_client_publishes
@@ -800,7 +931,7 @@ impl<
             .filter(|s| s.state == CPublishFlightState::AwaitingPubcomp)
             .map(|p| p.packet_identifier)
         {
-            let pubrel = PubrelPacket::new(packet_identifier, ReasonCode::Success);
+            let pubrel = PubrelPacket::<0>::new(packet_identifier, ReasonCode::Success);
 
             // Don't check whether length exceeds servers maximum packet size because we don't
             // add properties to PUBREL packets -> length is always minimal at 6 bytes.
@@ -840,7 +971,22 @@ impl<
     /// * [`MqttError::IllegalDisconnectSessionExpiryInterval`] if the session expiry interval in the
     ///   CONNECT packet was zero and the session expiry interval in the [`DisconnectOptions`] is [`Some`]
     ///   and not [`SessionExpiryInterval::EndOnDisconnect`].
-    pub async fn disconnect(&mut self, options: &DisconnectOptions) -> Result<(), MqttError<'c>> {
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`DisconnectOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
+    pub async fn disconnect(
+        &mut self,
+        options: &DisconnectOptions<'_>,
+    ) -> Result<(), MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "Attempted to send DISCONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         let connect_session_expiry_interval_was_zero =
             self.client_config.session_expiry_interval == SessionExpiryInterval::EndOnDisconnect;
         let disconnect_session_expiry_interval_is_non_zero = options
@@ -859,7 +1005,15 @@ impl<
             ReasonCode::Success
         };
 
-        let mut packet = DisconnectPacket::new(reason_code);
+        let mut packet = DisconnectPacket::<0>::new(
+            reason_code,
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+        );
         if let Some(s) = options.session_expiry_interval {
             packet.add_session_expiry_interval(s);
         }
@@ -895,8 +1049,13 @@ impl<
     ///
     /// Returns the errors that [`Client::poll_header`] and [`Client::poll_body`] return.
     /// For further information view their docs.
-    pub async fn poll(&mut self) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c>> {
-        let header = self.poll_header().await?;
+    pub async fn poll(
+        &mut self,
+    ) -> Result<
+        Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>,
+        MqttError<'c, MAX_USER_PROPERTIES>,
+    > {
+        let header = self.poll_header().await.map_err(MqttError::inflate)?;
         self.poll_body(header).await
     }
 
@@ -918,7 +1077,7 @@ impl<
     /// * [`MqttError::Server`] if:
     ///   * the server sends a malformed packet header
     ///   * the packet following this header exceeds the client's maximum packet size
-    pub async fn poll_header(&mut self) -> Result<FixedHeader, MqttError<'c>> {
+    pub async fn poll_header(&mut self) -> Result<FixedHeader, MqttError<'c, 0>> {
         let header = self.raw.recv_header().await?;
 
         if let Ok(p) = header.packet_type() {
@@ -973,7 +1132,10 @@ impl<
     pub async fn poll_body(
         &mut self,
         header: FixedHeader,
-    ) -> Result<Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS>, MqttError<'c>> {
+    ) -> Result<
+        Event<'c, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>,
+        MqttError<'c, MAX_USER_PROPERTIES>,
+    > {
         let event = match header.packet_type()? {
             PacketType::Pingresp => {
                 self.raw.recv_body::<PingrespPacket>(&header).await?;
@@ -983,7 +1145,10 @@ impl<
                 // We only send SUBSCRIBE packets with exactly 1 topic
                 // -> Packets with more than 1 reason code are currently rejected by the RxPacket::receive implementation
                 //    with RxError::Protocol error. This is correct as long as we only send SUBSCRIBE packets with 1 topic.
-                let suback = self.raw.recv_body::<SubackPacket<'_, 1>>(&header).await?;
+                let suback = self
+                    .raw
+                    .recv_body::<SubackPacket<1, MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = suback.packet_identifier;
 
                 if Self::remove_packet_identifier_if_exists(&mut self.pending_suback, pid) {
@@ -998,6 +1163,11 @@ impl<
 
                     Event::Suback(Suback {
                         packet_identifier: pid,
+                        user_properties: suback
+                            .user_properties
+                            .into_iter()
+                            .map(Property::into_inner)
+                            .collect(),
                         reason_code: *r,
                     })
                 } else {
@@ -1009,7 +1179,10 @@ impl<
                 // We only send UNSUBSCRIBE packets with exactly 1 topic
                 // -> Packets with more than 1 reason code are currently rejected by the RxPacket::receive implementation
                 //    with RxError::Protocol error. This is correct as long as we only send UNSUBSCRIBE packets with 1 topic.
-                let unsuback = self.raw.recv_body::<UnsubackPacket<'_, 1>>(&header).await?;
+                let unsuback = self
+                    .raw
+                    .recv_body::<UnsubackPacket<1, MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = unsuback.packet_identifier;
 
                 if Self::remove_packet_identifier_if_exists(&mut self.pending_unsuback, pid) {
@@ -1024,6 +1197,11 @@ impl<
 
                     Event::Unsuback(Suback {
                         packet_identifier: pid,
+                        user_properties: unsuback
+                            .user_properties
+                            .into_iter()
+                            .map(Property::into_inner)
+                            .collect(),
                         reason_code: *r,
                     })
                 } else {
@@ -1034,7 +1212,9 @@ impl<
             PacketType::Publish => {
                 let publish = self
                     .raw
-                    .recv_body::<PublishPacket<'_, MAX_SUBSCRIPTION_IDENTIFIERS>>(&header)
+                    .recv_body::<PublishPacket<MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>>(
+                        &header,
+                    )
                     .await?;
 
                 // Our topic alias maximum is always 0, the moment we receive a topic alias, this is an error.
@@ -1057,6 +1237,11 @@ impl<
                         .map(Property::into_inner),
                     response_topic: publish.response_topic.map(Property::into_inner),
                     correlation_data: publish.correlation_data.map(Property::into_inner),
+                    user_properties: publish
+                        .user_properties
+                        .into_iter()
+                        .map(Property::into_inner)
+                        .collect(),
                     subscription_identifiers: publish
                         .subscription_identifiers
                         .into_iter()
@@ -1078,7 +1263,7 @@ impl<
                         // We could disconnect here using ReasonCode::ReceiveMaximumExceeded, but incoming QoS 1 publications
                         // don't require resources outside of this scope which means we can just accept these packets.
 
-                        let puback = PubackPacket::new(pid, ReasonCode::Success);
+                        let puback = PubackPacket::<0>::new(pid, ReasonCode::Success);
 
                         debug!("sending PUBACK packet");
 
@@ -1108,7 +1293,7 @@ impl<
                             }
                         };
 
-                        let pubrec = PubrecPacket::new(pid, ReasonCode::Success);
+                        let pubrec = PubrecPacket::<0>::new(pid, ReasonCode::Success);
 
                         debug!("sending PUBREC packet");
 
@@ -1123,7 +1308,10 @@ impl<
                 }
             }
             PacketType::Puback => {
-                let puback = self.raw.recv_body::<PubackPacket>(&header).await?;
+                let puback = self
+                    .raw
+                    .recv_body::<PubackPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = puback.packet_identifier;
                 let reason_code = puback.reason_code;
 
@@ -1131,18 +1319,12 @@ impl<
                     Some(CPublishFlightState::AwaitingPuback) if reason_code.is_success() => {
                         debug!("publication with packet identifier {} complete", pid);
 
-                        Event::PublishAcknowledged(Puback {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishAcknowledged(Puback::from(puback))
                     }
                     Some(CPublishFlightState::AwaitingPuback) => {
                         debug!("publication with packet identifier {} aborted", pid);
 
-                        Event::PublishRejected(Pubrej {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishRejected(Pubrej::from(puback))
                     }
                     Some(
                         s @ CPublishFlightState::AwaitingPubrec
@@ -1168,7 +1350,10 @@ impl<
                 }
             }
             PacketType::Pubrec => {
-                let pubrec = self.raw.recv_body::<PubrecPacket>(&header).await?;
+                let pubrec = self
+                    .raw
+                    .recv_body::<PubrecPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = pubrec.packet_identifier;
                 let reason_code = pubrec.reason_code;
 
@@ -1178,7 +1363,7 @@ impl<
                         // removing a cpublish frees space to add a new in flight entry.
                         unsafe { self.session.await_pubcomp(pid) };
 
-                        let pubrel = PubrelPacket::new(pid, ReasonCode::Success);
+                        let pubrel = PubrelPacket::<0>::new(pid, ReasonCode::Success);
 
                         debug!("sending PUBREL packet");
 
@@ -1188,10 +1373,7 @@ impl<
                         self.raw.send(&pubrel).await?;
                         self.raw.flush().await?;
 
-                        Event::PublishReceived(Puback {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishReceived(Puback::from(pubrec))
                     }
                     Some(CPublishFlightState::AwaitingPubrec) => {
                         // After receiving an erroneous PUBREC, we have to treat any subsequent PUBLISH packet
@@ -1200,10 +1382,7 @@ impl<
 
                         debug!("publication with packet identifier {} aborted", pid);
 
-                        Event::PublishRejected(Pubrej {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishRejected(Pubrej::from(pubrec))
                     }
                     Some(
                         s @ CPublishFlightState::AwaitingPuback
@@ -1225,7 +1404,8 @@ impl<
                     None => {
                         debug!("packet identifier {} in PUBREC not in use", pid);
 
-                        let pubrel = PubrelPacket::new(pid, ReasonCode::PacketIdentifierNotFound);
+                        let pubrel =
+                            PubrelPacket::<0>::new(pid, ReasonCode::PacketIdentifierNotFound);
 
                         debug!("sending PUBREL packet");
 
@@ -1240,13 +1420,16 @@ impl<
                 }
             }
             PacketType::Pubrel => {
-                let pubrel = self.raw.recv_body::<PubrelPacket>(&header).await?;
+                let pubrel = self
+                    .raw
+                    .recv_body::<PubrelPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = pubrel.packet_identifier;
                 let reason_code = pubrel.reason_code;
 
                 match self.session.remove_spublish(pid) {
                     Some(SPublishFlightState::AwaitingPubrel) if reason_code.is_success() => {
-                        let pubcomp = PubcompPacket::new(pid, ReasonCode::Success);
+                        let pubcomp = PubcompPacket::<0>::new(pid, ReasonCode::Success);
 
                         debug!("sending PUBCOMP packet");
 
@@ -1256,23 +1439,18 @@ impl<
                         self.raw.send(&pubcomp).await?;
                         self.raw.flush().await?;
 
-                        Event::PublishReleased(Puback {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishReleased(Puback::from(pubrel))
                     }
                     Some(SPublishFlightState::AwaitingPubrel) => {
                         debug!("publication with packet identifier {} aborted", pid);
 
-                        Event::PublishRejected(Pubrej {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishRejected(Pubrej::from(pubrel))
                     }
                     None => {
                         debug!("packet identifier {} in PUBREL not in use", pid);
 
-                        let pubcomp = PubcompPacket::new(pid, ReasonCode::PacketIdentifierNotFound);
+                        let pubcomp =
+                            PubcompPacket::<0>::new(pid, ReasonCode::PacketIdentifierNotFound);
 
                         debug!("sending PUBCOMP packet");
 
@@ -1287,7 +1465,10 @@ impl<
                 }
             }
             PacketType::Pubcomp => {
-                let pubcomp = self.raw.recv_body::<PubcompPacket>(&header).await?;
+                let pubcomp = self
+                    .raw
+                    .recv_body::<PubcompPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
                 let pid = pubcomp.packet_identifier;
                 let reason_code = pubcomp.reason_code;
 
@@ -1295,18 +1476,12 @@ impl<
                     Some(CPublishFlightState::AwaitingPubcomp) if reason_code.is_success() => {
                         debug!("publication with packet identifier {} complete", pid);
 
-                        Event::PublishComplete(Puback {
-                            packet_identifier: pid,
-                            reason_code: pubcomp.reason_code,
-                        })
+                        Event::PublishComplete(Puback::from(pubcomp))
                     }
                     Some(CPublishFlightState::AwaitingPubcomp) => {
                         debug!("publication with packet identifier {} aborted", pid);
 
-                        Event::PublishRejected(Pubrej {
-                            packet_identifier: pid,
-                            reason_code,
-                        })
+                        Event::PublishRejected(Pubrej::from(pubcomp))
                     }
                     Some(
                         s @ CPublishFlightState::AwaitingPuback
@@ -1332,11 +1507,19 @@ impl<
                 }
             }
             PacketType::Disconnect => {
-                let disconnect = self.raw.recv_body::<DisconnectPacket>(&header).await?;
+                let disconnect = self
+                    .raw
+                    .recv_body::<DisconnectPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
 
                 return Err(MqttError::Disconnect {
                     reason: disconnect.reason_code,
                     reason_string: disconnect.reason_string.map(Property::into_inner),
+                    user_properties: disconnect
+                        .user_properties
+                        .into_iter()
+                        .map(Property::into_inner)
+                        .collect(),
                     server_reference: disconnect.server_reference.map(Property::into_inner),
                 });
             }

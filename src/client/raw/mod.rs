@@ -7,6 +7,8 @@ mod net;
 pub(crate) use err::Error as RawError;
 pub(crate) use net::Error as NetStateError;
 
+use heapless::Vec;
+
 #[cfg(debug_assertions)]
 use crate::fmt::unreachable;
 use crate::{
@@ -74,7 +76,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
 
         match &mut self.n {
             NetState::Faulted(n, r) => {
-                let packet = DisconnectPacket::new(*r);
+                let packet = DisconnectPacket::<0>::new(*r, Vec::new());
 
                 debug!("sending DISCONNECT packet with reason code: {:?}", r);
 
