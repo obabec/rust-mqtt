@@ -14,9 +14,9 @@ mod flight;
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Session<const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize> {
     /// The currently in-flight outgoing publications.
-    pub pending_client_publishes: Vec<InFlightPublish<CPublishFlightState>, RECEIVE_MAXIMUM>,
+    pub pending_client_publishes: Vec<InFlightPublish<CPublishFlightState>, SEND_MAXIMUM>,
     /// The currently in-flight incoming publications.
-    pub pending_server_publishes: Vec<InFlightPublish<SPublishFlightState>, SEND_MAXIMUM>,
+    pub pending_server_publishes: Vec<InFlightPublish<SPublishFlightState>, RECEIVE_MAXIMUM>,
 }
 
 impl<const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>

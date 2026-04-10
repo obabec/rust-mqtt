@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Fix swapped const generic parameter usage in `Session`
+
 ## 0.5.0 - 2026-03-27
 
 - Add subscription identifiers in subscriptions & incoming publishes
