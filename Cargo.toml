@@ -55,7 +55,7 @@ p256 = "0.13.2"
 default = ["v5", "alloc", "log-level-info"]
 
 log = ["dep:log"]
-defmt = ["dep:defmt", "embedded-io-async/defmt"]
+defmt = ["dep:defmt", "embedded-io-async/defmt", "heapless/defmt"]
 
 bump = []
 alloc = []
