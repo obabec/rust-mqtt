@@ -3,9 +3,9 @@ use std::{num::NonZero, time::Duration};
 use rust_mqtt::{
     Bytes,
     client::{
-        MqttError,
+        Client, MqttError,
         event::Event,
-        options::{PublicationOptions, TopicReference, WillOptions},
+        options::{PublicationOptions, SubscriptionOptions, TopicReference, WillOptions},
     },
     config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
     types::{MqttBinary, MqttString, ReasonCode, TopicFilter, TopicName},
@@ -20,7 +20,7 @@ use crate::common::{
     BROKER_ADDRESS, DEFAULT_DC_OPTIONS, DEFAULT_QOS0_SUB_OPTIONS, NO_SESSION_CONNECT_OPTIONS,
     assert::{assert_ok, assert_published, assert_recv, assert_recv_excl, assert_subscribe},
     fmt::warn_inspect,
-    utils::{connected_client, disconnect, tcp_connection, unique_topic},
+    utils::{ALLOC, connected_client, disconnect, tcp_connection, unique_topic},
 };
 
 #[tokio::test]
@@ -697,4 +697,145 @@ async fn keep_alive_not_kept_alive_will_timing() {
     ));
 
     disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn receive_maximum() {
+    let (topic_name, topic_filter) = unique_topic();
+    let mut rx: Client<'_, _, _, 1, 2, 0, 0, 16> = Client::new(ALLOC.get());
+    let mut tx: Client<'_, _, _, 1, 1, 10, 0, 16> = Client::new(ALLOC.get());
+
+    let tcp_rx = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+    let tcp_tx = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+
+    assert_ok!(rx.connect(tcp_rx, NO_SESSION_CONNECT_OPTIONS, None).await);
+    assert_ok!(tx.connect(tcp_tx, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let pid = assert_ok!(
+        rx.subscribe(topic_filter, &SubscriptionOptions::new().exactly_once())
+            .await
+    );
+    let e = assert_ok!(assert_ok!(
+        timeout(Duration::from_secs(10), rx.poll()).await
+    ));
+    if let Event::Suback(e) = e {
+        assert_eq!(e.packet_identifier, pid);
+        assert!(e.reason_code.is_success());
+    } else {
+        panic!()
+    }
+
+    let publisher = async {
+        let mut pids = Vec::new();
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name)).exactly_once();
+        for _ in 0..10 {
+            pids.push(assert_ok!(tx.publish(&pub_options, "".into()).await).unwrap());
+        }
+        loop {
+            if let Event::PublishComplete(p) =
+                assert_ok!(assert_ok!(timeout(Duration::from_secs(2), tx.poll()).await))
+            {
+                pids.retain(|pid| pid != &p.packet_identifier);
+            }
+            if pids.is_empty() {
+                break;
+            }
+        }
+        assert_ok!(tx.disconnect(DEFAULT_DC_OPTIONS).await);
+    };
+
+    let receiver = async {
+        let mut in_flight = 0;
+        while let Ok(e) = timeout(Duration::from_secs(3), rx.poll()).await {
+            match assert_ok!(e) {
+                Event::Publish(_) => in_flight += 1,
+                Event::PublishReleased(_) => in_flight -= 1,
+                _ => panic!(),
+            }
+            assert!(in_flight >= 0);
+            assert!(in_flight <= 2);
+        }
+
+        assert_ok!(rx.disconnect(DEFAULT_DC_OPTIONS).await);
+    };
+
+    join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn send_maximum_buffer_exceeded() {
+    let topic = unique_topic().0;
+    const SEND_MAXIMUM_BUFFER_SIZE: usize = 2;
+
+    let mut c: Client<'_, _, _, 1, 1, SEND_MAXIMUM_BUFFER_SIZE, 0, 16> = Client::new(ALLOC.get());
+
+    let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+
+    assert_ok!(c.connect(tcp, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let server_receive_maximum = c.server_config().receive_maximum.0.get();
+    assert!(
+        server_receive_maximum as usize > SEND_MAXIMUM_BUFFER_SIZE,
+        "server receive maximum must be greater than {SEND_MAXIMUM_BUFFER_SIZE} for this test"
+    );
+
+    let mut pids = Vec::new();
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic)).exactly_once();
+    for _ in 0..SEND_MAXIMUM_BUFFER_SIZE {
+        pids.push(assert_ok!(c.publish(&pub_options, "".into()).await).unwrap());
+    }
+    let e = assert_err!(c.publish(&pub_options, "".into()).await);
+    assert_eq!(e, MqttError::SessionBuffer);
+
+    loop {
+        if let Event::PublishComplete(p) =
+            assert_ok!(assert_ok!(timeout(Duration::from_secs(2), c.poll()).await))
+        {
+            pids.retain(|pid| pid != &p.packet_identifier);
+        }
+        if pids.is_empty() {
+            break;
+        }
+    }
+    assert_ok!(c.disconnect(DEFAULT_DC_OPTIONS).await);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn server_receive_maximum_exceeded() {
+    let topic_name = unique_topic().0;
+    let mut c: Client<'_, _, _, 1, 1, 256, 0, 16> = Client::new(ALLOC.get());
+
+    let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+
+    assert_ok!(c.connect(tcp, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let server_receive_maximum = c.server_config().receive_maximum.0.get();
+    assert!(
+        server_receive_maximum < 256,
+        "server receive maximum must be less than 256 for this test"
+    );
+
+    let mut pids = Vec::new();
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic_name)).exactly_once();
+    for _ in 0..server_receive_maximum {
+        pids.push(assert_ok!(c.publish(&pub_options, "".into()).await).unwrap());
+    }
+
+    let e = assert_err!(c.publish(&pub_options, "".into()).await);
+    assert_eq!(e, MqttError::SendQuotaExceeded);
+
+    loop {
+        if let Event::PublishComplete(p) =
+            assert_ok!(assert_ok!(timeout(Duration::from_secs(2), c.poll()).await))
+        {
+            pids.retain(|pid| pid != &p.packet_identifier);
+        }
+        if pids.is_empty() {
+            break;
+        }
+    }
+    assert_ok!(c.disconnect(DEFAULT_DC_OPTIONS).await);
 }
