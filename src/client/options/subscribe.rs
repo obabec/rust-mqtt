@@ -62,7 +62,7 @@ impl Options {
     pub const fn at_least_once(self) -> Self {
         self.qos(QoS::AtLeastOnce)
     }
-    /// Sets the Quality of Service level to 1 (Exactly Once).
+    /// Sets the Quality of Service level to 2 (Exactly Once).
     #[must_use]
     pub const fn exactly_once(self) -> Self {
         self.qos(QoS::ExactlyOnce)
