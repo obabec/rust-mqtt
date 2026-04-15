@@ -6,6 +6,8 @@ use core::marker::PhantomData;
 
 use heapless::Vec;
 
+#[cfg(test)]
+use crate::types::{MqttString, MqttStringPair};
 use crate::{
     buffer::BufferProvider,
     eio::{Read, Write},
@@ -187,8 +189,8 @@ impl<T: PubackPacketType, const MAX_USER_PROPERTIES: usize> TxPacket
     }
 }
 
-impl<T: PubackPacketType, const MAX_USER_PROPERTIES: usize>
-    GenericPubackPacket<'_, T, MAX_USER_PROPERTIES>
+impl<'p, T: PubackPacketType, const MAX_USER_PROPERTIES: usize>
+    GenericPubackPacket<'p, T, MAX_USER_PROPERTIES>
 {
     pub const fn new(packet_identifier: PacketIdentifier, reason_code: ReasonCode) -> Self {
         Self {
@@ -198,6 +200,17 @@ impl<T: PubackPacketType, const MAX_USER_PROPERTIES: usize>
             user_properties: Vec::new(),
             _phantom_data: PhantomData,
         }
+    }
+
+    #[cfg(test)]
+    pub fn add_reason_string(&mut self, reason_string: MqttString<'p>) {
+        self.reason_string = Some(reason_string.into());
+    }
+    #[cfg(test)]
+    pub fn add_user_property(&mut self, user_property: MqttStringPair<'p>) {
+        self.user_properties
+            .push(UserProperty(user_property))
+            .unwrap();
     }
 
     fn properties_length(&self) -> VarByteInt {
@@ -244,6 +257,45 @@ mod unit {
                     0x0F, // Packet identifier LSB
                     0x87, // Reason Code
                     0x00, // Property length
+                ]
+            );
+        }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn encode_properties() {
+            let mut packet = PubackPacket::<16>::new(
+                PacketIdentifier::new(NonZero::new(23485).unwrap()),
+                ReasonCode::TopicNameInvalid,
+            );
+            packet.add_reason_string(MqttString::from_str("invalid topic name!").unwrap());
+            packet.add_user_property(MqttStringPair::new(
+                MqttString::from_str("topic name").unwrap(),
+                MqttString::from_str("invalid").unwrap(),
+            ));
+            packet.add_user_property(MqttStringPair::new(
+                MqttString::from_str("accepted").unwrap(),
+                MqttString::from_str("negative").unwrap(),
+            ));
+
+            #[rustfmt::skip]
+            encode!(
+                packet,
+                [
+                    0x40,
+                    0x45,
+                    0x5B, // Packet identifier MSB
+                    0xBD, // Packet identifier LSB
+                    0x90, // Reason Code
+                    0x41, // Property length
+                    // Reason String
+                    0x1F, 0x00, 0x13, b'i', b'n', b'v', b'a', b'l', b'i', b'd', b' ', b't', b'o', b'p', b'i', b'c', b' ', b'n', b'a', b'm', b'e', b'!',
+                    // User Property
+                    0x26, 0x00, 0x0A, b't', b'o', b'p', b'i', b'c', b' ', b'n', b'a', b'm', b'e',
+                          0x00, 0x07, b'i', b'n', b'v', b'a', b'l', b'i', b'd',
+                    // User Property
+                    0x26, 0x00, 0x08, b'a', b'c', b'c', b'e', b'p', b't', b'e', b'd',
+                          0x00, 0x08, b'n', b'e', b'g', b'a', b't', b'i', b'v', b'e',
                 ]
             );
         }
@@ -396,6 +448,45 @@ mod unit {
 
         #[tokio::test]
         #[test_log::test]
+        async fn encode_properties() {
+            let mut packet = PubrecPacket::<16>::new(
+                PacketIdentifier::new(NonZero::new(23895).unwrap()),
+                ReasonCode::ImplementationSpecificError,
+            );
+            packet.add_reason_string(MqttString::from_str("I crashed :(").unwrap());
+            packet.add_user_property(MqttStringPair::new(
+                MqttString::from_str("me").unwrap(),
+                MqttString::from_str("somewhere over the rainbow").unwrap(),
+            ));
+            packet.add_user_property(MqttStringPair::new(
+                MqttString::from_str("problem").unwrap(),
+                MqttString::from_str("yours").unwrap(),
+            ));
+
+            #[rustfmt::skip]
+            encode!(
+                packet,
+                [
+                    0x50,
+                    0x45,
+                    0x5D, // Packet identifier MSB
+                    0x57, // Packet identifier LSB
+                    0x83, // Reason Code
+                    0x41, // Property length
+                    // Reason String
+                    0x1F, 0x00, 0x0C, b'I', b' ', b'c', b'r', b'a', b's', b'h', b'e', b'd', b' ', b':', b'(',
+                    // User Property
+                    0x26, 0x00, 0x02, b'm', b'e',
+                          0x00, 0x1A, b's', b'o', b'm', b'e', b'w', b'h', b'e', b'r', b'e', b' ', b'o', b'v', b'e', b'r', b' ', b't', b'h', b'e', b' ', b'r', b'a', b'i', b'n', b'b', b'o', b'w',
+                    // User Property
+                    0x26, 0x00, 0x07, b'p', b'r', b'o', b'b', b'l', b'e', b'm',
+                          0x00, 0x05, b'y', b'o', b'u', b'r', b's',
+                ]
+            );
+        }
+
+        #[tokio::test]
+        #[test_log::test]
         async fn decode_simple() {
             let packet = decode!(PubrecPacket<2>, 4, [0x50, 0x04, 0x26, 0x94, 0x91, 0x00]);
 
@@ -539,6 +630,38 @@ mod unit {
 
         #[tokio::test]
         #[test_log::test]
+        async fn encode_properties() {
+            let mut packet = PubrelPacket::<16>::new(
+                PacketIdentifier::new(NonZero::new(9786).unwrap()),
+                ReasonCode::PacketIdentifierNotFound,
+            );
+            packet.add_reason_string(MqttString::try_from("test reason").unwrap());
+            packet.add_user_property(MqttStringPair::new(
+                MqttString::try_from("test-name").unwrap(),
+                MqttString::try_from("test-value").unwrap(),
+            ));
+
+            #[rustfmt::skip]
+            encode!(
+                packet,
+                [
+                    0x62,
+                    0x2A,
+                    0x26,   // Packet identifier MSB
+                    0x3A,   // Packet identifier LSB
+                    0x92,   // Reason Code
+                    0x26,   // Property length
+                    // Reason String
+                    0x1F, 0x00, 0x0B, b't', b'e', b's', b't', b' ', b'r', b'e', b'a', b's', b'o', b'n',
+                    // User Property
+                    0x26, 0x00, 0x09, b't', b'e', b's', b't', b'-', b'n', b'a', b'm', b'e',
+                          0x00, 0x0A, b't', b'e', b's', b't', b'-', b'v', b'a', b'l', b'u', b'e',
+                ]
+            );
+        }
+
+        #[tokio::test]
+        #[test_log::test]
         async fn decode_simple() {
             let packet = decode!(PubrelPacket<2>, 4, [0x62, 0x04, 0x26, 0x94, 0x00, 0x00]);
 
@@ -589,7 +712,7 @@ mod unit {
                 [
                     0x62,
                     0x2A, 
-                    
+
                     0x26, 0x3A, // Packet Identifier
                     0x92,       // Reason Code
 
@@ -598,7 +721,7 @@ mod unit {
                     // Reason String
                     0x1F, 0x00, 0x0B,
                           b't', b'e', b's', b't', b' ', b'r', b'e', b'a', b's', b'o', b'n', 
-                    
+
                     // User Property
                     0x26, 0x00, 0x09, b't', b'e', b's', b't', b'-', b'n', b'a', b'm', b'e', 
                           0x00, 0x0A, b't', b'e', b's', b't', b'-', b'v', b'a', b'l', b'u', b'e',
@@ -683,6 +806,40 @@ mod unit {
                     0x6C, // Packet identifier LSB
                     0x92, // Reason Code
                     0x00, // Property length
+                ]
+            );
+        }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn encode_properties() {
+            let mut packet = PubcompPacket::<16>::new(
+                PacketIdentifier::new(NonZero::new(9786).unwrap()),
+                ReasonCode::PacketIdentifierNotFound,
+            );
+            packet.add_reason_string(MqttString::try_from("test reason").unwrap());
+            packet.add_user_property(MqttStringPair::new(
+                MqttString::try_from("test-name").unwrap(),
+                MqttString::try_from("test-value").unwrap(),
+            ));
+
+            #[rustfmt::skip]
+            encode!(
+                packet,
+                [
+                    0x70,
+                    0x2A,
+                    0x26,   // Packet identifier MSB
+                    0x3A,   // Packet identifier LSB
+                    0x92,   // Reason Code
+                    0x26,   // Property length
+
+                    // Reason String
+                    0x1F, 0x00, 0x0B, b't', b'e', b's', b't', b' ', b'r', b'e', b'a', b's', b'o', b'n',
+
+                    // User Property
+                    0x26, 0x00, 0x09, b't', b'e', b's', b't', b'-', b'n', b'a', b'm', b'e',
+                          0x00, 0x0A, b't', b'e', b's', b't', b'-', b'v', b'a', b'l', b'u', b'e',
                 ]
             );
         }
