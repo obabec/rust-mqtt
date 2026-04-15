@@ -201,7 +201,12 @@ impl<T: PubackPacketType, const MAX_USER_PROPERTIES: usize>
     }
 
     fn properties_length(&self) -> VarByteInt {
-        let len: usize = self.user_properties.iter().map(Writable::written_len).sum();
+        let len = self.reason_string.written_len()
+            + self
+                .user_properties
+                .iter()
+                .map(Writable::written_len)
+                .sum::<usize>();
 
         // max length = MAX_USER_PROPERTIES * 131077 + 65538
         // Invariant: MAX_USER_PROPERTIES <= 2047 => max length <= VarByteInt::MAX_ENCODABLE
