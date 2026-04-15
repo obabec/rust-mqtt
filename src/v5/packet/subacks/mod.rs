@@ -106,14 +106,13 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize, const MAX_USER_PRO
                 r.remaining_len()
             );
 
-            #[rustfmt::skip]
             match property_type {
                 PropertyType::ReasonString => {
                     reason_string.try_set(r).await?;
                     properties_length = properties_length
                         .checked_sub(reason_string.as_ref().unwrap().0.written_len())
                         .ok_or(RxError::MalformedPacket)?;
-                },
+                }
                 PropertyType::UserProperty if !user_properties.is_full() => {
                     let user_property = UserProperty::read(r).await?;
 
@@ -133,8 +132,8 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize, const MAX_USER_PRO
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
                     trace!("invalid {:?} property: {:?}", T::PACKET_TYPE, p);
-                    return Err(RxError::MalformedPacket)
-                },
+                    return Err(RxError::MalformedPacket);
+                }
             };
         }
 

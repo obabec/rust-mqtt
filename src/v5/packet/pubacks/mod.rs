@@ -117,7 +117,6 @@ impl<'p, T: PubackPacketType, const MAX_USER_PROPERTIES: usize> RxPacket<'p>
                 property_type,
                 r.remaining_len()
             );
-            #[rustfmt::skip]
             match property_type {
                 PropertyType::ReasonString => reason_string.try_set(r).await?,
                 PropertyType::UserProperty if !user_properties.is_full() => {
@@ -125,15 +124,15 @@ impl<'p, T: PubackPacketType, const MAX_USER_PROPERTIES: usize> RxPacket<'p>
 
                     // Safety: `!Vec::is_full` guarantees there is space
                     unsafe { user_properties.push_unchecked(user_property) };
-                },
+                }
                 PropertyType::UserProperty => {
                     UserProperty::skip(r).await?;
-                },
+                }
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
                     trace!("invalid packet {:?} property: {:?}", T::PACKET_TYPE, p);
-                    return Err(RxError::MalformedPacket)
-                },
+                    return Err(RxError::MalformedPacket);
+                }
             };
         }
 

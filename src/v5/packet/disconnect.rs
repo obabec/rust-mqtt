@@ -127,7 +127,6 @@ impl<'p, const MAX_USER_PROPERTIES: usize> RxPacket<'p>
                 property_type,
                 r.remaining_len()
             );
-            #[rustfmt::skip]
             match property_type {
                 // Protocol error according to [MQTT-3.14.2-2]
                 PropertyType::SessionExpiryInterval => return Err(RxError::ProtocolError),
@@ -137,16 +136,16 @@ impl<'p, const MAX_USER_PROPERTIES: usize> RxPacket<'p>
 
                     // Safety: `!Vec::is_full` guarantees there is space
                     unsafe { user_properties.push_unchecked(user_property) };
-                },
+                }
                 PropertyType::UserProperty => {
                     UserProperty::skip(r).await?;
-                },
+                }
                 PropertyType::ServerReference => server_reference.try_set(r).await?,
                 // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
                 p => {
                     trace!("invalid DISCONNECT property: {:?}", p);
-                    return Err(RxError::MalformedPacket)
-                },
+                    return Err(RxError::MalformedPacket);
+                }
             };
         }
 
