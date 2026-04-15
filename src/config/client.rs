@@ -16,10 +16,23 @@ pub struct Config {
     /// This value is configured when calling [`crate::client::Client::connect`]
     /// from the value in [`crate::client::options::ConnectOptions`]
     pub maximum_accepted_remaining_length: u32,
+
+    /// Whether reason string and user properties are sent (by the server) in case
+    /// of failures. In reality, this depends a lot on the specific server implementation
+    /// and only follows this rule:
+    ///
+    /// Whether the server is allowed to send reason strings or user properties on
+    /// packets other than PUBLISH, CONNACK or DISCONNECT (PUBACK, PUBREC, PUBREL,
+    /// PUBCOMP, SUBACK, UNSUBACK, AUTH).
+    ///
+    /// [MQTTv5.0 3.1.2.11.7](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901053)
+    ///
+    /// This value is configured when calling [`crate::client::Client::connect`]
+    /// from the value in [`crate::client::options::ConnectOptions`]
+    pub request_problem_information: bool,
     // receive_maximum
     // topic_alias_maximum
     // request_response_information this requests a response_information property in the CONNACK
-    // request_problem_information indicates to the server that it may include reason strings and user properties
 }
 
 impl Default for Config {
@@ -27,6 +40,7 @@ impl Default for Config {
         Self {
             session_expiry_interval: SessionExpiryInterval::default(),
             maximum_accepted_remaining_length: VarByteInt::MAX_ENCODABLE,
+            request_problem_information: false,
         }
     }
 }

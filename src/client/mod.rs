@@ -55,8 +55,11 @@ pub use err::Error as MqttError;
 ///   can further limit this with its receive maximum. The client will use the minimum of this value and [`Self::server_config`].
 /// - `MAX_SUBSCRIPTION_IDENTIFIERS`: The maximum amount of subscription identifier properties the client can receive within a
 ///   single PUBLISH packet. If a packet with more subscription identifiers is received, the later identifers will be discarded.
-/// - `MAX_USER_PROPERTIES`: The maximum amount of user properties that the client can send and receive in one packet. Must not
-///   be greater than 1021. This limitation currently exists to easily rule out any variable byte integer overflows.
+/// - `MAX_USER_PROPERTIES`: The maximum amount of user properties that the client can send and receive in one packet.
+///   - Must not be greater than 1021. This limitation currently exists to easily rule out any variable byte integer overflows.
+///   - It is recommended (but not strictly required) to use a value >= 1, because if the value is 0, the client does not
+///     guarantee to detect the protocol error and disconnect from the server when the request problem information property in
+///     CONNECT is 0 and the server sends user properties in a packet other than CONNACK, DISCONNECT or PUBLISH.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Client<
@@ -306,6 +309,11 @@ impl<
         // which session expiry interval can be sent in DISCONNECT packet.
         self.client_config.session_expiry_interval = options.session_expiry_interval;
 
+        // Set request problem information because it is required to detect protocol
+        // errors when server sends a reason string or user properties in any packet
+        // other than PUBLISH, CONNACK, or DISCONNECT
+        self.client_config.request_problem_information = options.request_problem_information;
+
         // Empirical maximum packet size mapping
         // -------------------------------------------------------------------------------------------------------
         //         remaining length              | fixed header length |              max packet size
@@ -352,6 +360,7 @@ impl<
                 // code is only reached when `RECEIVE_MAXIMUM` is greater than 0.
                 unsafe { NonZero::new_unchecked(RECEIVE_MAXIMUM as u16) },
                 options.request_response_information,
+                options.request_problem_information,
                 options
                     .user_properties
                     .iter()

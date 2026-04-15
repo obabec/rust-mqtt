@@ -1,4 +1,4 @@
-use core::num::NonZero;
+use core::{num::NonZero, ops::Not};
 
 use heapless::Vec;
 
@@ -136,6 +136,7 @@ impl<'p, const MAX_USER_PROPERTIES: usize> ConnectPacket<'p, MAX_USER_PROPERTIES
         session_expiry_interval: SessionExpiryInterval,
         receive_maximum: NonZero<u16>,
         request_response_information: bool,
+        request_problem_information: bool,
         user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
     ) -> Self {
         Self {
@@ -150,7 +151,10 @@ impl<'p, const MAX_USER_PROPERTIES: usize> ConnectPacket<'p, MAX_USER_PROPERTIES
             request_response_information: request_response_information
                 .then_some(true)
                 .map(Into::into),
-            request_problem_information: None,
+            request_problem_information: request_problem_information
+                .not()
+                .then_some(false)
+                .map(Into::into),
             user_properties,
             authentication_method: None,
             authentication_data: None,
@@ -246,6 +250,7 @@ mod unit {
             SessionExpiryInterval::EndOnDisconnect,
             NonZero::new(u16::MAX).unwrap(),
             false,
+            true,
             Vec::new(),
         );
 
@@ -281,6 +286,7 @@ mod unit {
             SessionExpiryInterval::Seconds(8136391),
             NonZero::new(63543).unwrap(),
             true,
+            false,
             [
                 UserProperty(MqttStringPair::new(
                     MqttString::from_str("triple 1").unwrap(),
@@ -301,7 +307,7 @@ mod unit {
         #[rustfmt::skip]
         encode!(packet, [
             0x10,       //
-            0x52,       // remaining length
+            0x54,       // remaining length
             0x00,       // ---
             0x04,       //
             b'M',       //
@@ -312,7 +318,7 @@ mod unit {
             0b00000000, // Connect flags
             0x00,       // Keep alive MSB
             0x00,       // Keep alive LSB
-            0x44,       // Property length
+            0x46,       // Property length
 
             0x11,       // Session expiry interval
             0x00, 0x7C, 0x26, 0xC7,
@@ -325,6 +331,9 @@ mod unit {
 
             0x19,       // Request response information
             0x01,
+
+            0x17,       // Request problem information
+            0x00,
 
             0x26,       // User property
             0x00, 0x08, b't', b'r', b'i', b'p', b'l', b'e', b' ', b'1', 
@@ -353,6 +362,7 @@ mod unit {
             SessionExpiryInterval::EndOnDisconnect,
             NonZero::new(u16::MAX).unwrap(),
             false,
+            true,
             Vec::new(),
         );
 
@@ -415,6 +425,7 @@ mod unit {
             MaximumPacketSize::Unlimited,
             SessionExpiryInterval::Seconds(893475),
             NonZero::new(u16::MAX).unwrap(),
+            true,
             true,
             Vec::new(),
         );
