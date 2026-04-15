@@ -258,6 +258,8 @@ impl<
     ///   * the first received packet is something other than a CONNACK packet
     ///   * `client_identifier` is [`None`] and the server did not assign a client identifier
     ///   * the server causes a protocol error
+    ///   * the server sends Response Information despite `request_response_information` in [`ConnectOptions`]
+    ///     being 0
     /// * [`MqttError::Disconnect`] if the CONNACK packet's reason code is not successful (>= 0x80)
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
     /// * [`MqttError::Alloc`] if the underlying [`BufferProvider`] returned an error
@@ -416,6 +418,12 @@ impl<
             response_information,
             server_reference,
         } = self.raw.recv_body(&header).await?;
+
+        if !options.request_response_information && response_information.is_some() {
+            error!("server sent response information when request response information was false");
+            self.raw.close_with(Some(ReasonCode::ProtocolError));
+            return Err(MqttError::Server);
+        }
 
         if reason_code.is_success() {
             debug!("CONNACK packet indicates success");
