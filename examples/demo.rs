@@ -103,6 +103,7 @@ async fn main() {
     match client.poll().await {
         Ok(Event::Suback(Suback {
             packet_identifier: _,
+            reason_string: _,
             user_properties: _,
             reason_code,
         })) => {
@@ -207,6 +208,7 @@ async fn main() {
     match client.poll().await {
         Ok(Event::Unsuback(Suback {
             packet_identifier: _,
+            reason_string: _,
             user_properties: _,
             reason_code,
         })) => {
@@ -310,6 +312,7 @@ async fn main() {
             Ok(Event::PublishComplete(Puback {
                 packet_identifier,
                 reason_code: _,
+                reason_string: _,
                 user_properties: _,
             })) if packet_identifier == incomplete_publish_packet_identifier => {
                 info!("Completed republish of packet identifier {packet_identifier}");

@@ -1174,6 +1174,7 @@ impl<
 
                     Event::Suback(Suback {
                         packet_identifier: pid,
+                        reason_string: suback.reason_string.map(Property::into_inner),
                         user_properties: suback
                             .user_properties
                             .into_iter()
@@ -1206,6 +1207,7 @@ impl<
 
                     Event::Unsuback(Suback {
                         packet_identifier: pid,
+                        reason_string: unsuback.reason_string.map(Property::into_inner),
                         user_properties: unsuback
                             .user_properties
                             .into_iter()

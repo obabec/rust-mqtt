@@ -108,6 +108,8 @@ pub struct Suback<'s, const MAX_USER_PROPERTIES: usize> {
     /// Packet identifier of the acknowledged SUBSCRIBE packet.
     pub packet_identifier: PacketIdentifier,
 
+    /// The reason string of the SUBACK/UNSUBACK packet.
+    pub reason_string: Option<MqttString<'s>>,
     /// The user property entries in the SUBACK/UNSUBACK packet.
     /// If the vector is full, this list might not be exhaustive.
     pub user_properties: Vec<MqttStringPair<'s>, MAX_USER_PROPERTIES>,
@@ -186,6 +188,8 @@ pub struct Puback<'p, const MAX_USER_PROPERTIES: usize> {
     pub packet_identifier: PacketIdentifier,
     /// Reason code of this state in the publication process
     pub reason_code: ReasonCode,
+    /// The reason string of the PUBACK/PUBREC/PUBREL/PUBCOMP packet.
+    pub reason_string: Option<MqttString<'p>>,
     /// The user property entries in the PUBACK/PUBREC/PUBREL/PUBCOMP packet.
     /// If the vector is full, this list might not be exhaustive.
     pub user_properties: Vec<MqttStringPair<'p>, MAX_USER_PROPERTIES>,
@@ -200,6 +204,7 @@ impl<'p, T, const MAX_USER_PROPERTIES: usize> From<GenericPubackPacket<'p, T, MA
         Self {
             packet_identifier: packet.packet_identifier,
             reason_code: packet.reason_code,
+            reason_string: packet.reason_string.map(Property::into_inner),
             user_properties: packet
                 .user_properties
                 .into_iter()
@@ -219,6 +224,8 @@ pub struct Pubrej<'p, const MAX_USER_PROPERTIES: usize> {
     pub packet_identifier: PacketIdentifier,
     /// Reason code of the rejection.
     pub reason_code: ReasonCode,
+    /// The reason string of the PUBACK/PUBREC/PUBREL/PUBCOMP packet.
+    pub reason_string: Option<MqttString<'p>>,
     /// The user property entries in the PUBACK/PUBREC/PUBREL/PUBCOMP packet.
     /// If the vector is full, this list might not be exhaustive.
     pub user_properties: Vec<MqttStringPair<'p>, MAX_USER_PROPERTIES>,
@@ -233,6 +240,7 @@ impl<'p, T, const MAX_USER_PROPERTIES: usize> From<GenericPubackPacket<'p, T, MA
         Self {
             packet_identifier: packet.packet_identifier,
             reason_code: packet.reason_code,
+            reason_string: packet.reason_string.map(Property::into_inner),
             user_properties: packet
                 .user_properties
                 .into_iter()
