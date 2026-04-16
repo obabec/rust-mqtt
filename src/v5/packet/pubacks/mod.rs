@@ -4,6 +4,8 @@
 
 use core::marker::PhantomData;
 
+use heapless::Vec;
+
 use crate::{
     buffer::BufferProvider,
     eio::{Read, Write},
@@ -17,31 +19,40 @@ use crate::{
     types::{PacketIdentifier, ReasonCode, VarByteInt},
     v5::{
         packet::pubacks::types::{Ack, Comp, PubackPacketType, Rec, Rel},
-        property::PropertyType,
+        property::{PropertyType, UserProperty},
     },
 };
 
 mod types;
 
-pub type PubackPacket<'p> = GenericPubackPacket<'p, Ack>;
-pub type PubrecPacket<'p> = GenericPubackPacket<'p, Rec>;
-pub type PubrelPacket<'p> = GenericPubackPacket<'p, Rel>;
-pub type PubcompPacket<'p> = GenericPubackPacket<'p, Comp>;
+pub type PubackPacket<'p, const MAX_USER_PROPERTIES: usize> =
+    GenericPubackPacket<'p, Ack, MAX_USER_PROPERTIES>;
+pub type PubrecPacket<'p, const MAX_USER_PROPERTIES: usize> =
+    GenericPubackPacket<'p, Rec, MAX_USER_PROPERTIES>;
+pub type PubrelPacket<'p, const MAX_USER_PROPERTIES: usize> =
+    GenericPubackPacket<'p, Rel, MAX_USER_PROPERTIES>;
+pub type PubcompPacket<'p, const MAX_USER_PROPERTIES: usize> =
+    GenericPubackPacket<'p, Comp, MAX_USER_PROPERTIES>;
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct GenericPubackPacket<'p, T: PubackPacketType> {
+pub struct GenericPubackPacket<'p, T, const MAX_USER_PROPERTIES: usize> {
     pub packet_identifier: PacketIdentifier,
     pub reason_code: ReasonCode,
     // reason string is currently unused and does not have to be read into memory.
     // reason_string: Option<ReasonString<'p>>,
+    pub user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
     _phantom_data: PhantomData<&'p T>,
 }
 
-impl<T: PubackPacketType> Packet for GenericPubackPacket<'_, T> {
+impl<T: PubackPacketType, const MAX_USER_PROPERTIES: usize> Packet
+    for GenericPubackPacket<'_, T, MAX_USER_PROPERTIES>
+{
     const PACKET_TYPE: PacketType = T::PACKET_TYPE;
 }
-impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
+impl<'p, T: PubackPacketType, const MAX_USER_PROPERTIES: usize> RxPacket<'p>
+    for GenericPubackPacket<'p, T, MAX_USER_PROPERTIES>
+{
     async fn receive<R: Read, B: BufferProvider<'p>>(
         header: &FixedHeader,
         mut reader: BodyReader<'_, 'p, R, B>,
@@ -74,8 +85,6 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
             c
         };
 
-        let mut seen_reason_string = false;
-
         let properties_length = if header.remaining_len.value() < 4 {
             0
         } else {
@@ -92,6 +101,9 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
             );
             return Err(RxError::MalformedPacket);
         }
+
+        let mut seen_reason_string = false;
+        let mut user_properties = Vec::new();
 
         while r.remaining_len() > 0 {
             verbose!(
@@ -114,13 +126,14 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
                     verbose!("skipping reason string ({} bytes)", len);
                     r.skip(len).await?;
                 },
+                PropertyType::UserProperty if !user_properties.is_full() => {
+                    let user_property = UserProperty::read(r).await?;
+
+                    // Safety: `!Vec::is_full` guarantees there is space
+                    unsafe { user_properties.push_unchecked(user_property) };
+                },
                 PropertyType::UserProperty => {
-                    let len = u16::read(r).await? as usize;
-                    verbose!("skipping user property name ({} bytes)", len);
-                    r.skip(len).await?;
-                    let len = u16::read(r).await? as usize;
-                    verbose!("skipping user property value ({} bytes)", len);
-                    r.skip(len).await?;
+                    UserProperty::skip(r).await?;
                 },
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
@@ -133,11 +146,14 @@ impl<'p, T: PubackPacketType> RxPacket<'p> for GenericPubackPacket<'p, T> {
         Ok(Self {
             packet_identifier,
             reason_code,
+            user_properties,
             _phantom_data: PhantomData,
         })
     }
 }
-impl<T: PubackPacketType> TxPacket for GenericPubackPacket<'_, T> {
+impl<T: PubackPacketType, const MAX_USER_PROPERTIES: usize> TxPacket
+    for GenericPubackPacket<'_, T, MAX_USER_PROPERTIES>
+{
     fn remaining_len(&self) -> VarByteInt {
         let variable_header_length = self.packet_identifier.written_len() + wlen!(ReasonCode);
 
@@ -146,10 +162,13 @@ impl<T: PubackPacketType> TxPacket for GenericPubackPacket<'_, T> {
 
         let total_length = variable_header_length + total_properties_length;
 
-        // Invariant: Max length = 65545 < VarByteInt::MAX_ENCODABLE
-        // property length: 4
-        // properties: 65538
+        // max length = MAX_USER_PROPERTIES * 131077 + 65545
+        // Invariant: MAX_USER_PROPERTIES <= 2047 => max length <= VarByteInt::MAX_ENCODABLE
+        //
         // variable header: 3
+        // property length: 4
+        // reason string: 65538
+        // user properties: MAX_USER_PROPERTIES * 131077
         VarByteInt::new_unchecked(total_length as u32)
     }
 
@@ -163,41 +182,49 @@ impl<T: PubackPacketType> TxPacket for GenericPubackPacket<'_, T> {
 
         // FIXME(reason string)
         // match &self.reason_string {
-        //     // Invariant: reason string length 65537 < VarByteInt::MAX_ENCODABLE
+        //     // Invariant: reason string length 65537 <= VarByteInt::MAX_ENCODABLE
         //     Some(r) => {
         //         VarByteInt::new_unchecked(r.written_len() as u32)
         //             .write(write)
         //             .await?;
         //         r.write(write).await?;
         //     }
-        //     // Invariant: 0 < VarByteInt::MAX_ENCODABLE
+        //     // Invariant: 0 <= VarByteInt::MAX_ENCODABLE
         //     None => VarByteInt::new_unchecked(0).write(write).await?,
         // }
 
         // FIXME(reason string)
         // write empty property length
-        // Invariant: 0 < VarByteInt::MAX_ENCODABLE
+        // Invariant: 0 <= VarByteInt::MAX_ENCODABLE
         VarByteInt::new_unchecked(0).write(write).await?;
+
+        for user_property in &self.user_properties {
+            user_property.write(write).await?;
+        }
 
         Ok(())
     }
 }
 
-impl<T: PubackPacketType> GenericPubackPacket<'_, T> {
+impl<T: PubackPacketType, const MAX_USER_PROPERTIES: usize>
+    GenericPubackPacket<'_, T, MAX_USER_PROPERTIES>
+{
     pub const fn new(packet_identifier: PacketIdentifier, reason_code: ReasonCode) -> Self {
         Self {
             packet_identifier,
             reason_code,
+            user_properties: Vec::new(),
             _phantom_data: PhantomData,
         }
     }
 
     fn properties_length(&self) -> VarByteInt {
-        // Invariant: Max length of reason string is 65538 < VarByteInt::MAX_ENCODABLE
-        // VarByteInt::new_unchecked(len as u32)
+        let len: usize = self.user_properties.iter().map(Writable::written_len).sum();
 
-        // Invariant: Max length = 0 < VarByteInt::MAX_ENCODABLE
-        VarByteInt::new_unchecked(0)
+        // FIXME(user property): No support for outgoing user properties yet, therefore the
+        // encoded length of user properties is 0
+        // Invariant: Max length = 0 <= VarByteInt::MAX_ENCODABLE
+        VarByteInt::new_unchecked(len as u32)
     }
 }
 
@@ -208,8 +235,8 @@ mod unit {
 
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{PacketIdentifier, ReasonCode},
-            v5::packet::PubackPacket,
+            types::{MqttString, MqttStringPair, PacketIdentifier, ReasonCode},
+            v5::{packet::PubackPacket, property::UserProperty},
         };
 
         #[tokio::test]
@@ -217,7 +244,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubackPacket::new(PacketIdentifier::new(NonZero::new(7439).unwrap()), ReasonCode::NotAuthorized),
+                PubackPacket::<0>::new(PacketIdentifier::new(NonZero::new(7439).unwrap()), ReasonCode::NotAuthorized),
                 [
                     0x40,
                     0x04,
@@ -232,7 +259,7 @@ mod unit {
         #[tokio::test]
         #[test_log::test]
         async fn decode_simple() {
-            let packet = decode!(PubackPacket, 4, [0x40, 0x04, 0x26, 0x29, 0x10, 0x00]);
+            let packet = decode!(PubackPacket<2>, 4, [0x40, 0x04, 0x26, 0x29, 0x10, 0x00]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -240,12 +267,13 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::NoMatchingSubscribers);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_abbreviated() {
-            let packet = decode!(PubackPacket, 3, [0x40, 0x03, 0x71, 0x59, 0x80]);
+            let packet = decode!(PubackPacket<2>, 3, [0x40, 0x03, 0x71, 0x59, 0x80]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -253,12 +281,13 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::UnspecifiedError);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_minimal() {
-            let packet = decode!(PubackPacket, 2, [0x40, 0x02, 0x89, 0x35]);
+            let packet = decode!(PubackPacket<2>, 2, [0x40, 0x02, 0x89, 0x35]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -266,14 +295,15 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_properties() {
             #[rustfmt::skip]
-            let packet = decode!(PubackPacket, 42, [
-                0x40, 0x2A, 
+            let packet = decode!(PubackPacket<2>, 42, [
+                0x40, 0x2A,
                 0x12, 0x34, // Packet Identifier
                 0x99, // Reason Code
                 0x26, // Property length
@@ -293,6 +323,53 @@ mod unit {
             //     packet.reason_string,
             //     Some(ReasonString(MqttString::try_from("test reason").unwrap()))
             // );
+
+            assert_eq!(packet.user_properties.len(), 1);
+            assert_eq!(
+                packet.user_properties.first().unwrap(),
+                &UserProperty(MqttStringPair::new(
+                    MqttString::try_from("test-name").unwrap(),
+                    MqttString::try_from("test-value").unwrap()
+                ))
+            );
+        }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn decode_incomplete_user_properties() {
+            #[rustfmt::skip]
+            let packet = decode!(PubackPacket<2>, 31, [
+                0x40, 0x1F,
+                0x12, 0x34, // Packet Identifier
+                0x00,       // Reason Code
+                0x1B,       // Property length
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'1',
+                      0x00, 0x02, b'v', b'1',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'2',
+                      0x00, 0x02, b'v', b'2',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'3',
+                      0x00, 0x02, b'v', b'3',
+            ]);
+
+            assert_eq!(
+                packet.user_properties.as_slice(),
+                &[
+                    UserProperty(MqttStringPair::new(
+                        MqttString::try_from("k1").unwrap(),
+                        MqttString::try_from("v1").unwrap()
+                    )),
+                    UserProperty(MqttStringPair::new(
+                        MqttString::try_from("k2").unwrap(),
+                        MqttString::try_from("v2").unwrap()
+                    ))
+                ]
+            );
         }
     }
 
@@ -301,8 +378,8 @@ mod unit {
 
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{PacketIdentifier, ReasonCode},
-            v5::packet::PubrecPacket,
+            types::{MqttString, MqttStringPair, PacketIdentifier, ReasonCode},
+            v5::{packet::PubrecPacket, property::UserProperty},
         };
 
         #[tokio::test]
@@ -310,7 +387,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubrecPacket::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::QuotaExceeded),
+                PubrecPacket::<0>::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::QuotaExceeded),
                 [
                     0x50,
                     0x04,
@@ -325,7 +402,7 @@ mod unit {
         #[tokio::test]
         #[test_log::test]
         async fn decode_simple() {
-            let packet = decode!(PubrecPacket, 4, [0x50, 0x04, 0x26, 0x94, 0x91, 0x00]);
+            let packet = decode!(PubrecPacket<2>, 4, [0x50, 0x04, 0x26, 0x94, 0x91, 0x00]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -333,12 +410,13 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierInUse);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_abbreviated() {
-            let packet = decode!(PubrecPacket, 3, [0x50, 0x03, 0x45, 0xC9, 0x83]);
+            let packet = decode!(PubrecPacket<2>, 3, [0x50, 0x03, 0x45, 0xC9, 0x83]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -346,12 +424,13 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::ImplementationSpecificError);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_minimal() {
-            let packet = decode!(PubrecPacket, 2, [0x50, 0x02, 0x5B, 0xBF]);
+            let packet = decode!(PubrecPacket<2>, 2, [0x50, 0x02, 0x5B, 0xBF]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -359,13 +438,14 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_properties() {
             #[rustfmt::skip]
-            let packet = decode!(PubrecPacket, 42, [
+            let packet = decode!(PubrecPacket<2>, 42, [
                 0x50,
                 0x2A,
                 0x26, 0x3A, // Packet Identifier
@@ -389,6 +469,47 @@ mod unit {
             //     packet.reason_string,
             //     Some(ReasonString(MqttString::try_from("test reason").unwrap()))
             // );
+
+            assert_eq!(packet.user_properties.len(), 1);
+            assert_eq!(
+                packet.user_properties.first().unwrap(),
+                &UserProperty(MqttStringPair::new(
+                    MqttString::try_from("test-name").unwrap(),
+                    MqttString::try_from("test-value").unwrap()
+                ))
+            );
+        }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn decode_incomplete_user_properties() {
+            #[rustfmt::skip]
+            let packet = decode!(PubrecPacket<1>, 31, [
+                0x50, 0x1F,
+                0x12, 0x34, // Packet Identifier
+                0x00,       // Reason Code
+                0x1B,       // Property length
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'1',
+                      0x00, 0x02, b'v', b'1',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'2',
+                      0x00, 0x02, b'v', b'2',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'3',
+                      0x00, 0x02, b'v', b'3',
+            ]);
+
+            assert_eq!(
+                packet.user_properties.as_slice(),
+                &[UserProperty(MqttStringPair::new(
+                    MqttString::try_from("k1").unwrap(),
+                    MqttString::try_from("v1").unwrap()
+                ))]
+            );
         }
     }
 
@@ -397,8 +518,8 @@ mod unit {
 
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{PacketIdentifier, ReasonCode},
-            v5::packet::PubrelPacket,
+            types::{MqttString, MqttStringPair, PacketIdentifier, ReasonCode},
+            v5::{packet::PubrelPacket, property::UserProperty},
         };
 
         #[tokio::test]
@@ -406,7 +527,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubrelPacket::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::PacketIdentifierNotFound),
+                PubrelPacket::<0>::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::PacketIdentifierNotFound),
                 [
                     0x62,
                     0x04,
@@ -421,7 +542,7 @@ mod unit {
         #[tokio::test]
         #[test_log::test]
         async fn decode_simple() {
-            let packet = decode!(PubrelPacket, 4, [0x62, 0x04, 0x26, 0x94, 0x00, 0x00]);
+            let packet = decode!(PubrelPacket<2>, 4, [0x62, 0x04, 0x26, 0x94, 0x00, 0x00]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -429,12 +550,13 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_abbreviated() {
-            let packet = decode!(PubrelPacket, 3, [0x62, 0x03, 0x45, 0xC9, 0x92]);
+            let packet = decode!(PubrelPacket<2>, 3, [0x62, 0x03, 0x45, 0xC9, 0x92]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -442,12 +564,13 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierNotFound);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_minimal() {
-            let packet = decode!(PubrelPacket, 2, [0x62, 0x02, 0x5B, 0xBF]);
+            let packet = decode!(PubrelPacket<2>, 2, [0x62, 0x02, 0x5B, 0xBF]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -455,6 +578,7 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
@@ -462,7 +586,7 @@ mod unit {
         async fn decode_properties() {
             #[rustfmt::skip]
             let packet = decode!(
-                PubrelPacket,
+                PubrelPacket<2>,
                 42,
                 [
                     0x62,
@@ -492,6 +616,47 @@ mod unit {
             //     packet.reason_string,
             //     Some(ReasonString(MqttString::try_from("test reason").unwrap()))
             // );
+
+            assert_eq!(packet.user_properties.len(), 1);
+            assert_eq!(
+                packet.user_properties.first().unwrap(),
+                &UserProperty(MqttStringPair::new(
+                    MqttString::try_from("test-name").unwrap(),
+                    MqttString::try_from("test-value").unwrap()
+                ))
+            );
+        }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn decode_incomplete_user_properties() {
+            #[rustfmt::skip]
+            let packet = decode!(PubrelPacket<1>, 31, [
+                0x62, 0x1F,
+                0x12, 0x34, // Packet Identifier
+                0x00,       // Reason Code
+                0x1B,       // Property length
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'1',
+                      0x00, 0x02, b'v', b'1',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'2',
+                      0x00, 0x02, b'v', b'2',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'3',
+                      0x00, 0x02, b'v', b'3',
+            ]);
+
+            assert_eq!(
+                packet.user_properties.as_slice(),
+                &[UserProperty(MqttStringPair::new(
+                    MqttString::try_from("k1").unwrap(),
+                    MqttString::try_from("v1").unwrap()
+                ))]
+            );
         }
     }
 
@@ -500,8 +665,8 @@ mod unit {
 
         use crate::{
             test::{rx::decode, tx::encode},
-            types::{PacketIdentifier, ReasonCode},
-            v5::packet::PubcompPacket,
+            types::{MqttString, MqttStringPair, PacketIdentifier, ReasonCode},
+            v5::{packet::PubcompPacket, property::UserProperty},
         };
 
         #[tokio::test]
@@ -509,7 +674,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubcompPacket::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::PacketIdentifierNotFound),
+                PubcompPacket::<0>::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::PacketIdentifierNotFound),
                 [
                     0x70,
                     0x04,
@@ -524,7 +689,7 @@ mod unit {
         #[tokio::test]
         #[test_log::test]
         async fn decode_simple() {
-            let packet = decode!(PubcompPacket, 4, [0x70, 0x04, 0x26, 0x94, 0x00, 0x00]);
+            let packet = decode!(PubcompPacket<2>, 4, [0x70, 0x04, 0x26, 0x94, 0x00, 0x00]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -532,12 +697,13 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_abbreviated() {
-            let packet = decode!(PubcompPacket, 3, [0x70, 0x03, 0x45, 0xC9, 0x92]);
+            let packet = decode!(PubcompPacket<2>, 3, [0x70, 0x03, 0x45, 0xC9, 0x92]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -545,12 +711,13 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::PacketIdentifierNotFound);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_minimal() {
-            let packet = decode!(PubcompPacket, 2, [0x70, 0x02, 0x5B, 0xBF]);
+            let packet = decode!(PubcompPacket<2>, 2, [0x70, 0x02, 0x5B, 0xBF]);
 
             assert_eq!(
                 packet.packet_identifier,
@@ -558,13 +725,14 @@ mod unit {
             );
             assert_eq!(packet.reason_code, ReasonCode::Success);
             // assert!(packet.reason_string.is_none());
+            assert!(packet.user_properties.is_empty());
         }
 
         #[tokio::test]
         #[test_log::test]
         async fn decode_properties() {
             #[rustfmt::skip]
-            let packet = decode!(PubcompPacket, 42, [
+            let packet = decode!(PubcompPacket<2>, 42, [
                 0x70,
                 0x2A,
 
@@ -589,6 +757,53 @@ mod unit {
             //     packet.reason_string,
             //     Some(ReasonString(MqttString::try_from("test reason").unwrap()))
             // );
+
+            assert_eq!(packet.user_properties.len(), 1);
+            assert_eq!(
+                packet.user_properties.first().unwrap(),
+                &UserProperty(MqttStringPair::new(
+                    MqttString::try_from("test-name").unwrap(),
+                    MqttString::try_from("test-value").unwrap()
+                ))
+            );
+        }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn decode_incomplete_user_properties() {
+            #[rustfmt::skip]
+            let packet = decode!(PubcompPacket<2>, 31, [
+                0x70, 0x1F,
+                0x12, 0x34, // Packet Identifier
+                0x00,       // Reason Code
+                0x1B,       // Property length
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'1', 
+                      0x00, 0x02, b'v', b'1',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'2', 
+                      0x00, 0x02, b'v', b'2',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'3', 
+                      0x00, 0x02, b'v', b'3',
+            ]);
+
+            assert_eq!(
+                packet.user_properties.as_slice(),
+                &[
+                    UserProperty(MqttStringPair::new(
+                        MqttString::try_from("k1").unwrap(),
+                        MqttString::try_from("v1").unwrap()
+                    )),
+                    UserProperty(MqttStringPair::new(
+                        MqttString::try_from("k2").unwrap(),
+                        MqttString::try_from("v2").unwrap()
+                    ))
+                ]
+            );
         }
     }
 }

@@ -2,20 +2,21 @@
 
 use heapless::Vec;
 
+#[allow(unused_imports)]
+use crate::types::QoS;
 use crate::{
     bytes::Bytes,
     types::{
-        IdentifiedQoS, MqttBinary, MqttString, PacketIdentifier, ReasonCode, TopicName, VarByteInt,
+        IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, PacketIdentifier, ReasonCode,
+        TopicName, VarByteInt,
     },
+    v5::{packet::GenericPubackPacket, property::Property},
 };
-
-#[allow(unused_imports)]
-use crate::types::QoS;
 
 /// Events emitted by the client when receiving an MQTT packet.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
+pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PROPERTIES: usize> {
     /// The server sent a PINGRESP packet.
     Pingresp,
 
@@ -25,19 +26,19 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// - [`QoS`] 0: No action
     /// - [`QoS`] 1: A PUBACK packet has been sent to the server.
     /// - [`QoS`] 2: A PUBREC packet has been sent to the server and the packet identifier is tracked as in flight
-    Publish(Publish<'e, MAX_SUBSCRIPTION_IDENTIFIERS>),
+    Publish(Publish<'e, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>),
 
     /// The server sent a SUBACK packet matching a SUBSCRIBE packet.
     ///
     /// The subscription process is complete and was successful if the reason code indicates success.
     /// The SUBSCRIBE packet won't have to be resent.
-    Suback(Suback),
+    Suback(Suback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent an UNSUBACK packet matching an UNSUBSCRIBE packet.
     ///
     /// The unsubscription process is complete and was successful if the reason code indicates success.
     /// The UNSUBSCRIBE packet won't have to be resent.
-    Unsuback(Suback),
+    Unsuback(Suback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a PUBACK or PUBREC with an erroneous reason code,
     /// therefore rejecting the publication.
@@ -45,7 +46,7 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// The included reason code is always erroneous.
     ///
     /// The publication process is aborted.
-    PublishRejected(Pubrej),
+    PublishRejected(Pubrej<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a PUBACK packet matching a [`QoS`] 1 PUBLISH packet
     /// confirming that the PUBLISH has been received.
@@ -54,7 +55,7 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     ///
     /// The [`QoS`] 1 publication process is complete,
     /// the PUBLISH packet won't have to be resent.
-    PublishAcknowledged(Puback),
+    PublishAcknowledged(Puback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a PUBREC packet matching a [`QoS`] 2 PUBLISH packet
     /// confirming that the PUBLISH has been received.
@@ -65,7 +66,7 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     ///
     /// The first handshake of the [`QoS`] 2 publication process is complete,
     /// the PUBLISH packet won't have to be resent.
-    PublishReceived(Puback),
+    PublishReceived(Puback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a PUBREL packet matching a [`QoS`] 2 PUBREC packet
     /// confirming that the PUBREC has been received.
@@ -76,7 +77,7 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     ///
     /// The [`QoS`] 2 publication process is complete,
     /// the PUBREC packet won't have to be resent.
-    PublishReleased(Puback),
+    PublishReleased(Puback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a PUBCOMP packet matching a [`QoS`] 2 PUBREL packet
     /// confirming that the PUBREL has been received.
@@ -85,7 +86,7 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     ///
     /// The [`QoS`] 2 publication process is complete,
     /// the PUBREL packet won't have to be resent.
-    PublishComplete(Puback),
+    PublishComplete(Puback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a SUBACK, PUBACK, PUBREC, PUBREL or PUBCOMP
     /// packet with a packet identifier that is not in flight (anymore).
@@ -103,9 +104,14 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
 /// Content of [`Event::Suback`].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Suback {
+pub struct Suback<'s, const MAX_USER_PROPERTIES: usize> {
     /// Packet identifier of the acknowledged SUBSCRIBE packet.
     pub packet_identifier: PacketIdentifier,
+
+    /// The user property entries in the SUBACK/UNSUBACK packet.
+    /// If the vector is full, this list might not be exhaustive.
+    pub user_properties: Vec<MqttStringPair<'s>, MAX_USER_PROPERTIES>,
+
     /// Reason code returned for the subscription.
     pub reason_code: ReasonCode,
 }
@@ -113,7 +119,8 @@ pub struct Suback {
 /// Content of [`Event::Publish`].
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
+pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PROPERTIES: usize>
+{
     /// The DUP flag in the PUBLISH packet. If set to false, it indicates that this is the first occasion
     /// the server has attempted to send this publication.
     pub dup: bool,
@@ -153,6 +160,10 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
     /// link back to the original request.
     pub correlation_data: Option<MqttBinary<'p>>,
 
+    /// The user property entries in the PUBLISH packet. If the vector is full, this list might not be
+    /// exhaustive.
+    pub user_properties: Vec<MqttStringPair<'p>, MAX_USER_PROPERTIES>,
+
     /// The subscription identifiers in the PUBLISH packet. If the vector is full, this list might not
     /// be exhaustive.
     pub subscription_identifiers: Vec<VarByteInt, MAX_SUBSCRIPTION_IDENTIFIERS>,
@@ -170,11 +181,32 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize> {
 /// The reason code is always successful.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Puback {
+pub struct Puback<'p, const MAX_USER_PROPERTIES: usize> {
     /// Packet identifier of the acknowledged PUBLISH packet.
     pub packet_identifier: PacketIdentifier,
     /// Reason code of this state in the publication process
     pub reason_code: ReasonCode,
+    /// The user property entries in the PUBACK/PUBREC/PUBREL/PUBCOMP packet.
+    /// If the vector is full, this list might not be exhaustive.
+    pub user_properties: Vec<MqttStringPair<'p>, MAX_USER_PROPERTIES>,
+}
+
+impl<'p, T, const MAX_USER_PROPERTIES: usize> From<GenericPubackPacket<'p, T, MAX_USER_PROPERTIES>>
+    for Puback<'p, MAX_USER_PROPERTIES>
+{
+    fn from(packet: GenericPubackPacket<'p, T, MAX_USER_PROPERTIES>) -> Self {
+        debug_assert!(packet.reason_code.is_success());
+
+        Self {
+            packet_identifier: packet.packet_identifier,
+            reason_code: packet.reason_code,
+            user_properties: packet
+                .user_properties
+                .into_iter()
+                .map(Property::into_inner)
+                .collect(),
+        }
+    }
 }
 
 /// Content of [`Event::PublishRejected`].
@@ -182,9 +214,30 @@ pub struct Puback {
 /// The reason code is always erroneous.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct Pubrej {
+pub struct Pubrej<'p, const MAX_USER_PROPERTIES: usize> {
     /// Packet identifier of the rejected PUBLISH packet.
     pub packet_identifier: PacketIdentifier,
     /// Reason code of the rejection.
     pub reason_code: ReasonCode,
+    /// The user property entries in the PUBACK/PUBREC/PUBREL/PUBCOMP packet.
+    /// If the vector is full, this list might not be exhaustive.
+    pub user_properties: Vec<MqttStringPair<'p>, MAX_USER_PROPERTIES>,
+}
+
+impl<'p, T, const MAX_USER_PROPERTIES: usize> From<GenericPubackPacket<'p, T, MAX_USER_PROPERTIES>>
+    for Pubrej<'p, MAX_USER_PROPERTIES>
+{
+    fn from(packet: GenericPubackPacket<'p, T, MAX_USER_PROPERTIES>) -> Self {
+        debug_assert!(packet.reason_code.is_erroneous());
+
+        Self {
+            packet_identifier: packet.packet_identifier,
+            reason_code: packet.reason_code,
+            user_properties: packet
+                .user_properties
+                .into_iter()
+                .map(Property::into_inner)
+                .collect(),
+        }
+    }
 }

@@ -48,7 +48,7 @@ impl<'p, T: PingPacketType> RxPacket<'p> for GenericPingPacket<T> {
 }
 impl<T: PingPacketType> TxPacket for GenericPingPacket<T> {
     fn remaining_len(&self) -> VarByteInt {
-        // Invariant: 0 < VarByteInt::MAX_ENCODABLE
+        // Invariant: 0 <= VarByteInt::MAX_ENCODABLE
         VarByteInt::new_unchecked(0)
     }
 

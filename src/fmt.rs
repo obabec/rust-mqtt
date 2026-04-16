@@ -1,6 +1,15 @@
 #![allow(unused)]
 
 #[clippy::format_args]
+macro_rules! const_assert_ {
+    ($($x:tt)*) => {
+        {
+            ::core::assert!($($x)*);
+        }
+    };
+}
+
+#[clippy::format_args]
 macro_rules! assert_ {
     ($($x:tt)*) => {
         {
@@ -190,9 +199,10 @@ pub(crate) use trace;
 pub(crate) use verbose;
 pub(crate) use warn_ as warn;
 
-pub(crate) use assert_ as assert;
-
+pub(crate) use const_assert_ as const_assert;
 pub(crate) use const_debug_assert_ as const_debug_assert;
+
+pub(crate) use assert_ as assert;
 
 pub(crate) use debug_assert_ as debug_assert;
 pub(crate) use debug_assert_eq_ as debug_assert_eq;

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+- Add user property support across CONNECT, CONNACK, PUBLISH, SUBSCRIBE, SUBACK, UNSUBSCRIBE, UNSUBACK, DISCONNECT, plus incoming PUBACK, PUBREC, PUBREL, and PUBCOMP packets
+- Add `UnsubscriptionOptions`
+- Change `Client::subscribe` to take `SubscriptionOptions` by reference instead of by value
+- Add slices of user property `MqttStringPair`'s to `ConnectOptions`, `WillOptions`, `DisconnectOptions`, `PublicationOptions`, `SubscriptionOptions`, `UnsubscriptionOptions`, as well as `Vec`'s of user property `MqttStringPair`'s to `ConnectInfo` and the `Suback`, `Publish`, `Puback` or `Pubrej` event contents
+- Add the `MAX_USER_PROPERTIES` const generic parameter to the client as an upper limit to the amount of user properties the client can process
+- Fix reason string being allowed more than once in incoming SUBACK and UNSUBACK packets
+
 ## 0.5.1 - 2026-04-10
 
 - Fix swapped const generic parameter usage in `Session`

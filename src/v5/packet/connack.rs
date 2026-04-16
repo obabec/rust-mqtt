@@ -1,3 +1,5 @@
+use heapless::Vec;
+
 use crate::{
     buffer::BufferProvider,
     config::{MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
@@ -11,13 +13,13 @@ use crate::{
         AssignedClientIdentifier, AtMostOnceProperty, MaximumQoS, PropertyType, ReasonString,
         ResponseInformation, RetainAvailable, ServerKeepAlive, ServerReference,
         SharedSubscriptionAvailable, SubscriptionIdentifierAvailable, TopicAliasMaximum,
-        WildcardSubscriptionAvailable,
+        UserProperty, WildcardSubscriptionAvailable,
     },
 };
 
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct ConnackPacket<'p> {
+pub struct ConnackPacket<'p, const MAX_USER_PROPERTIES: usize> {
     pub session_present: bool,
     pub reason_code: ReasonCode,
 
@@ -30,6 +32,7 @@ pub struct ConnackPacket<'p> {
     pub assigned_client_identifier: Option<AssignedClientIdentifier<'p>>,
     pub topic_alias_maximum: Option<TopicAliasMaximum>,
     pub reason_string: Option<ReasonString<'p>>,
+    pub user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
     pub wildcard_subscription_available: Option<WildcardSubscriptionAvailable>,
     pub subscription_identifier_available: Option<SubscriptionIdentifierAvailable>,
     pub shared_subscription_available: Option<SharedSubscriptionAvailable>,
@@ -42,10 +45,10 @@ pub struct ConnackPacket<'p> {
     // pub authentication_data: Option<AuthenticationData<'p>>,
 }
 
-impl Packet for ConnackPacket<'_> {
+impl<const MAX_USER_PROPERTIES: usize> Packet for ConnackPacket<'_, MAX_USER_PROPERTIES> {
     const PACKET_TYPE: PacketType = PacketType::Connack;
 }
-impl<'p> RxPacket<'p> for ConnackPacket<'p> {
+impl<'p, const MAX_USER_PROPERTIES: usize> RxPacket<'p> for ConnackPacket<'p, MAX_USER_PROPERTIES> {
     async fn receive<R: Read, B: BufferProvider<'p>>(
         header: &FixedHeader,
         mut reader: BodyReader<'_, 'p, R, B>,
@@ -98,26 +101,6 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
             return Err(RxError::ProtocolError);
         }
 
-        let mut packet = Self {
-            session_present: connack_flags > 0,
-            reason_code: connect_reason_code,
-
-            session_expiry_interval: None,
-            receive_maximum: None,
-            maximum_qos: None,
-            retain_available: None,
-            maximum_packet_size: None,
-            assigned_client_identifier: None,
-            topic_alias_maximum: None,
-            reason_string: None,
-            wildcard_subscription_available: None,
-            subscription_identifier_available: None,
-            shared_subscription_available: None,
-            server_keep_alive: None,
-            response_information: None,
-            server_reference: None,
-        };
-
         verbose!("reading property length field");
         let properties_length = VarByteInt::read(r).await?.size();
 
@@ -127,6 +110,22 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
             trace!("invalid CONNACK property length for remaining packet length");
             return Err(RxError::MalformedPacket);
         }
+
+        let mut session_expiry_interval = None;
+        let mut receive_maximum = None;
+        let mut maximum_qos = None;
+        let mut retain_available = None;
+        let mut maximum_packet_size = None;
+        let mut assigned_client_identifier = None;
+        let mut topic_alias_maximum = None;
+        let mut reason_string = None;
+        let mut user_properties = Vec::new();
+        let mut wildcard_subscription_available = None;
+        let mut subscription_identifier_available = None;
+        let mut shared_subscription_available = None;
+        let mut server_keep_alive = None;
+        let mut response_information = None;
+        let mut server_reference = None;
 
         let mut seen_authentication_method = false;
         let mut seen_authentication_data = false;
@@ -145,20 +144,29 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
             );
             #[rustfmt::skip]
             match property_type {
-                PropertyType::SessionExpiryInterval => packet.session_expiry_interval.try_set(r).await?,
-                PropertyType::ReceiveMaximum => packet.receive_maximum.try_set(r).await?,
-                PropertyType::MaximumQoS => packet.maximum_qos.try_set(r).await?,
-                PropertyType::RetainAvailable => packet.retain_available.try_set(r).await?,
-                PropertyType::MaximumPacketSize => packet.maximum_packet_size.try_set(r).await?,
-                PropertyType::AssignedClientIdentifier => packet.assigned_client_identifier.try_set(r).await?,
-                PropertyType::TopicAliasMaximum => packet.topic_alias_maximum.try_set(r).await?,
-                PropertyType::ReasonString => packet.reason_string.try_set(r).await?,
-                PropertyType::WildcardSubscriptionAvailable => packet.wildcard_subscription_available.try_set(r).await?,
-                PropertyType::SubscriptionIdentifierAvailable => packet.subscription_identifier_available.try_set(r).await?,
-                PropertyType::SharedSubscriptionAvailable => packet.shared_subscription_available.try_set(r).await?,
-                PropertyType::ServerKeepAlive => packet.server_keep_alive.try_set(r).await?,
-                PropertyType::ResponseInformation => packet.response_information.try_set(r).await?,
-                PropertyType::ServerReference => packet.server_reference.try_set(r).await?,
+                PropertyType::SessionExpiryInterval => session_expiry_interval.try_set(r).await?,
+                PropertyType::ReceiveMaximum => receive_maximum.try_set(r).await?,
+                PropertyType::MaximumQoS => maximum_qos.try_set(r).await?,
+                PropertyType::RetainAvailable => retain_available.try_set(r).await?,
+                PropertyType::MaximumPacketSize => maximum_packet_size.try_set(r).await?,
+                PropertyType::AssignedClientIdentifier => assigned_client_identifier.try_set(r).await?,
+                PropertyType::TopicAliasMaximum => topic_alias_maximum.try_set(r).await?,
+                PropertyType::ReasonString => reason_string.try_set(r).await?,
+                PropertyType::UserProperty if !user_properties.is_full() => {
+                    let user_property = UserProperty::read(r).await?;
+
+                    // Safety: `!Vec::is_full` guarantees there is space
+                    unsafe { user_properties.push_unchecked(user_property) };
+                },
+                PropertyType::UserProperty => {
+                    UserProperty::skip(r).await?;
+                },
+                PropertyType::WildcardSubscriptionAvailable => wildcard_subscription_available.try_set(r).await?,
+                PropertyType::SubscriptionIdentifierAvailable => subscription_identifier_available.try_set(r).await?,
+                PropertyType::SharedSubscriptionAvailable => shared_subscription_available.try_set(r).await?,
+                PropertyType::ServerKeepAlive => server_keep_alive.try_set(r).await?,
+                PropertyType::ResponseInformation => response_information.try_set(r).await?,
+                PropertyType::ServerReference => server_reference.try_set(r).await?,
                 PropertyType::AuthenticationMethod if seen_authentication_method => return Err(RxError::ProtocolError),
                 PropertyType::AuthenticationMethod => {
                     seen_authentication_method = true;
@@ -173,14 +181,6 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
                     verbose!("skipping authentication data ({} bytes)", len);
                     r.skip(len).await?;
                 },
-                PropertyType::UserProperty => {
-                    let len = u16::read(r).await? as usize;
-                    verbose!("skipping user property name ({} bytes)", len);
-                    r.skip(len).await?;
-                    let len = u16::read(r).await? as usize;
-                    verbose!("skipping user property value ({} bytes)", len);
-                    r.skip(len).await?;
-                },
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
                     trace!("invalid CONNACK property: {:?}", p);
@@ -189,7 +189,25 @@ impl<'p> RxPacket<'p> for ConnackPacket<'p> {
             };
         }
 
-        Ok(packet)
+        Ok(Self {
+            session_present: connack_flags > 0,
+            reason_code: connect_reason_code,
+            session_expiry_interval,
+            receive_maximum,
+            maximum_qos,
+            retain_available,
+            maximum_packet_size,
+            assigned_client_identifier,
+            topic_alias_maximum,
+            reason_string,
+            user_properties,
+            wildcard_subscription_available,
+            subscription_identifier_available,
+            shared_subscription_available,
+            server_keep_alive,
+            response_information,
+            server_reference,
+        })
     }
 }
 
@@ -200,13 +218,14 @@ mod unit {
     use crate::{
         config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
         test::rx::decode,
-        types::{MqttString, QoS, ReasonCode},
+        types::{MqttString, MqttStringPair, QoS, ReasonCode},
         v5::{
             packet::ConnackPacket,
             property::{
                 AssignedClientIdentifier, MaximumQoS, ReasonString, ResponseInformation,
                 RetainAvailable, ServerKeepAlive, ServerReference, SharedSubscriptionAvailable,
-                SubscriptionIdentifierAvailable, TopicAliasMaximum, WildcardSubscriptionAvailable,
+                SubscriptionIdentifierAvailable, TopicAliasMaximum, UserProperty,
+                WildcardSubscriptionAvailable,
             },
         },
     };
@@ -214,7 +233,7 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn decode_simple() {
-        let packet = decode!(ConnackPacket, 3, [0x20, 0x03, 0x01, 0x9D, 0x00]);
+        let packet = decode!(ConnackPacket<16>, 3, [0x20, 0x03, 0x01, 0x9D, 0x00]);
 
         assert_eq!(packet.reason_code, ReasonCode::ServerMoved);
         assert!(packet.session_present);
@@ -226,6 +245,7 @@ mod unit {
         assert!(packet.maximum_packet_size.is_none());
         assert!(packet.assigned_client_identifier.is_none());
         assert!(packet.topic_alias_maximum.is_none());
+        assert!(packet.user_properties.is_empty());
         assert!(packet.reason_string.is_none());
         assert!(packet.wildcard_subscription_available.is_none());
         assert!(packet.subscription_identifier_available.is_none());
@@ -242,7 +262,7 @@ mod unit {
     async fn decode_properties() {
         #[rustfmt::skip]
         let packet = decode!(
-            ConnackPacket,
+            ConnackPacket<16>,
             127,
             [
                 0x20, // packet type
@@ -333,6 +353,14 @@ mod unit {
             packet.reason_string,
             Some(ReasonString(MqttString::try_from("OK").unwrap()))
         );
+        assert_eq!(packet.user_properties.len(), 1);
+        assert_eq!(
+            packet.user_properties.first().unwrap(),
+            &UserProperty(MqttStringPair::new(
+                MqttString::try_from("key").unwrap(),
+                MqttString::try_from("value").unwrap()
+            ))
+        );
         assert_eq!(
             packet.wildcard_subscription_available,
             Some(WildcardSubscriptionAvailable(true))
@@ -375,5 +403,43 @@ mod unit {
         //         MqttBinary::try_from("auth_data".as_bytes()).unwrap()
         //     ))
         // );
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn decode_incomplete_user_properties() {
+        #[rustfmt::skip]
+        let packet = decode!(
+            ConnackPacket<1>,
+            30,
+            [
+                0x20,
+                0x1E,
+
+                0x00, // connect acknowledge flags
+                0x00, // reason code
+                0x1B, // property length
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'1',
+                      0x00, 0x02, b'v', b'1',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'2',
+                      0x00, 0x02, b'v', b'2',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'3',
+                      0x00, 0x02, b'v', b'3',
+            ]
+        );
+
+        assert_eq!(
+            packet.user_properties.first().unwrap(),
+            &UserProperty(MqttStringPair::new(
+                MqttString::try_from("k1").unwrap(),
+                MqttString::try_from("v1").unwrap()
+            ))
+        );
     }
 }

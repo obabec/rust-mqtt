@@ -1,6 +1,6 @@
 use log::info;
 use rust_mqtt::{
-    client::options::{PublicationOptions, SubscriptionOptions, TopicReference},
+    client::options::{PublicationOptions, TopicReference},
     types::{IdentifiedQoS, QoS, TopicName},
 };
 use tokio::{
@@ -9,7 +9,7 @@ use tokio::{
 };
 
 use crate::common::{
-    BROKER_ADDRESS, DEFAULT_DC_OPTIONS, NO_SESSION_CONNECT_OPTIONS,
+    BROKER_ADDRESS, DEFAULT_DC_OPTIONS, DEFAULT_QOS0_SUB_OPTIONS, NO_SESSION_CONNECT_OPTIONS,
     assert::{assert_ok, assert_published, assert_recv, assert_subscribe},
     utils::{connected_client, disconnect, unique_topic},
 };
@@ -57,16 +57,10 @@ async fn receive_multiple(
     let mut client =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let options = SubscriptionOptions {
-        retain_handling: rust_mqtt::client::options::RetainHandling::AlwaysSend,
-        retain_as_published: false,
-        no_local: false,
-        qos,
-        subscription_identifier: None,
-    };
+    let options = DEFAULT_QOS0_SUB_OPTIONS.qos(qos);
 
     info!("[Receiver] Subscribing to topic {:?}", topic_name.as_ref());
-    assert_subscribe!(client, options, topic_name.into());
+    assert_subscribe!(client, &options, topic_name.into());
 
     info!("[Receiver] Subscription confirmed, signaling ready");
     assert_ok!(ready_tx.send(()));

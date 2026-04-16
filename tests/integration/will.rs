@@ -7,7 +7,7 @@ use rust_mqtt::{
         options::{DisconnectOptions, WillOptions},
     },
     config::SessionExpiryInterval,
-    types::{IdentifiedQoS, MqttBinary, MqttString, ReasonCode},
+    types::{IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, ReasonCode},
 };
 use tokio::{
     join,
@@ -56,6 +56,7 @@ async fn network_failure() {
             message_expiry_interval,
             response_topic,
             correlation_data,
+            user_properties,
             subscription_identifiers,
             content_type,
             message,
@@ -68,6 +69,7 @@ async fn network_failure() {
         assert_eq!(message_expiry_interval, None);
         assert_eq!(response_topic, None);
         assert_eq!(correlation_data, None);
+        assert!(user_properties.is_empty());
         assert!(subscription_identifiers.is_empty());
         assert_eq!(content_type, None);
         assert_eq!(&*message, will_msg.as_bytes());
@@ -112,6 +114,7 @@ async fn disconnect_with_will_message() {
             message_expiry_interval,
             response_topic,
             correlation_data,
+            user_properties,
             subscription_identifiers,
             content_type,
             message,
@@ -124,6 +127,7 @@ async fn disconnect_with_will_message() {
         assert_eq!(message_expiry_interval, None);
         assert_eq!(response_topic, None);
         assert_eq!(correlation_data, None);
+        assert!(user_properties.is_empty());
         assert!(subscription_identifiers.is_empty());
         assert_eq!(content_type, None);
         assert_eq!(&*message, will_msg.as_bytes());
@@ -250,6 +254,20 @@ async fn properties() {
     let will_content_type = MqttString::from_str("application/json").unwrap();
     let will_correlation_data = MqttBinary::from_slice(b"ask3n028cnc+wscuw c09qn").unwrap();
     let will_response_topic = unique_topic().0;
+    let will_user_properties = Box::leak(Box::new([
+        MqttStringPair::new(
+            MqttString::from_str("Magic smoke").unwrap(),
+            MqttString::from_str("escaped").unwrap(),
+        ),
+        MqttStringPair::new(
+            MqttString::from_str("Sensor accuracy").unwrap(),
+            MqttString::from_str("roughly 50/50").unwrap(),
+        ),
+        MqttStringPair::new(
+            MqttString::from_str("Deep sleep").unwrap(),
+            MqttString::from_str("no alarm set").unwrap(),
+        ),
+    ]));
 
     let will = WillOptions::new(
         will_topic_name.clone(),
@@ -259,7 +277,8 @@ async fn properties() {
     .correlation_data(will_correlation_data.clone())
     .payload_format_indicator(true)
     .message_expiry_interval(1234)
-    .response_topic(will_response_topic.clone());
+    .response_topic(will_response_topic.clone())
+    .user_properties(will_user_properties);
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS.clone().will(will);
 
@@ -284,6 +303,7 @@ async fn properties() {
             message_expiry_interval,
             response_topic,
             correlation_data,
+            user_properties,
             subscription_identifiers,
             content_type,
             message,
@@ -296,6 +316,7 @@ async fn properties() {
         assert_eq!(message_expiry_interval, Some(1234));
         assert_eq!(response_topic, Some(will_response_topic));
         assert_eq!(correlation_data, Some(will_correlation_data));
+        assert_eq!(user_properties.as_slice(), will_user_properties);
         assert!(subscription_identifiers.is_empty());
         assert_eq!(content_type, Some(will_content_type));
         assert_eq!(&*message, will_msg.as_bytes());
@@ -332,7 +353,7 @@ async fn qos0() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             will_topic_filter
         );
 
@@ -373,7 +394,7 @@ async fn qos1() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             will_topic_filter
         );
 
@@ -414,7 +435,7 @@ async fn qos2() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
+            &DEFAULT_QOS0_SUB_OPTIONS.exactly_once(),
             will_topic_filter
         );
 
@@ -797,6 +818,7 @@ async fn will_existing_session_taken_over_with_session_expiry() {
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
                 reason_string: _,
+                user_properties: _,
                 server_reference: _,
             }
         ));
@@ -863,6 +885,7 @@ async fn will_existing_session_taken_over_with_will_delay() {
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
                 reason_string: _,
+                user_properties: _,
                 server_reference: _,
             }
         ));
@@ -925,6 +948,7 @@ async fn will_existing_session_taken_over_with_clean_start() {
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
                 reason_string: _,
+                user_properties: _,
                 server_reference: _,
             }
         ));
@@ -988,6 +1012,7 @@ async fn no_will_existing_session_taken_over() {
             MqttError::Disconnect {
                 reason: ReasonCode::SessionTakenOver,
                 reason_string: _,
+                user_properties: _,
                 server_reference: _,
             }
         ));
@@ -1160,7 +1185,7 @@ async fn retain() {
     let receiver = async {
         assert_subscribe!(
             rx,
-            DEFAULT_QOS0_SUB_OPTIONS.retain_as_published(),
+            &DEFAULT_QOS0_SUB_OPTIONS.retain_as_published(),
             will_topic_filter.clone()
         );
 

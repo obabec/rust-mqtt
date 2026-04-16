@@ -6,7 +6,7 @@ use crate::{
     eio::{ErrorType, Read},
     fmt::{unreachable, verbose},
     io::err::{BodyReadError, ReadError},
-    types::{MqttBinary, MqttString, TopicName, VarByteInt},
+    types::{MqttBinary, MqttString, MqttStringPair, TopicName, VarByteInt},
 };
 
 pub trait Readable<R: Read>: Sized {
@@ -18,7 +18,7 @@ pub trait Store<'a>: Read {
 }
 
 impl<R: Read, const N: usize> Readable<R> for [u8; N] {
-    async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
+    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         verbose!("reading array of {} byte(s)", N);
 
         let mut array = [0; N];
@@ -50,7 +50,7 @@ int_read_impl!(u16);
 int_read_impl!(u32);
 
 impl<R: Read> Readable<R> for bool {
-    async fn read(read: &mut R) -> Result<Self, ReadError<<R>::Error>> {
+    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
         match u8::read(read).await? {
             0 => Ok(false),
             1 => Ok(true),
@@ -105,6 +105,14 @@ impl<'s, R: Read + Store<'s>> Readable<R> for MqttString<'s> {
             .await?
             .try_into()
             .map_err(|_| ReadError::MalformedPacket)
+    }
+}
+impl<'s, R: Read + Store<'s>> Readable<R> for MqttStringPair<'s> {
+    async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
+        let name = MqttString::read(read).await?;
+        let value = MqttString::read(read).await?;
+
+        Ok(MqttStringPair::new(name, value))
     }
 }
 impl<'s, R: Read + Store<'s>> Readable<R> for TopicName<'s> {
@@ -341,7 +349,7 @@ mod unit {
                 read::{BodyReader, Readable},
             },
             test::read::SliceReader,
-            types::{MqttBinary, MqttString, VarByteInt},
+            types::{MqttBinary, MqttString, MqttStringPair, VarByteInt},
         };
 
         #[tokio::test]
@@ -500,6 +508,25 @@ mod unit {
 
         #[tokio::test]
         #[test_log::test]
+        async fn read_string_pair() {
+            let mut s = SliceReader::new(&[
+                0x00, 0x03, b'k', b'e', b'y', 0x00, 0x05, b'v', b'a', b'l', b'u', b'e',
+            ]);
+            #[cfg(feature = "alloc")]
+            let mut b = AllocBuffer;
+            #[cfg(feature = "bump")]
+            let mut b = [0; 64];
+            #[cfg(feature = "bump")]
+            let mut b = BumpBuffer::new(&mut b);
+
+            let mut r = BodyReader::new(&mut s, &mut b, 12);
+            let v = assert_ok!(MqttStringPair::read(&mut r).await);
+            assert_eq!(v.name.as_ref(), "key");
+            assert_eq!(v.value.as_ref(), "value");
+        }
+
+        #[tokio::test]
+        #[test_log::test]
         async fn read_stream() {
             #[rustfmt::skip]
             let mut s = SliceReader::new(
@@ -511,6 +538,8 @@ mod unit {
                     0x80, 0x01,                              // varbyteint
                     0x00, 0x03, 0xAA, 0xBB, 0xCC,            // binary
                     0x00, 0x04, b't', b'e', b's', b't',      // string
+                    0x00, 0x03, b'k', b'e', b'y',            // string pair name
+                    0x00, 0x05, b'v', b'a', b'l', b'u', b'e',// string pair value
                     0x11, 0x22, 0x33,                        // array[3]
                 ]
             );
@@ -521,7 +550,7 @@ mod unit {
             #[cfg(feature = "bump")]
             let mut b = BumpBuffer::new(&mut b);
 
-            let mut r = BodyReader::new(&mut s, &mut b, 24);
+            let mut r = BodyReader::new(&mut s, &mut b, 36);
 
             let v_u8 = assert_ok!(u8::read(&mut r).await);
             assert_eq!(v_u8, 0x42);
@@ -543,6 +572,10 @@ mod unit {
 
             let v_string = assert_ok!(MqttString::read(&mut r).await);
             assert_eq!(v_string.as_ref(), "test");
+
+            let v_string_pair = assert_ok!(MqttStringPair::read(&mut r).await);
+            assert_eq!(v_string_pair.name.as_ref(), "key");
+            assert_eq!(v_string_pair.value.as_ref(), "value");
 
             let v_array = assert_ok!(<[u8; 3]>::read(&mut r).await);
             assert_eq!(v_array, [0x11, 0x22, 0x33]);
@@ -661,6 +694,32 @@ mod unit {
 
             let mut r = BodyReader::new(&mut s, &mut b, 6);
             let e = assert_err!(MqttString::read(&mut r).await);
+            assert_eq!(e, ReadError::UnexpectedEOF);
+
+            // MqttStringPair - EOF when reading name length
+            let mut s = SliceReader::new(b"\x00");
+            #[cfg(feature = "alloc")]
+            let mut b = AllocBuffer;
+            #[cfg(feature = "bump")]
+            let mut b = [0; 64];
+            #[cfg(feature = "bump")]
+            let mut b = BumpBuffer::new(&mut b);
+
+            let mut r = BodyReader::new(&mut s, &mut b, 2);
+            let e = assert_err!(MqttStringPair::read(&mut r).await);
+            assert_eq!(e, ReadError::UnexpectedEOF);
+
+            // MqttStringPair - EOF when reading value string
+            let mut s = SliceReader::new(&[0x00, 0x03, b'k', b'e', b'y', 0x00, 0x05, b'v', b'a']);
+            #[cfg(feature = "alloc")]
+            let mut b = AllocBuffer;
+            #[cfg(feature = "bump")]
+            let mut b = [0; 64];
+            #[cfg(feature = "bump")]
+            let mut b = BumpBuffer::new(&mut b);
+
+            let mut r = BodyReader::new(&mut s, &mut b, 12);
+            let e = assert_err!(MqttStringPair::read(&mut r).await);
             assert_eq!(e, ReadError::UnexpectedEOF);
         }
 
@@ -884,6 +943,25 @@ mod unit {
 
             let mut r = BodyReader::new(&mut s, &mut b, 2);
             let e = assert_err!(MqttString::read(&mut r).await);
+            assert_eq!(e, ReadError::Read(BodyReadError::InsufficientRemainingLen));
+        }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn read_insufficient_remaining_len_string_pair() {
+            // Insufficient remaining length while reading value string
+            let mut s = SliceReader::new(&[
+                0x00, 0x03, b'k', b'e', b'y', 0x00, 0x05, b'v', b'a', b'l', b'u', b'e',
+            ]);
+            #[cfg(feature = "alloc")]
+            let mut b = AllocBuffer;
+            #[cfg(feature = "bump")]
+            let mut b = [0; 64];
+            #[cfg(feature = "bump")]
+            let mut b = BumpBuffer::new(&mut b);
+
+            let mut r = BodyReader::new(&mut s, &mut b, 11);
+            let e = assert_err!(MqttStringPair::read(&mut r).await);
             assert_eq!(e, ReadError::Read(BodyReadError::InsufficientRemainingLen));
         }
     }

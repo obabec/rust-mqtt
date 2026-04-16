@@ -14,7 +14,7 @@ pub use connack::ConnackPacket;
 pub use connect::ConnectPacket;
 pub use disconnect::DisconnectPacket;
 pub use pings::{PingreqPacket, PingrespPacket};
-pub use pubacks::*;
+pub use pubacks::{GenericPubackPacket, PubackPacket, PubcompPacket, PubrecPacket, PubrelPacket};
 pub use publish::PublishPacket;
 pub use subacks::{SubackPacket, UnsubackPacket};
 pub use subscribe::SubscribePacket;

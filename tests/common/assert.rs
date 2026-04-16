@@ -30,9 +30,9 @@ macro_rules! assert_subscribe {
 }
 
 macro_rules! assert_unsubscribe {
-    ($client:expr, $topic:expr) => {
+    ($client:expr, $options:expr, $topic:expr) => {
         assert_ok!(
-            crate::common::utils::unsubscribe(&mut $client, $topic).await,
+            crate::common::utils::unsubscribe(&mut $client, $options, $topic).await,
             "Failed to unsubscribe"
         );
     };

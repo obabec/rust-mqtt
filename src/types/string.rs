@@ -254,3 +254,52 @@ impl<'s> MqttString<'s> {
         Self(self.0.as_borrowed())
     }
 }
+
+/// A name-value pair of two [`MqttString`]'s.
+#[derive(Default, Clone, PartialEq, Eq)]
+pub struct MqttStringPair<'s> {
+    /// The name part of the string pair.
+    pub name: MqttString<'s>,
+
+    /// The value part of the string pair.
+    pub value: MqttString<'s>,
+}
+
+impl<'s> core::fmt::Debug for MqttStringPair<'s> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("MqttStringPair")
+            .field("name", &self.name.as_str())
+            .field("value", &self.value.as_str())
+            .finish()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<'a> defmt::Format for MqttStringPair<'a> {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(
+            fmt,
+            "MqttStringPair {{ name: {:?}, value: {:?} }}",
+            self.name.as_str(),
+            self.value.as_str()
+        );
+    }
+}
+
+impl<'s> MqttStringPair<'s> {
+    /// Creates a new [`MqttStringPair`]
+    #[must_use]
+    pub const fn new(name: MqttString<'s>, value: MqttString<'s>) -> Self {
+        Self { name, value }
+    }
+
+    /// Delegates to [`crate::Bytes::as_borrowed`].
+    #[inline]
+    #[must_use]
+    pub const fn as_borrowed(&'s self) -> Self {
+        Self {
+            name: self.name.as_borrowed(),
+            value: self.value.as_borrowed(),
+        }
+    }
+}

@@ -5,7 +5,7 @@ use const_fn::const_fn;
 use crate::{
     client::options::WillOptions,
     config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
-    types::{MqttBinary, MqttString},
+    types::{MqttBinary, MqttString, MqttStringPair},
 };
 
 /// Options for a connection.
@@ -26,6 +26,11 @@ pub struct Options<'c> {
 
     /// When set to true, the broker may return response information used to construct response topics.
     pub request_response_information: bool,
+
+    /// Arbitrary key-value pairs of strings sent as the user property entries of the CONNECT packet.
+    /// Note that this slice's length must be less than [`crate::client::Client`]'s const generic
+    /// parameter `MAX_USER_PROPERTIES`.
+    pub user_properties: &'c [MqttStringPair<'c>],
 
     /// The user name the client wishes to authenticate with.
     pub user_name: Option<MqttString<'c>>,
@@ -53,6 +58,7 @@ impl<'c> Options<'c> {
             session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
             maximum_packet_size: MaximumPacketSize::Unlimited,
             request_response_information: false,
+            user_properties: &[],
             user_name: None,
             password: None,
             will: None,
@@ -88,6 +94,13 @@ impl<'c> Options<'c> {
     #[must_use]
     pub const fn request_response_information(mut self) -> Self {
         self.request_response_information = true;
+        self
+    }
+    /// Sets the user properties. Note that this slice's length must be less than
+    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    #[must_use]
+    pub const fn user_properties(mut self, user_properties: &'c [MqttStringPair<'c>]) -> Self {
+        self.user_properties = user_properties;
         self
     }
     /// Sets the user name.

@@ -1,7 +1,7 @@
 use const_fn::const_fn;
 
 use crate::{
-    types::{MqttBinary, MqttString, QoS, TopicName, Will},
+    types::{MqttBinary, MqttString, MqttStringPair, QoS, TopicName, Will},
     v5::property::WillDelayInterval,
 };
 
@@ -51,6 +51,10 @@ pub struct Options<'c> {
     /// on the network.
     pub correlation_data: Option<MqttBinary<'c>>,
 
+    /// The user properties in the will publication. Note that this slice's length must be less than
+    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    pub user_properties: &'c [MqttStringPair<'c>],
+
     /// The payload of the will publication.
     pub will_message: MqttBinary<'c>,
 }
@@ -70,6 +74,7 @@ impl<'c> Options<'c> {
             content_type: None,
             response_topic: None,
             correlation_data: None,
+            user_properties: &[],
             will_message: message,
         }
     }
@@ -136,10 +141,19 @@ impl<'c> Options<'c> {
         self.correlation_data = Some(correlation_data);
         self
     }
+    /// Sets the user properties. Note that this slice's length must be less than
+    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    #[must_use]
+    pub const fn user_properties(mut self, user_properties: &'c [MqttStringPair<'c>]) -> Self {
+        self.user_properties = user_properties;
+        self
+    }
 }
 
 impl<'c> Options<'c> {
-    pub(crate) fn as_borrowed_will(&'c self) -> Will<'c> {
+    pub(crate) fn as_borrowed_will<const MAX_USER_PROPERTIES: usize>(
+        &'c self,
+    ) -> Will<'c, MAX_USER_PROPERTIES> {
         Will {
             will_topic: self.will_topic.as_borrowed(),
             will_delay_interval: match self.will_delay_interval {
@@ -163,6 +177,12 @@ impl<'c> Options<'c> {
                 .as_ref()
                 .map(MqttBinary::as_borrowed)
                 .map(Into::into),
+            user_properties: self
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
             will_message: self.will_message.as_borrowed(),
         }
     }
