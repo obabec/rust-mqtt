@@ -1157,13 +1157,12 @@ impl<
 
                 if Self::remove_packet_identifier_if_exists(&mut self.pending_suback, pid) {
                     // We only send SUBSCRIBE packets with exactly 1 topic
-                    if suback.reason_codes.len() != 1 {
+
+                    let [r] = suback.reason_codes.as_slice() else {
                         error!("received mismatched SUBACK");
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
-                    }
-
-                    let r = suback.reason_codes.first().unwrap();
+                    };
 
                     Event::Suback(Suback {
                         packet_identifier: pid,
@@ -1191,13 +1190,11 @@ impl<
 
                 if Self::remove_packet_identifier_if_exists(&mut self.pending_unsuback, pid) {
                     // We only send UNSUBSCRIBE packets with exactly 1 topic
-                    if unsuback.reason_codes.len() != 1 {
+                    let [r] = unsuback.reason_codes.as_slice() else {
                         error!("received mismatched UNSUBACK");
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
                         return Err(MqttError::Server);
-                    }
-
-                    let r = unsuback.reason_codes.first().unwrap();
+                    };
 
                     Event::Unsuback(Suback {
                         packet_identifier: pid,
