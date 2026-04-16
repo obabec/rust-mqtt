@@ -168,14 +168,12 @@ impl<'p, T: SubackPacketType, const MAX_TOPIC_FILTERS: usize, const MAX_USER_PRO
                 .map_err(|_| RxError::ProtocolError)?;
         }
 
-        let packet = Self {
+        Ok(Self {
             packet_identifier,
             user_properties,
             reason_codes,
             _phantom_data: PhantomData,
-        };
-
-        Ok(packet)
+        })
     }
 }
 

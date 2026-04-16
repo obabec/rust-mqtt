@@ -205,7 +205,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PROPERTIES: u
 
         let message = r.read_and_store(r.remaining_len()).await?;
 
-        Ok(PublishPacket {
+        Ok(Self {
             dup,
             identified_qos,
             retain,

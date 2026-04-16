@@ -150,15 +150,13 @@ impl<'p, const MAX_USER_PROPERTIES: usize> RxPacket<'p>
             };
         }
 
-        let packet = Self {
+        Ok(Self {
             reason_code: disconnect_reason_code,
             session_expiry_interval: None,
             reason_string,
             user_properties,
             server_reference,
-        };
-
-        Ok(packet)
+        })
     }
 }
 impl<const MAX_USER_PROPERTIES: usize> TxPacket for DisconnectPacket<'_, MAX_USER_PROPERTIES> {
