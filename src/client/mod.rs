@@ -110,18 +110,20 @@ impl<
     /// The session state is initialised as a new session. If you want to start the
     /// client with an existing session, use [`Self::with_session`].
     pub fn new(buffer: &'c mut B) -> Self {
-        assert!(
-            RECEIVE_MAXIMUM <= 65535,
-            "RECEIVE_MAXIMUM must be less than or equal to 65535"
-        );
-        assert!(
-            RECEIVE_MAXIMUM > 0,
-            "RECEIVE_MAXIMUM must be greater than 0"
-        );
-        assert!(
-            MAX_USER_PROPERTIES <= 1021,
-            "MAX_USER_PROPERTIES must be less than or equal to 1021"
-        );
+        const {
+            assert!(
+                RECEIVE_MAXIMUM <= 65535,
+                "RECEIVE_MAXIMUM must be less than or equal to 65535"
+            );
+            assert!(
+                RECEIVE_MAXIMUM > 0,
+                "RECEIVE_MAXIMUM must be greater than 0"
+            );
+            assert!(
+                MAX_USER_PROPERTIES <= 1021,
+                "MAX_USER_PROPERTIES must be less than or equal to 1021"
+            );
+        }
 
         Self {
             client_config: ClientConfig::default(),
