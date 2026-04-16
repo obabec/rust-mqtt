@@ -551,7 +551,7 @@ impl<
             MAX_USER_PROPERTIES
         );
 
-        if self.pending_suback.len() == MAX_SUBSCRIBES {
+        if self.pending_suback.is_full() {
             info!("maximum concurrent subscriptions reached");
             return Err(MqttError::SessionBuffer);
         }
@@ -581,6 +581,8 @@ impl<
 
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
+
+        // `!self.pending_suback.is_full` guarantees there is space
         self.pending_suback.push(pid).unwrap();
 
         Ok(pid)
@@ -619,7 +621,7 @@ impl<
             MAX_USER_PROPERTIES
         );
 
-        if self.pending_unsuback.len() == MAX_SUBSCRIBES {
+        if self.pending_unsuback.is_full() {
             info!("maximum concurrent unsubscriptions reached");
             return Err(MqttError::SessionBuffer);
         }
@@ -646,6 +648,8 @@ impl<
 
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
+
+        // `!self.pending_unsuback.is_full` guarantees there is space
         self.pending_unsuback.push(pid).unwrap();
 
         Ok(pid)
