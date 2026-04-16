@@ -404,4 +404,42 @@ mod unit {
         //     ))
         // );
     }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn decode_incomplete_user_properties() {
+        #[rustfmt::skip]
+        let packet = decode!(
+            ConnackPacket<1>,
+            30,
+            [
+                0x20,
+                0x1E,
+
+                0x00, // connect acknowledge flags
+                0x00, // reason code
+                0x1B, // property length
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'1',
+                      0x00, 0x02, b'v', b'1',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'2',
+                      0x00, 0x02, b'v', b'2',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'3',
+                      0x00, 0x02, b'v', b'3',
+            ]
+        );
+
+        assert_eq!(
+            packet.user_properties.first().unwrap(),
+            &UserProperty(MqttStringPair::new(
+                MqttString::try_from("k1").unwrap(),
+                MqttString::try_from("v1").unwrap()
+            ))
+        );
+    }
 }

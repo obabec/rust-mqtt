@@ -421,4 +421,36 @@ mod unit {
             ))
         );
     }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn decode_incomplete_user_properties() {
+        #[rustfmt::skip]
+        let packet = decode!(DisconnectPacket<1>, 29, [
+            0xE0,
+            0x1D,
+            0x00, // Reason code
+            0x1B, // Property length
+
+            // User Property
+            0x26, 0x00, 0x02, b'k', b'1',
+                  0x00, 0x02, b'v', b'1',
+
+            // User Property
+            0x26, 0x00, 0x02, b'k', b'2',
+                  0x00, 0x02, b'v', b'2',
+
+            // User Property
+            0x26, 0x00, 0x02, b'k', b'3',
+                  0x00, 0x02, b'v', b'3',
+        ]);
+
+        assert_eq!(
+            packet.user_properties.as_slice(),
+            &[UserProperty(MqttStringPair::new(
+                MqttString::from_str("k1").unwrap(),
+                MqttString::from_str("v1").unwrap()
+            ))]
+        );
+    }
 }

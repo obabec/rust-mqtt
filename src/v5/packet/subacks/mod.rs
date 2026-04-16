@@ -287,6 +287,46 @@ mod unit {
             let reason_codes: Vec<_, 1> = [ReasonCode::Success].into();
             assert_eq!(packet.reason_codes, reason_codes);
         }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn decode_incomplete_user_properties() {
+            #[rustfmt::skip]
+            let packet = decode!(
+                SubackPacket<1, 1>,
+                31,
+                [
+                    0x90,
+                    0x1F,
+
+                    0x12, 0x34, // packet identifier
+                    0x1B,       // Property length
+
+                    // User Property
+                    0x26, 0x00, 0x02, b'k', b'1',
+                          0x00, 0x02, b'v', b'1',
+
+                    // User Property
+                    0x26, 0x00, 0x02, b'k', b'2',
+                          0x00, 0x02, b'v', b'2',
+
+                    // User Property
+                    0x26, 0x00, 0x02, b'k', b'3',
+                          0x00, 0x02, b'v', b'3',
+
+                    // Reason codes
+                    0x00,
+                ]
+            );
+
+            assert_eq!(
+                packet.user_properties.as_slice(),
+                &[UserProperty(MqttStringPair::new(
+                    MqttString::from_str("k1").unwrap(),
+                    MqttString::from_str("v1").unwrap()
+                ))]
+            );
+        }
     }
 
     mod unsuback {
@@ -394,6 +434,52 @@ mod unit {
 
             let reason_codes: Vec<_, 1> = [ReasonCode::Success].into();
             assert_eq!(packet.reason_codes, reason_codes);
+        }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn decode_incomplete_user_properties() {
+            #[rustfmt::skip]
+            let packet = decode!(
+                UnsubackPacket<1, 2>,
+                31,
+                [
+                    0xB0,
+                    0x1F,
+
+                    0x12, 0x34, // packet identifier
+                    0x1B,       // Property length
+
+                    // User Property
+                    0x26, 0x00, 0x02, b'k', b'1',
+                          0x00, 0x02, b'v', b'1',
+
+                    // User Property
+                    0x26, 0x00, 0x02, b'k', b'2',
+                          0x00, 0x02, b'v', b'2',
+
+                    // User Property
+                    0x26, 0x00, 0x02, b'k', b'3',
+                          0x00, 0x02, b'v', b'3',
+
+                    // Reason codea
+                    0x00,
+                ]
+            );
+
+            assert_eq!(
+                packet.user_properties.as_slice(),
+                &[
+                    UserProperty(MqttStringPair::new(
+                        MqttString::from_str("k1").unwrap(),
+                        MqttString::from_str("v1").unwrap()
+                    )),
+                    UserProperty(MqttStringPair::new(
+                        MqttString::from_str("k2").unwrap(),
+                        MqttString::from_str("v2").unwrap()
+                    ))
+                ]
+            );
         }
     }
 }

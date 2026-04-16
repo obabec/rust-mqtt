@@ -333,6 +333,44 @@ mod unit {
                 ))
             );
         }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn decode_incomplete_user_properties() {
+            #[rustfmt::skip]
+            let packet = decode!(PubackPacket<2>, 31, [
+                0x40, 0x1F,
+                0x12, 0x34, // Packet Identifier
+                0x00,       // Reason Code
+                0x1B,       // Property length
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'1',
+                      0x00, 0x02, b'v', b'1',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'2',
+                      0x00, 0x02, b'v', b'2',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'3',
+                      0x00, 0x02, b'v', b'3',
+            ]);
+
+            assert_eq!(
+                packet.user_properties.as_slice(),
+                &[
+                    UserProperty(MqttStringPair::new(
+                        MqttString::try_from("k1").unwrap(),
+                        MqttString::try_from("v1").unwrap()
+                    )),
+                    UserProperty(MqttStringPair::new(
+                        MqttString::try_from("k2").unwrap(),
+                        MqttString::try_from("v2").unwrap()
+                    ))
+                ]
+            );
+        }
     }
 
     mod rec {
@@ -439,6 +477,38 @@ mod unit {
                     MqttString::try_from("test-name").unwrap(),
                     MqttString::try_from("test-value").unwrap()
                 ))
+            );
+        }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn decode_incomplete_user_properties() {
+            #[rustfmt::skip]
+            let packet = decode!(PubrecPacket<1>, 31, [
+                0x50, 0x1F,
+                0x12, 0x34, // Packet Identifier
+                0x00,       // Reason Code
+                0x1B,       // Property length
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'1',
+                      0x00, 0x02, b'v', b'1',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'2',
+                      0x00, 0x02, b'v', b'2',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'3',
+                      0x00, 0x02, b'v', b'3',
+            ]);
+
+            assert_eq!(
+                packet.user_properties.as_slice(),
+                &[UserProperty(MqttStringPair::new(
+                    MqttString::try_from("k1").unwrap(),
+                    MqttString::try_from("v1").unwrap()
+                ))]
             );
         }
     }
@@ -556,6 +626,38 @@ mod unit {
                 ))
             );
         }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn decode_incomplete_user_properties() {
+            #[rustfmt::skip]
+            let packet = decode!(PubrelPacket<1>, 31, [
+                0x62, 0x1F,
+                0x12, 0x34, // Packet Identifier
+                0x00,       // Reason Code
+                0x1B,       // Property length
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'1',
+                      0x00, 0x02, b'v', b'1',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'2',
+                      0x00, 0x02, b'v', b'2',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'3',
+                      0x00, 0x02, b'v', b'3',
+            ]);
+
+            assert_eq!(
+                packet.user_properties.as_slice(),
+                &[UserProperty(MqttStringPair::new(
+                    MqttString::try_from("k1").unwrap(),
+                    MqttString::try_from("v1").unwrap()
+                ))]
+            );
+        }
     }
 
     mod comp {
@@ -663,6 +765,44 @@ mod unit {
                     MqttString::try_from("test-name").unwrap(),
                     MqttString::try_from("test-value").unwrap()
                 ))
+            );
+        }
+
+        #[tokio::test]
+        #[test_log::test]
+        async fn decode_incomplete_user_properties() {
+            #[rustfmt::skip]
+            let packet = decode!(PubcompPacket<2>, 31, [
+                0x70, 0x1F,
+                0x12, 0x34, // Packet Identifier
+                0x00,       // Reason Code
+                0x1B,       // Property length
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'1', 
+                      0x00, 0x02, b'v', b'1',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'2', 
+                      0x00, 0x02, b'v', b'2',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'3', 
+                      0x00, 0x02, b'v', b'3',
+            ]);
+
+            assert_eq!(
+                packet.user_properties.as_slice(),
+                &[
+                    UserProperty(MqttStringPair::new(
+                        MqttString::try_from("k1").unwrap(),
+                        MqttString::try_from("v1").unwrap()
+                    )),
+                    UserProperty(MqttStringPair::new(
+                        MqttString::try_from("k2").unwrap(),
+                        MqttString::try_from("v2").unwrap()
+                    ))
+                ]
             );
         }
     }

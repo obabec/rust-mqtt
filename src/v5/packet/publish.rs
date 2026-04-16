@@ -380,12 +380,13 @@ mod unit {
         test::{rx::decode, tx::encode},
         types::{
             IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, PacketIdentifier, TopicName,
+            VarByteInt,
         },
         v5::{
             packet::PublishPacket,
             property::{
                 ContentType, CorrelationData, MessageExpiryInterval, PayloadFormatIndicator,
-                Property, ResponseTopic, UserProperty,
+                ResponseTopic, UserProperty,
             },
         },
     };
@@ -667,20 +668,89 @@ mod unit {
             ))]
         );
 
-        assert_eq!(packet.subscription_identifiers.len(), 1);
         assert_eq!(
-            packet
-                .subscription_identifiers
-                .first()
-                .unwrap()
-                .into_inner()
-                .value(),
-            42
+            packet.subscription_identifiers.as_slice(),
+            &[VarByteInt::from(42u8).into()]
         );
 
         assert_eq!(
             packet.content_type,
             Some(ContentType(MqttString::try_from("text/plain").unwrap()))
         );
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn decode_incomplete_subscription_identifiers() {
+        #[rustfmt::skip]
+        let packet = decode!(
+            PublishPacket<'_, 2, 16>,
+            21,
+            [
+                0x30,
+                0x15,
+
+                0x00, 0x04, b't', b'e', b's', b't', // Topic name "test"
+                0x0C, // Property length
+
+                // Subscription Identifier
+                0x0B, 0x80, 0xAD, 0xE2, 0x04,
+
+                // Subscription Identifier
+                0x0B, 0xF4, 0x03,
+
+                // Subscription Identifier
+                0x0B, 0xA0, 0x9C, 0x01,
+
+                // Payload
+                b'O', b'K',
+            ]
+        );
+
+        assert_eq!(
+            packet.subscription_identifiers.as_slice(),
+            &[
+                VarByteInt::try_from(10_000_000u32).unwrap().into(),
+                VarByteInt::from(500u16).into()
+            ]
+        );
+        assert_eq!(packet.message, Bytes::from("OK".as_bytes()));
+    }
+
+    #[tokio::test]
+    #[test_log::test]
+    async fn decode_incomplete_user_properties() {
+        #[rustfmt::skip]
+        let packet = decode!(
+            PublishPacket<'_, 1, 1>,
+            27,
+            [
+                0x30,
+                0x1B,
+
+                0x00, 0x04, b't', b'e', b's', b't', // Topic name "test"
+                0x12, // Property length
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'1',
+                      0x00, 0x02, b'v', b'1',
+
+                // User Property
+                0x26, 0x00, 0x02, b'k', b'2',
+                      0x00, 0x02, b'v', b'2',
+
+                // Payload
+                b'o', b'k',
+            ]
+        );
+
+        assert_eq!(
+            packet.user_properties.as_slice(),
+            &[UserProperty(MqttStringPair::new(
+                MqttString::from_str("k1").unwrap(),
+                MqttString::from_str("v1").unwrap()
+            ))]
+        );
+        assert_eq!(packet.message, Bytes::from("ok".as_bytes()));
     }
 }
