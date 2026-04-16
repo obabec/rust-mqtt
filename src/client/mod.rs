@@ -17,7 +17,7 @@ use crate::{
         raw::Raw,
     },
     config::{ClientConfig, MaximumPacketSize, ServerConfig, SessionExpiryInterval, SharedConfig},
-    fmt::{assert, debug, error, info, panic, trace, unreachable, warn},
+    fmt::{assert, const_assert, debug, error, info, panic, trace, unreachable, warn},
     header::{FixedHeader, PacketType},
     io::Transport,
     packet::{Packet, TxPacket},
@@ -111,15 +111,15 @@ impl<
     /// client with an existing session, use [`Self::with_session`].
     pub fn new(buffer: &'c mut B) -> Self {
         const {
-            assert!(
+            const_assert!(
                 RECEIVE_MAXIMUM <= 65535,
                 "RECEIVE_MAXIMUM must be less than or equal to 65535"
             );
-            assert!(
+            const_assert!(
                 RECEIVE_MAXIMUM > 0,
                 "RECEIVE_MAXIMUM must be greater than 0"
             );
-            assert!(
+            const_assert!(
                 MAX_USER_PROPERTIES <= 1021,
                 "MAX_USER_PROPERTIES must be less than or equal to 1021"
             );
