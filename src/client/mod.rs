@@ -557,8 +557,7 @@ impl<
         let subscribe_filter = SubscriptionFilter::new(topic_filter, options);
 
         let pid = self.packet_identifier();
-        let mut subscribe_filters = Vec::<_, 1>::new();
-        let _ = subscribe_filters.push(subscribe_filter);
+        let subscribe_filters = [subscribe_filter].into();
         let packet = SubscribePacket::<1, MAX_USER_PROPERTIES>::new(
             pid,
             options.subscription_identifier.map(Into::into),
@@ -624,8 +623,7 @@ impl<
         }
 
         let pid = self.packet_identifier();
-        let mut topic_filters = Vec::<_, 1>::new();
-        let _ = topic_filters.push(topic_filter);
+        let topic_filters = [topic_filter].into();
         let packet = UnsubscribePacket::<1, MAX_USER_PROPERTIES>::new(
             pid,
             options

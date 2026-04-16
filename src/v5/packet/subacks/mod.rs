@@ -216,29 +216,21 @@ mod unit {
             // assert!(packet.reason_string.is_none());
             assert!(packet.user_properties.is_empty());
 
-            let mut reason_codes: Vec<_, 12> = Vec::new();
-            reason_codes.push(ReasonCode::Success).unwrap();
-            reason_codes
-                .push(ReasonCode::WildcardSubscriptionsNotSupported)
-                .unwrap();
-            reason_codes.push(ReasonCode::GrantedQoS1).unwrap();
-            reason_codes
-                .push(ReasonCode::SubscriptionIdentifiersNotSupported)
-                .unwrap();
-            reason_codes.push(ReasonCode::GrantedQoS2).unwrap();
-            reason_codes
-                .push(ReasonCode::SharedSubscriptionsNotSupported)
-                .unwrap();
-            reason_codes.push(ReasonCode::UnspecifiedError).unwrap();
-            reason_codes.push(ReasonCode::QuotaExceeded).unwrap();
-            reason_codes
-                .push(ReasonCode::ImplementationSpecificError)
-                .unwrap();
-            reason_codes
-                .push(ReasonCode::PacketIdentifierInUse)
-                .unwrap();
-            reason_codes.push(ReasonCode::NotAuthorized).unwrap();
-            reason_codes.push(ReasonCode::TopicFilterInvalid).unwrap();
+            let reason_codes: Vec<_, 12> = [
+                ReasonCode::Success,
+                ReasonCode::WildcardSubscriptionsNotSupported,
+                ReasonCode::GrantedQoS1,
+                ReasonCode::SubscriptionIdentifiersNotSupported,
+                ReasonCode::GrantedQoS2,
+                ReasonCode::SharedSubscriptionsNotSupported,
+                ReasonCode::UnspecifiedError,
+                ReasonCode::QuotaExceeded,
+                ReasonCode::ImplementationSpecificError,
+                ReasonCode::PacketIdentifierInUse,
+                ReasonCode::NotAuthorized,
+                ReasonCode::TopicFilterInvalid,
+            ]
+            .into();
             assert_eq!(packet.reason_codes, reason_codes);
         }
 
@@ -292,8 +284,7 @@ mod unit {
                 ]
             );
 
-            let mut reason_codes: Vec<_, 1> = Vec::new();
-            reason_codes.push(ReasonCode::Success).unwrap();
+            let reason_codes: Vec<_, 1> = [ReasonCode::Success].into();
             assert_eq!(packet.reason_codes, reason_codes);
         }
     }
@@ -334,21 +325,16 @@ mod unit {
             // assert!(packet.reason_string.is_none());
             assert!(packet.user_properties.is_empty());
 
-            let mut reason_codes: Vec<_, 7> = Vec::new();
-
-            reason_codes.push(ReasonCode::Success).unwrap();
-            reason_codes
-                .push(ReasonCode::PacketIdentifierInUse)
-                .unwrap();
-            reason_codes
-                .push(ReasonCode::NoSubscriptionExisted)
-                .unwrap();
-            reason_codes.push(ReasonCode::TopicFilterInvalid).unwrap();
-            reason_codes.push(ReasonCode::UnspecifiedError).unwrap();
-            reason_codes.push(ReasonCode::NotAuthorized).unwrap();
-            reason_codes
-                .push(ReasonCode::ImplementationSpecificError)
-                .unwrap();
+            let reason_codes: Vec<_, 7> = [
+                ReasonCode::Success,
+                ReasonCode::PacketIdentifierInUse,
+                ReasonCode::NoSubscriptionExisted,
+                ReasonCode::TopicFilterInvalid,
+                ReasonCode::UnspecifiedError,
+                ReasonCode::NotAuthorized,
+                ReasonCode::ImplementationSpecificError,
+            ]
+            .into();
 
             assert_eq!(packet.reason_codes, reason_codes);
         }
@@ -406,8 +392,7 @@ mod unit {
                 ]
             );
 
-            let mut reason_codes: Vec<_, 1> = Vec::new();
-            reason_codes.push(ReasonCode::Success).unwrap();
+            let reason_codes: Vec<_, 1> = [ReasonCode::Success].into();
             assert_eq!(packet.reason_codes, reason_codes);
         }
     }
