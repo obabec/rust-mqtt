@@ -1,3 +1,5 @@
+use core::num::NonZero;
+
 use const_fn::const_fn;
 
 use crate::types::{MqttBinary, MqttString, MqttStringPair, QoS, TopicName};
@@ -142,15 +144,15 @@ pub enum TopicReference<'t> {
 
     /// Publish to an already mapped topic alias. The alias must have been defined earlier
     /// in the network connection.
-    Alias(u16),
+    Alias(NonZero<u16>),
 
     /// Create a new topic alias or replace an existing topic alias.
     /// The alias lasts until the end of the network connection.
-    Mapping(TopicName<'t>, u16),
+    Mapping(TopicName<'t>, NonZero<u16>),
 }
 
 impl<'t> TopicReference<'t> {
-    pub(crate) fn alias(&self) -> Option<u16> {
+    pub(crate) fn alias(&self) -> Option<NonZero<u16>> {
         match self {
             Self::Name(_) => None,
             Self::Alias(alias) => Some(*alias),

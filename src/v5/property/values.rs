@@ -120,7 +120,7 @@ property!(ResponseInformation<'c>, MqttString<'c>);
 property!(ServerReference<'c>, MqttString<'c>);
 property!(ReasonString<'c>, MqttString<'c>);
 property!(TopicAliasMaximum, u16);
-property!(TopicAlias, u16);
+property!(TopicAlias, NonZero<u16>);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MaximumQoS(pub(crate) QoS);

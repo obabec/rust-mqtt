@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZero, time::Duration};
 
 use rust_mqtt::{
     client::{
@@ -156,13 +156,16 @@ async fn topic_alias_basic() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions::new(TopicReference::Mapping(topic_name.clone(), 1))
-            .retain()
-            .at_least_once();
+        let pub_options = PublicationOptions::new(TopicReference::Mapping(
+            topic_name.clone(),
+            NonZero::new(1).unwrap(),
+        ))
+        .retain()
+        .at_least_once();
 
         assert_published!(tx, pub_options.clone(), msg.into());
 
-        let pub_options = PublicationOptions::new(TopicReference::Alias(1))
+        let pub_options = PublicationOptions::new(TopicReference::Alias(NonZero::new(1).unwrap()))
             .retain()
             .at_least_once();
 
@@ -201,19 +204,25 @@ async fn topic_alias_remap() {
     let publisher = async {
         sleep(Duration::from_secs(1)).await;
 
-        let pub_options = PublicationOptions::new(TopicReference::Mapping(topic_name1.clone(), 1))
-            .retain()
-            .at_least_once();
+        let pub_options = PublicationOptions::new(TopicReference::Mapping(
+            topic_name1.clone(),
+            NonZero::new(1).unwrap(),
+        ))
+        .retain()
+        .at_least_once();
 
         assert_published!(tx, pub_options.clone(), msg.into());
 
-        let pub_options = PublicationOptions::new(TopicReference::Mapping(topic_name2.clone(), 1))
-            .retain()
-            .at_least_once();
+        let pub_options = PublicationOptions::new(TopicReference::Mapping(
+            topic_name2.clone(),
+            NonZero::new(1).unwrap(),
+        ))
+        .retain()
+        .at_least_once();
 
         assert_published!(tx, pub_options.clone(), msg.into());
 
-        let pub_options = PublicationOptions::new(TopicReference::Alias(1))
+        let pub_options = PublicationOptions::new(TopicReference::Alias(NonZero::new(1).unwrap()))
             .retain()
             .at_least_once();
 

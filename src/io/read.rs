@@ -1,4 +1,4 @@
-use core::{cmp::min, marker::PhantomData};
+use core::{cmp::min, marker::PhantomData, num::NonZero};
 
 use crate::{
     buffer::BufferProvider,
@@ -40,6 +40,11 @@ macro_rules! int_read_impl {
                 <[u8; size_of::<$int>()]>::read(read)
                     .await
                     .map(Self::from_be_bytes)
+            }
+        }
+        impl<R: Read> Readable<R> for NonZero<$int> {
+            async fn read(read: &mut R) -> Result<Self, ReadError<R::Error>> {
+                NonZero::new(<$int>::read(read).await?).ok_or(ReadError::ProtocolError)
             }
         }
     };

@@ -1,3 +1,5 @@
+use core::num::NonZero;
+
 use crate::{
     eio::Write,
     fmt::unreachable,
@@ -54,6 +56,14 @@ macro_rules! int_write_impl {
             }
             async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
                 self.to_be_bytes().write(write).await
+            }
+        }
+        impl Writable for NonZero<$int> {
+            fn written_len(&self) -> usize {
+                self.get().written_len()
+            }
+            async fn write<W: Write>(&self, write: &mut W) -> Result<(), WriteError<W::Error>> {
+                self.get().write(write).await
             }
         }
     };

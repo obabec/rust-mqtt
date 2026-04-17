@@ -119,8 +119,11 @@ async fn main() {
         }
     }
 
-    let pub_options =
-        PublicationOptions::new(TopicReference::Mapping(topic.clone(), 1)).exactly_once();
+    let pub_options = PublicationOptions::new(TopicReference::Mapping(
+        topic.clone(),
+        NonZero::new(1).unwrap(),
+    ))
+    .exactly_once();
 
     match client
         .publish(&pub_options, Bytes::from("anything".as_bytes()))
@@ -225,7 +228,8 @@ async fn main() {
     }
 
     // Start a Quality of Service 2 publish flow
-    let pub_options = PublicationOptions::new(TopicReference::Alias(1)).exactly_once();
+    let pub_options =
+        PublicationOptions::new(TopicReference::Alias(NonZero::new(1).unwrap())).exactly_once();
 
     let incomplete_publish_packet_identifier = match client
         .publish(&pub_options, Bytes::from("something".as_bytes()))

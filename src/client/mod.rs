@@ -729,7 +729,7 @@ impl<
         if options
             .topic
             .alias()
-            .is_some_and(|a| !(1..=self.server_config.topic_alias_maximum).contains(&a))
+            .is_some_and(|a| !(1..=self.server_config.topic_alias_maximum).contains(&a.get()))
         {
             return Err(MqttError::InvalidTopicAlias);
         }
@@ -881,7 +881,7 @@ impl<
         if options
             .topic
             .alias()
-            .is_some_and(|a| !(1..=self.server_config.topic_alias_maximum).contains(&a))
+            .is_some_and(|a| !(1..=self.server_config.topic_alias_maximum).contains(&a.get()))
         {
             return Err(MqttError::InvalidTopicAlias);
         }
