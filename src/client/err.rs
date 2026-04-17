@@ -138,6 +138,8 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     ///   server
     /// - a publication with a quality of service level greater than the server's maximum quality of service
     ///   being attempted
+    /// - a publication with retain set to true being attempted despite retain not being available on the
+    ///   server
     /// 
     /// Recoverable error. No action has been taken by the client.
     UnsupportedByServer,

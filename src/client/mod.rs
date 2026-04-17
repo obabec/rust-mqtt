@@ -714,6 +714,8 @@ impl<
     /// * [`MqttError::UnsupportedByServer`]
     ///   * if the quality of service level in the [`PublicationOptions`] is greater than the maximum
     ///     value specified in the server's CONNACK packet
+    ///   * if the server specified in its CONNACK that retain is not available and a publication with
+    ///     the retain flag set to true is attempted
     ///
     /// # Panics
     ///
@@ -732,6 +734,10 @@ impl<
         );
 
         if options.qos > self.server_config.maximum_qos {
+            return Err(MqttError::UnsupportedByServer);
+        }
+
+        if !self.server_config.retain_supported && options.retain {
             return Err(MqttError::UnsupportedByServer);
         }
 
@@ -849,6 +855,8 @@ impl<
     /// * [`MqttError::UnsupportedByServer`]
     ///   * if the quality of service level in the [`PublicationOptions`] is greater than the maximum
     ///     value specified in the server's CONNACK packet
+    ///   * if the server specified in its CONNACK that retain is not available and a publication with
+    ///     the retain flag set to true is attempted
     ///
     /// # Panics
     ///
@@ -875,6 +883,10 @@ impl<
         );
 
         if options.qos > self.server_config.maximum_qos {
+            return Err(MqttError::UnsupportedByServer);
+        }
+
+        if !self.server_config.retain_supported && options.retain {
             return Err(MqttError::UnsupportedByServer);
         }
 
