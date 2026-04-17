@@ -552,6 +552,8 @@ impl<
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this SUBSCRIBE packet
     /// * [`MqttError::UnsupportedByServer`] 
+    ///   * if the server specified in its CONNACK that wildcard subscriptions are not available and
+    ///     the topic filter is the topic filter of a shared subscription
     ///   * if the server specified in its CONNACK that shared subscriptions are not available and the
     ///     topic filter is the topic filter of a shared subscription
     ///
@@ -571,6 +573,9 @@ impl<
             MAX_USER_PROPERTIES
         );
 
+        if !self.server_config.wildcard_subscription_supported && topic_filter.has_wildcard() {
+            return Err(MqttError::UnsupportedByServer);
+        }
         if !self.server_config.shared_subscription_supported && topic_filter.is_shared() {
             return Err(MqttError::UnsupportedByServer);
         }

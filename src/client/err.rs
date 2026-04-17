@@ -130,8 +130,10 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// be executed as is, a protocol error would be caused.
     /// 
     /// This could be:
-    /// - a shared subscription (topic filter starts with "$share") despite shared subscriptions not
-    ///   being available on the server
+    /// - a shared subscription (topic filter starts with "$share") is attempted despite shared subscriptions
+    ///   not being available on the server
+    /// - a wildcard occuring in a topic filter despite wildcard subscriptions not being available on the
+    ///   server
     /// 
     /// Recoverable error. No action has been taken by the client.
     UnsupportedByServer,
