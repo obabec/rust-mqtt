@@ -227,6 +227,24 @@ impl<'t> TopicFilter<'t> {
             && s[5] == b'e'
     }
 
+    /// Returns whether the topic filter contains one or more of the wildcard characters `#` or `+`.
+    pub const fn has_wildcard(&self) -> bool {
+        let s = self.0.as_str().as_bytes();
+
+        let mut i = 0;
+        while i < s.len() {
+            let b = s[i];
+
+            if b == b'#' || b == b'+' {
+                return true;
+            }
+
+            i += 1;
+        }
+
+        return false;
+    }
+
     /// Creates a new topic filter while checking for correct syntax of the topic filter string.
     /// If the filter starts with "$share", the constraints for a shared subscription's topic
     /// filter are also enforced.
@@ -338,29 +356,36 @@ mod unit {
     use crate::types::{MqttString, TopicFilter, TopicName};
 
     macro_rules! assert_valid {
-        ($t:ty, $l:literal) => {
+        ($t:ty, $l:literal) => {{
             let s = assert_ok!(MqttString::from_str($l), "{}", $l);
             let t = <$t>::new(s);
-            assert!(t.is_some());
-        };
+            assert!(t.is_some(), "{}", $l);
+            let t = t.unwrap();
+
+            t
+        }};
     }
     macro_rules! assert_valid_shared {
-        ($t:ty, $l:literal) => {
+        ($t:ty, $l:literal) => {{
             let s = assert_ok!(MqttString::from_str($l), "{}", $l);
             let t = <$t>::new(s);
-            assert!(t.is_some());
+            assert!(t.is_some(), "{}", $l);
             let t = t.unwrap();
-            assert!(t.is_shared());
-        };
+            assert!(t.is_shared(), "{}", $l);
+
+            t
+        }};
     }
     macro_rules! assert_valid_non_shared {
-        ($t:ty, $l:literal) => {
+        ($t:ty, $l:literal) => {{
             let s = assert_ok!(MqttString::from_str($l), "{}", $l);
             let t = <$t>::new(s);
-            assert!(t.is_some());
+            assert!(t.is_some(), "{}", $l);
             let t = t.unwrap();
-            assert!(!t.is_shared());
-        };
+            assert!(!t.is_shared(), "{}", $l);
+
+            t
+        }};
     }
     macro_rules! assert_invalid {
         ($t:ty, $l:literal) => {
@@ -513,5 +538,27 @@ mod unit {
         assert_valid_shared!(TopicFilter, "$share/consumer1/sport/tennis/+");
         assert_valid_shared!(TopicFilter, "$share/consumer2/sport/tennis/+");
         assert_valid_shared!(TopicFilter, "$share/consumer1//finance");
+        assert_valid_shared!(TopicFilter, "$share/consumer1/+/finance");
+    }
+
+    #[test]
+    fn topic_filter_has_wildcard() {
+        assert!(!assert_valid!(TopicFilter, "a").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "/").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "//").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "/a/").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "$").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "$a/$/").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "$share/consumer1//finance").has_wildcard());
+
+        assert!(assert_valid!(TopicFilter, "#").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "+").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "/+/").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "+/").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "/#").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "/+").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "/+").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "$share/consumer1/+/finance").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "$share/consumer1/#").has_wildcard());
     }
 }
