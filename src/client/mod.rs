@@ -704,9 +704,6 @@ impl<
     /// * [`MqttError::SendQuotaExceeded`] if the server's control flow limit is reached and sending
     ///   the PUBLISH would exceed the limit causing a protocol error
     /// * [`MqttError::SessionBuffer`] if the buffer for outgoing PUBLISH packet identifiers is full
-    /// * [`MqttError::InvalidTopicAlias`] if a topic alias is used and
-    ///   * its value is 0
-    ///   * its value is greater than the server's maximum topic alias
     /// * [`MqttError::PacketMaximumLengthExceeded`] if the PUBLISH packet is too long to be encoded
     ///   with MQTT's [`VarByteInt`]
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
@@ -716,6 +713,8 @@ impl<
     ///     value specified in the server's CONNACK packet
     ///   * if the server specified in its CONNACK that retain is not available and a publication with
     ///     the retain flag set to true is attempted
+    ///   * if a topic alias is used and its value is greater than the maximum value specified in the
+    ///     server's CONNACK packet
     ///
     /// # Panics
     ///
@@ -741,6 +740,15 @@ impl<
             return Err(MqttError::UnsupportedByServer);
         }
 
+        if options
+            .topic
+            .alias()
+            .map(NonZero::get)
+            .is_some_and(|a| a > self.server_config.topic_alias_maximum)
+        {
+            return Err(MqttError::UnsupportedByServer);
+        }
+
         if options.qos > QoS::AtMostOnce {
             if self.remaining_send_quota() == 0 {
                 info!("server receive maximum reached");
@@ -757,14 +765,6 @@ impl<
             QoS::AtLeastOnce => IdentifiedQoS::AtLeastOnce(self.packet_identifier()),
             QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(self.packet_identifier()),
         };
-
-        if options
-            .topic
-            .alias()
-            .is_some_and(|a| !(1..=self.server_config.topic_alias_maximum).contains(&a.get()))
-        {
-            return Err(MqttError::InvalidTopicAlias);
-        }
 
         let packet = PublishPacket::<0, MAX_USER_PROPERTIES>::new(
             false,
@@ -845,9 +845,6 @@ impl<
     ///   has already been received and the server has therefore already received the PUBLISH
     /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in the
     ///   client's session
-    /// * [`MqttError::InvalidTopicAlias`] if a topic alias is used and
-    ///   * its value is 0
-    ///   * its value is greater than the server's maximum topic alias
     /// * [`MqttError::PacketMaximumLengthExceeded`] if the PUBLISH packet is too long to be encoded
     ///   with MQTT's [`VarByteInt`]
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
@@ -857,6 +854,8 @@ impl<
     ///     value specified in the server's CONNACK packet
     ///   * if the server specified in its CONNACK that retain is not available and a publication with
     ///     the retain flag set to true is attempted
+    ///   * if a topic alias is used and its value is greater than the maximum value specified in the
+    ///     server's CONNACK packet
     ///
     /// # Panics
     ///
@@ -887,6 +886,15 @@ impl<
         }
 
         if !self.server_config.retain_supported && options.retain {
+            return Err(MqttError::UnsupportedByServer);
+        }
+
+        if options
+            .topic
+            .alias()
+            .map(NonZero::get)
+            .is_some_and(|a| a > self.server_config.topic_alias_maximum)
+        {
             return Err(MqttError::UnsupportedByServer);
         }
 
@@ -924,14 +932,6 @@ impl<
                 return Err(MqttError::PacketIdentifierNotInFlight);
             }
         };
-
-        if options
-            .topic
-            .alias()
-            .is_some_and(|a| !(1..=self.server_config.topic_alias_maximum).contains(&a.get()))
-        {
-            return Err(MqttError::InvalidTopicAlias);
-        }
 
         let packet = PublishPacket::<0, MAX_USER_PROPERTIES>::new(
             true,

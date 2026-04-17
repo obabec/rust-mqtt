@@ -101,12 +101,6 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// Recoverable error. No action has been taken by the client.
     ServerMaximumPacketSizeExceeded,
 
-    /// The value of a topic alias in an outgoing PUBLISH packet was 0 or greater than the server's maximum allowed
-    /// value. Sending this PUBLISH packet would raise a protocol error.
-    ///
-    /// Recoverable error. No action has been taken by the client.
-    InvalidTopicAlias,
-
     /// An action was rejected because an internal buffer used for tracking session state is full.
     ///
     /// Recoverable error. Try again after a [`crate::client::event::Event`] has been emitted that indicates
@@ -140,6 +134,7 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     ///   being attempted
     /// - a publication with retain set to true being attempted despite retain not being available on the
     ///   server
+    /// - a topic alias in an outgoing publication being greater than the server's maximum topic alias value
     /// 
     /// Recoverable error. No action has been taken by the client.
     UnsupportedByServer,
@@ -167,7 +162,6 @@ impl<const MAX_USER_PROPERTIES: usize> Error<'_, MAX_USER_PROPERTIES> {
                 | Self::PacketIdentifierAwaitingPubcomp
                 | Self::PacketMaximumLengthExceeded
                 | Self::ServerMaximumPacketSizeExceeded
-                | Self::InvalidTopicAlias
                 | Self::SessionBuffer
                 | Self::SendQuotaExceeded
                 | Self::UnsupportedByServer
@@ -205,7 +199,6 @@ impl<'e> Error<'e, 0> {
             Self::PacketIdentifierAwaitingPubcomp => Error::PacketIdentifierAwaitingPubcomp,
             Self::PacketMaximumLengthExceeded => Error::PacketMaximumLengthExceeded,
             Self::ServerMaximumPacketSizeExceeded => Error::ServerMaximumPacketSizeExceeded,
-            Self::InvalidTopicAlias => Error::InvalidTopicAlias,
             Self::SessionBuffer => Error::SessionBuffer,
             Self::SendQuotaExceeded => Error::SendQuotaExceeded,
             Self::UnsupportedByServer => Error::UnsupportedByServer,
