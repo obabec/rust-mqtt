@@ -1,7 +1,7 @@
 use log::info;
 use rust_mqtt::{
     client::options::{PublicationOptions, TopicReference},
-    types::{IdentifiedQoS, QoS, TopicName},
+    types::{IdentifiedQoS, QoS, TopicFilter, TopicName},
 };
 use tokio::{
     join,
@@ -60,7 +60,11 @@ async fn receive_multiple(
     let options = DEFAULT_QOS0_SUB_OPTIONS.qos(qos);
 
     info!("[Receiver] Subscribing to topic {:?}", topic_name.as_ref());
-    assert_subscribe!(client, &options, topic_name.into());
+    assert_subscribe!(
+        client,
+        &options,
+        TopicFilter::new(topic_name.as_ref().as_borrowed()).unwrap()
+    );
 
     info!("[Receiver] Subscription confirmed, signaling ready");
     assert_ok!(ready_tx.send(()));

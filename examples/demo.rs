@@ -18,7 +18,7 @@ use rust_mqtt::{
         },
     },
     config::{KeepAlive, SessionExpiryInterval},
-    types::{MqttBinary, MqttString, TopicName, VarByteInt},
+    types::{MqttBinary, MqttString, TopicFilter, TopicName, VarByteInt},
 };
 use tokio::{net::TcpStream, select, time::sleep};
 
@@ -90,9 +90,14 @@ async fn main() {
         sub_options.subscription_identifier = Some(VarByteInt::from(42u16));
     }
 
-    let topic = TopicName::new(MqttString::from_str("rust-mqtt/is/great").unwrap()).unwrap();
+    let topic_string = MqttString::from_str("rust-mqtt/is/great").unwrap();
+    let topic_filter = TopicFilter::new(topic_string.as_borrowed()).unwrap();
+    let topic_name = TopicName::new(topic_string.as_borrowed()).unwrap();
 
-    match client.subscribe(topic.clone().into(), &sub_options).await {
+    match client
+        .subscribe(topic_filter.as_borrowed(), &sub_options)
+        .await
+    {
         Ok(_) => info!("Sent Subscribe"),
         Err(e) => {
             error!("Failed to subscribe: {e:?}");
@@ -120,7 +125,7 @@ async fn main() {
     }
 
     let pub_options = PublicationOptions::new(TopicReference::Mapping(
-        topic.clone(),
+        topic_name.as_borrowed(),
         NonZero::new(1).unwrap(),
     ))
     .exactly_once();
@@ -198,7 +203,7 @@ async fn main() {
     }
 
     match client
-        .unsubscribe(topic.clone().into(), &UnsubscriptionOptions::new())
+        .unsubscribe(topic_filter.as_borrowed(), &UnsubscriptionOptions::new())
         .await
     {
         Ok(_) => info!("Sent Unsubscribe"),
@@ -293,7 +298,7 @@ async fn main() {
         }
     }
 
-    let pub_options = PublicationOptions::new(TopicReference::Name(topic.clone())).exactly_once();
+    let pub_options = PublicationOptions::new(TopicReference::Name(topic_name)).exactly_once();
 
     match client
         .republish(
