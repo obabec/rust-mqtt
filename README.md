@@ -28,6 +28,7 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 - Session recovery
 - Client- & serverside maximum packet size
 - Subscription identifiers
+- Shared & wildcard subscriptions
 - Message expiry interval
 - Topic alias in outgoing publications
 - Request/Response
