@@ -132,6 +132,8 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// This could be:
     /// - a shared subscription (topic filter starts with "$share") is attempted despite shared subscriptions
     ///   not being available on the server
+    /// - a subscription identifier being specified despite subscription identifiers not being available on
+    ///   the server
     /// - a wildcard occuring in a topic filter despite wildcard subscriptions not being available on the
     ///   server
     /// 
