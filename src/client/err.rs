@@ -126,16 +126,18 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// been emitted that indicates that buffer might be free again.
     SendQuotaExceeded,
 
-    /// An operation was attempted which the server stated it does not support. If this operation would
-    /// be executed as is, a protocol error would be caused.
+    /// An operation was attempted which the server stated it does not support. If the requested operation
+    /// were executed as is, a protocol error would be caused.
     /// 
     /// This could be:
-    /// - a shared subscription (topic filter starts with "$share") is attempted despite shared subscriptions
-    ///   not being available on the server
+    /// - a shared subscription (topic filter starts with "$share") being attempted despite shared
+    ///   subscriptions not being available on the server
     /// - a subscription identifier being specified despite subscription identifiers not being available on
     ///   the server
     /// - a wildcard occuring in a topic filter despite wildcard subscriptions not being available on the
     ///   server
+    /// - a publication with a quality of service level greater than the server's maximum quality of service
+    ///   being attempted
     /// 
     /// Recoverable error. No action has been taken by the client.
     UnsupportedByServer,
@@ -166,6 +168,7 @@ impl<const MAX_USER_PROPERTIES: usize> Error<'_, MAX_USER_PROPERTIES> {
                 | Self::InvalidTopicAlias
                 | Self::SessionBuffer
                 | Self::SendQuotaExceeded
+                | Self::UnsupportedByServer
                 | Self::IllegalDisconnectSessionExpiryInterval
         )
     }

@@ -711,6 +711,9 @@ impl<
     ///   with MQTT's [`VarByteInt`]
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this PUBLISH packet
+    /// * [`MqttError::UnsupportedByServer`]
+    ///   * if the quality of service level in the [`PublicationOptions`] is greater than the maximum
+    ///     value specified in the server's CONNACK packet
     ///
     /// # Panics
     ///
@@ -727,6 +730,10 @@ impl<
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
+
+        if options.qos > self.server_config.maximum_qos {
+            return Err(MqttError::UnsupportedByServer);
+        }
 
         if options.qos > QoS::AtMostOnce {
             if self.remaining_send_quota() == 0 {
@@ -839,6 +846,9 @@ impl<
     ///   with MQTT's [`VarByteInt`]
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this PUBLISH packet
+    /// * [`MqttError::UnsupportedByServer`]
+    ///   * if the quality of service level in the [`PublicationOptions`] is greater than the maximum
+    ///     value specified in the server's CONNACK packet
     ///
     /// # Panics
     ///
@@ -858,8 +868,14 @@ impl<
             MAX_USER_PROPERTIES
         );
 
-        if options.qos == QoS::AtMostOnce {
-            panic!("QoS 0 packets cannot be republished");
+        assert_ne!(
+            options.qos,
+            QoS::AtMostOnce,
+            "QoS 0 packets cannot be republished"
+        );
+
+        if options.qos > self.server_config.maximum_qos {
+            return Err(MqttError::UnsupportedByServer);
         }
 
         let identified_qos = match self.session.cpublish_flight_state(packet_identifier) {
