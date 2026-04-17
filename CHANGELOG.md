@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Detect protocol error on a response information property in CONNACK after CONNECT with request response information set to 0
 - Add request problem information support
 - Add reason string to incoming PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, UNSUBACK
-- Detect protocol error when server sends user properties (only when `MAX_USER_PROPERTIES` > 0) or a reason string occur in the PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK and UNSUBACK packets
+- Detect protocol error when server sends user properties (only when `MAX_USER_PROPERTIES` > 0) or a reason string in the PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK and UNSUBACK packets
 
 ## 0.5.1 - 2026-04-10
 

@@ -113,7 +113,8 @@ impl<'c> Options<'c> {
         self
     }
     /// Sets the request problem information property to true allowing the server to send
-    /// user properties and reason strings on all packets instead of only
+    /// user properties and reason strings on all packets instead of only PUBLISH,
+    /// CONNACK and DISCONNECT.
     #[must_use]
     pub const fn request_problem_information(mut self) -> Self {
         self.request_problem_information = true;

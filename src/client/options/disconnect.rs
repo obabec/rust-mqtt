@@ -7,8 +7,8 @@ use crate::types::ReasonCode;
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Options<'d> {
-    /// If set to true, the client uses [`ReasonCode::DisconnectWithWillMessage`] in and
-    /// the server publishes the will message.
+    /// If set to true, the client uses [`ReasonCode::DisconnectWithWillMessage`] in the
+    /// DISCONNECT packet and the server publishes the will message.
     pub publish_will: bool,
 
     /// The session expiry interval property. Not allowed to be set to a non-zero value
