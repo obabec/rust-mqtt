@@ -551,6 +551,9 @@ impl<
     /// * [`MqttError::SessionBuffer`] if the buffer for outgoing SUBSCRIBE packet identifiers is full
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this SUBSCRIBE packet
+    /// * [`MqttError::UnsupportedByServer`] 
+    ///   * if the server specified in its CONNACK that shared subscriptions are not available and the
+    ///     topic filter is the topic filter of a shared subscription
     ///
     /// # Panics
     ///
@@ -567,6 +570,10 @@ impl<
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
+
+        if !self.server_config.shared_subscription_supported && topic_filter.is_shared() {
+            return Err(MqttError::UnsupportedByServer);
+        }
 
         if self.pending_suback.is_full() {
             info!("maximum concurrent subscriptions reached");

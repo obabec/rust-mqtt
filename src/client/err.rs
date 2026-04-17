@@ -126,6 +126,16 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// been emitted that indicates that buffer might be free again.
     SendQuotaExceeded,
 
+    /// An operation was attempted which the server stated it does not support. If this operation would
+    /// be executed as is, a protocol error would be caused.
+    /// 
+    /// This could be:
+    /// - a shared subscription (topic filter starts with "$share") despite shared subscriptions not
+    ///   being available on the server
+    /// 
+    /// Recoverable error. No action has been taken by the client.
+    UnsupportedByServer,
+
     /// A disconnect now with the given session expiry interval would cause a protocol error.
     ///
     /// A disconnection was attempted with a session expiry interval change where the session expiry interval in the
@@ -189,6 +199,7 @@ impl<'e> Error<'e, 0> {
             Self::InvalidTopicAlias => Error::InvalidTopicAlias,
             Self::SessionBuffer => Error::SessionBuffer,
             Self::SendQuotaExceeded => Error::SendQuotaExceeded,
+            Self::UnsupportedByServer => Error::UnsupportedByServer,
             Self::IllegalDisconnectSessionExpiryInterval => {
                 Error::IllegalDisconnectSessionExpiryInterval
             }
