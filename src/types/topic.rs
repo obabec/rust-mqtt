@@ -242,7 +242,7 @@ impl<'t> TopicFilter<'t> {
             i += 1;
         }
 
-        return false;
+        false
     }
 
     /// Creates a new topic filter while checking for correct syntax of the topic filter string.

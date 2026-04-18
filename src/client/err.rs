@@ -122,7 +122,7 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
 
     /// An operation was attempted which the server stated it does not support. If the requested operation
     /// were executed as is, a protocol error would be caused.
-    /// 
+    ///
     /// This could be:
     /// - a shared subscription (topic filter starts with "$share") being attempted despite shared
     ///   subscriptions not being available on the server
@@ -135,7 +135,7 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// - a publication with retain set to true being attempted despite retain not being available on the
     ///   server
     /// - a topic alias in an outgoing publication being greater than the server's maximum topic alias value
-    /// 
+    ///
     /// Recoverable error. No action has been taken by the client.
     UnsupportedByServer,
 
