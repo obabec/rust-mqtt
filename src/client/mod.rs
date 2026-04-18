@@ -536,10 +536,16 @@ impl<
     /// If no [`Event::Suback`] is received within a custom time,
     /// this method can be used to send the SUBSCRIBE packet again.
     ///
-    /// A subscription identifier should only be set if the server supports
-    /// subscription identifiers (Can be checked with [`Self::server_config`]).
-    /// The client does not double-check whether this feature is supported and will
-    /// always include the subscription identifier argument if present.
+    /// Note:
+    /// * A topic filter with one or more wildcards should only be used if the server
+    ///   supports wildcard subscriptions.
+    /// * A subscription identifier should only be set if the server supports
+    ///   subscription identifiers.
+    /// * A topic filter of a shared subscriptions should only be used if the server
+    ///   supports shared subscriptions.
+    ///
+    /// If a violation occurs, the client will not subscribe but prevent the protocol
+    /// error and return an error.
     ///
     /// # Returns:
     /// The packet identifier of the sent SUBSCRIBE packet.
@@ -691,7 +697,16 @@ impl<
         Ok(pid)
     }
 
-    /// Publish a message. If [`QoS`] is greater than 0, the packet identifier is also kept track of by the client
+    /// Publish a message. If [`QoS`] is greater than 0, the packet identifier is also kept track of
+    /// by the client.
+    ///
+    /// Note:
+    /// * The [`QoS`] should be less than or equal to the server's maximum [`QoS`].
+    /// * The retain flag should only be set if the server supports retain.
+    /// * A topic alias must be less than or equal to the server's maximum topic alias.
+    ///
+    /// If a violation occurs, the client will not publish but prevent the protocol error and return
+    /// an error.
     ///
     /// # Returns:
     /// - In case of [`QoS`] 0: [`None`]

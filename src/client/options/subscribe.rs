@@ -1,3 +1,5 @@
+#[allow(unused_imports)]
+use crate::client::Client;
 use crate::types::{MqttStringPair, QoS, VarByteInt};
 
 /// Options for subscription included for every topic.
@@ -20,14 +22,18 @@ pub struct Options<'s> {
     /// If set to true on a shared subscription, a protocol error is triggered.
     pub no_local: bool,
 
-    /// The maximum quality of service that the server can forward publications
-    /// matching this subscription with to the client. A quality of service level
+    /// The maximum quality of service that the server is allowed to forward publications
+    /// at matching this subscription with to the client. A quality of service level
     /// lower than this can be granted by the server.
     pub qos: QoS,
 
     /// The subscription identifier of the subscription. The server will set
     /// subscription identifier properties in its PUBLISH packets to the values of
     /// all matching subscriptions with a subscription identifier.
+    ///
+    /// Must be [`None`] when the server does not support retain (can be checked via
+    /// [`Client::server_config`]). The client will not subscribe if a violation occurs
+    /// but prevent the protocol error and return an error.
     pub subscription_identifier: Option<VarByteInt>,
 
     /// Arbitrary key-value pairs of strings sent as the user property entries of the SUBSCRIBE packet.
@@ -92,6 +98,8 @@ impl<'s> Options<'s> {
         self
     }
     /// Sets the subscription identifier property.
+    ///
+    /// Note that this is only allowed if the server supports subscription identifiers.
     #[must_use]
     pub const fn subscription_identifier(mut self, subscription_identifier: VarByteInt) -> Self {
         self.subscription_identifier = Some(subscription_identifier);
