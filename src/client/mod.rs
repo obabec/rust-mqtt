@@ -8,8 +8,7 @@ use crate::{
     buffer::BufferProvider,
     bytes::Bytes,
     client::{
-        event::{Event, Puback, Publish, Pubrej, Suback},
-        info::ConnectInfo,
+        event::{Connected, Event, Puback, Publish, Pubrej, Suback},
         options::{
             ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions,
             TopicReference, UnsubscriptionOptions,
@@ -39,7 +38,6 @@ use crate::{
 mod err;
 
 pub mod event;
-pub mod info;
 pub mod options;
 pub mod raw;
 
@@ -157,7 +155,7 @@ impl<
     /// Returns the amount of publications the client is allowed to make according to the server's
     /// receive maximum. Does not account local space for storing publication state.
     fn remaining_send_quota(&self) -> u16 {
-        self.server_config.receive_maximum.into_inner().get() - self.session.in_flight_cpublishes()
+        self.server_config.receive_maximum.get() - self.session.in_flight_cpublishes()
     }
 
     fn is_packet_identifier_used(&self, packet_identifier: PacketIdentifier) -> bool {
@@ -277,7 +275,7 @@ impl<
         net: N,
         options: &ConnectOptions<'_>,
         client_identifier: Option<MqttString<'d>>,
-    ) -> Result<ConnectInfo<'d, MAX_USER_PROPERTIES>, MqttError<'c, MAX_USER_PROPERTIES>>
+    ) -> Result<Connected<'d, MAX_USER_PROPERTIES>, MqttError<'c, MAX_USER_PROPERTIES>>
     where
         'c: 'd,
     {
@@ -457,7 +455,7 @@ impl<
                 server_keep_alive.map_or(options.keep_alive, Property::into_inner);
 
             if let Some(r) = receive_maximum {
-                self.server_config.receive_maximum = r;
+                self.server_config.receive_maximum = r.into_inner();
             }
             if let Some(m) = maximum_qos {
                 self.server_config.maximum_qos = m.into_inner();
@@ -483,7 +481,7 @@ impl<
 
             info!("connected to server (session present: {})", session_present);
 
-            Ok(ConnectInfo {
+            Ok(Connected {
                 session_present,
                 client_identifier,
                 user_properties: user_properties
