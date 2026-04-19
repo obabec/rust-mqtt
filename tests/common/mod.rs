@@ -36,6 +36,7 @@ pub const NO_SESSION_CONNECT_OPTIONS: &ConnectOptions<'static> = &ConnectOptions
     maximum_packet_size: MaximumPacketSize::Unlimited,
     session_expiry_interval: SessionExpiryInterval::EndOnDisconnect,
     request_response_information: false,
+    request_problem_information: true,
     user_properties: &[],
     user_name: Some(USERNAME),
     password: Some(PASSWORD),

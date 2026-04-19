@@ -130,6 +130,7 @@ pub async fn subscribe<'c>(
         match warn_inspect!(client.poll().await, "Client::poll() failed")? {
             Event::Suback(Suback {
                 packet_identifier,
+                reason_string: _,
                 user_properties: _,
                 reason_code,
             }) if packet_identifier == pid => {
@@ -143,6 +144,7 @@ pub async fn subscribe<'c>(
             }
             Event::Suback(Suback {
                 packet_identifier,
+                reason_string: _,
                 user_properties: _,
                 reason_code: _,
             }) => {
@@ -171,6 +173,7 @@ pub async fn unsubscribe<'c>(
         match warn_inspect!(client.poll().await, "Client::poll() failed")? {
             Event::Unsuback(Suback {
                 packet_identifier,
+                reason_string: _,
                 user_properties: _,
                 reason_code,
             }) if packet_identifier == pid => {
@@ -179,6 +182,7 @@ pub async fn unsubscribe<'c>(
             }
             Event::Unsuback(Suback {
                 packet_identifier,
+                reason_string: _,
                 user_properties: _,
                 reason_code: _,
             }) => {

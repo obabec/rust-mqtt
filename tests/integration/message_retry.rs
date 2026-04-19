@@ -82,6 +82,7 @@ async fn outgoing_qos1_retry() {
                         Event::PublishAcknowledged(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         }) if packet_identifier == pid => break,
                         _ => {}
@@ -169,6 +170,7 @@ async fn outgoing_qos2_retry_publish() {
                         Event::PublishComplete(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         }) if packet_identifier == pid => break,
                         _ => {}
@@ -234,6 +236,7 @@ async fn outgoing_qos2_retry_pubrel() {
                         Event::PublishReceived(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         }) if packet_identifier == pid => break,
                         _ => {}
@@ -269,6 +272,7 @@ async fn outgoing_qos2_retry_pubrel() {
                         Event::PublishComplete(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         }) if packet_identifier == pid => break,
                         _ => {}
@@ -369,6 +373,7 @@ async fn incoming_qos2_retry_pubcomp() {
                         Event::PublishReleased(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         }) if packet_identifier == pid => {
                             break;
@@ -447,6 +452,7 @@ async fn outgoing_qos1_write_fail_retry() {
                         Event::PublishAcknowledged(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         }) if pid == packet_identifier => {}
                         _ => panic!("Should only receive a PUBACK"),
@@ -491,6 +497,7 @@ async fn outgoing_qos1_write_fail_retry() {
                     Event::PublishAcknowledged(Puback {
                         packet_identifier,
                         reason_code: _,
+                        reason_string: _,
                         user_properties: _,
                     }) if pid == packet_identifier => {}
                     _ => panic!("Should only receive a PUBACK"),
@@ -562,6 +569,7 @@ async fn outgoing_qos1_read_fail_retry() {
                         Ok(Event::PublishAcknowledged(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         })) if pid == packet_identifier => {}
                         Ok(_) => panic!("Should only receive a PUBACK"),
@@ -600,6 +608,7 @@ async fn outgoing_qos1_read_fail_retry() {
                     Event::PublishAcknowledged(Puback {
                         packet_identifier,
                         reason_code: _,
+                        reason_string: _,
                         user_properties: _,
                     }) if pid == packet_identifier => {}
                     _ => panic!("Should only receive a PUBACK"),
@@ -674,6 +683,7 @@ async fn outgoing_qos2_write_fail_retry() {
                         Ok(Event::PublishReceived(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         })) if pid == packet_identifier => {}
                         Ok(_) => panic!("Should only receive a PUBREC"),
@@ -688,6 +698,7 @@ async fn outgoing_qos2_write_fail_retry() {
                         Event::PublishComplete(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         }) if pid == packet_identifier => {}
                         _ => panic!("Should only receive a PUBCOMP"),
@@ -744,6 +755,7 @@ async fn outgoing_qos2_write_fail_retry() {
                         Event::PublishReceived(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         }) if pid == packet_identifier => {}
                         _ => panic!("Should only receive a PUBREC"),
@@ -754,6 +766,7 @@ async fn outgoing_qos2_write_fail_retry() {
                     Event::PublishComplete(Puback {
                         packet_identifier,
                         reason_code: _,
+                        reason_string: _,
                         user_properties: _,
                     }) if pid == packet_identifier => {}
                     _ => panic!("Should only receive a PUBCOMP"),
@@ -824,6 +837,7 @@ async fn outgoing_qos2_read_fail_retry() {
                         Ok(Event::PublishReceived(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         })) if pid == packet_identifier => {}
                         Ok(_) => panic!("Should only receive a PUBREC"),
@@ -837,6 +851,7 @@ async fn outgoing_qos2_read_fail_retry() {
                         Ok(Event::PublishComplete(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         })) if pid == packet_identifier => {}
                         Ok(_) => panic!("Should only receive a PUBCOMP"),
@@ -897,6 +912,7 @@ async fn outgoing_qos2_read_fail_retry() {
                         Event::PublishReceived(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         }) if pid == packet_identifier => {}
                         _ => panic!("Should only receive a PUBREC"),
@@ -907,6 +923,7 @@ async fn outgoing_qos2_read_fail_retry() {
                     Event::PublishComplete(Puback {
                         packet_identifier,
                         reason_code: _,
+                        reason_string: _,
                         user_properties: _,
                     }) if pid == packet_identifier => {}
                     _ => panic!("Should only receive a PUBCOMP"),
@@ -1006,6 +1023,7 @@ async fn incoming_qos1_write_fail_retry() {
                     match assert_ok!(rx.poll().await) {
                         Event::Suback(Suback {
                             packet_identifier,
+                            reason_string: _,
                             user_properties: _,
                             reason_code: _,
                         }) if pid == packet_identifier => {}
@@ -1116,6 +1134,7 @@ async fn incoming_qos1_read_fail_retry() {
                     match rx.poll().await {
                         Ok(Event::Suback(Suback {
                             packet_identifier,
+                            reason_string: _,
                             user_properties: _,
                             reason_code: _,
                         })) if pid == packet_identifier => {}
@@ -1232,6 +1251,7 @@ async fn incoming_qos2_write_fail_retry() {
                     match assert_ok!(rx.poll().await) {
                         Event::Suback(Suback {
                             packet_identifier,
+                            reason_string: _,
                             user_properties: _,
                             reason_code: _,
                         }) if pid == packet_identifier => {}
@@ -1259,6 +1279,7 @@ async fn incoming_qos2_write_fail_retry() {
                         Ok(Event::PublishReleased(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         })) if packet_identifier == pid => {}
                         Ok(Event::PublishReleased(_)) => panic!("Received non-matching PUBREL"),
@@ -1294,6 +1315,7 @@ async fn incoming_qos2_write_fail_retry() {
                             Event::PublishReleased(Puback {
                                 packet_identifier,
                                 reason_code: _,
+                                reason_string: _,
                                 user_properties: _,
                             }) if packet_identifier == pid => break,
                             Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
@@ -1369,6 +1391,7 @@ async fn incoming_qos2_read_fail_retry() {
                     match rx.poll().await {
                         Ok(Event::Suback(Suback {
                             packet_identifier,
+                            reason_string: _,
                             user_properties: _,
                             reason_code: _,
                         })) if pid == packet_identifier => {}
@@ -1400,6 +1423,7 @@ async fn incoming_qos2_read_fail_retry() {
                         Ok(Event::PublishReleased(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         })) if packet_identifier == pid => {}
                         Ok(Event::PublishReleased(_)) => panic!("Received non-matching PUBREL"),
@@ -1435,6 +1459,7 @@ async fn incoming_qos2_read_fail_retry() {
                         Event::PublishReleased(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         }) if packet_identifier == pid.unwrap() => break 'complete,
                         Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
@@ -1451,6 +1476,7 @@ async fn incoming_qos2_read_fail_retry() {
                         Event::PublishReleased(Puback {
                             packet_identifier,
                             reason_code: _,
+                            reason_string: _,
                             user_properties: _,
                         }) if packet_identifier == pid => break 'complete,
                         Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),

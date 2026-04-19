@@ -67,7 +67,7 @@ async fn main() {
     #[cfg(feature = "bump")]
     let mut buffer = BumpBuffer::new(&mut buffer);
 
-    let mut client = Client::<'_, _, _, 1, 1, 1, 0, 0>::new(&mut buffer);
+    let mut client = Client::<'_, _, _, 1, 1, 1, 0, 1>::new(&mut buffer);
 
     let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8883);
     let connection = TcpStream::connect(addr).await.unwrap();

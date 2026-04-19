@@ -157,10 +157,10 @@ impl<'p, const MAX_USER_PROPERTIES: usize> RxPacket<'p> for ConnackPacket<'p, MA
 
                     // Safety: `!Vec::is_full` guarantees there is space
                     unsafe { user_properties.push_unchecked(user_property) };
-                },
+                }
                 PropertyType::UserProperty => {
                     UserProperty::skip(r).await?;
-                },
+                }
                 PropertyType::WildcardSubscriptionAvailable => wildcard_subscription_available.try_set(r).await?,
                 PropertyType::SubscriptionIdentifierAvailable => subscription_identifier_available.try_set(r).await?,
                 PropertyType::SharedSubscriptionAvailable => shared_subscription_available.try_set(r).await?,
@@ -173,19 +173,19 @@ impl<'p, const MAX_USER_PROPERTIES: usize> RxPacket<'p> for ConnackPacket<'p, MA
                     let len = u16::read(r).await? as usize;
                     verbose!("skipping authentication method ({} bytes)", len);
                     r.skip(len).await?;
-                },
+                }
                 PropertyType::AuthenticationData if seen_authentication_data => return Err(RxError::ProtocolError),
                 PropertyType::AuthenticationData => {
                     seen_authentication_data = true;
                     let len = u16::read(r).await? as usize;
                     verbose!("skipping authentication data ({} bytes)", len);
                     r.skip(len).await?;
-                },
+                }
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
                     trace!("invalid CONNACK property: {:?}", p);
-                    return Err(RxError::MalformedPacket)
-                },
+                    return Err(RxError::MalformedPacket);
+                }
             };
         }
 

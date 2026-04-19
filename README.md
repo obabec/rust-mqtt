@@ -29,16 +29,17 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 - Client- & serverside maximum packet size
 - Subscription identifiers
 - Message expiry interval
-- Topic alias
+- Topic alias in outgoing publications
 - Request/Response
-- Reason String in CONNACK & DISCONNECT packets
+- Reason String in CONNACK, SUBACK, UNSUBACK and DISCONNECT packet as well as incoming PUBACK, PUBREC, PUBREL and PUBCOMP packets
 - User Property in CONNECT, CONNACK, PUBLISH, SUBSCRIBE, SUBACK, UNSUBSCRIBE, UNSUBACK and DISCONNECT packets as well as incoming PUBACK, PUBREC, PUBREL and PUBCOMP packets
 
 ### Currently unsupported MQTT features & limitations
 
 - AUTH packet
-- Properties: Authentication Method, Authentication Data, Request Problem Information, Reason String (PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, UNSUBACK), User Property (outgoing PUBACK, PUBREC, PUBREL and PUBCOMP)
+- Properties: Authentication Method, Authentication Data, Request Problem Information, Reason String (outgoing PUBACK, PUBREC, PUBREL, PUBCOMP), User Property (outgoing PUBACK, PUBREC, PUBREL and PUBCOMP)
 - Subscribing to multiple topics in a single packet
+- Topic alias in incoming publications
 
 ### Extension plans (more or less by priority)
 

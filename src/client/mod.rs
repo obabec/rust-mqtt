@@ -55,8 +55,11 @@ pub use err::Error as MqttError;
 ///   can further limit this with its receive maximum. The client will use the minimum of this value and [`Self::server_config`].
 /// - `MAX_SUBSCRIPTION_IDENTIFIERS`: The maximum amount of subscription identifier properties the client can receive within a
 ///   single PUBLISH packet. If a packet with more subscription identifiers is received, the later identifers will be discarded.
-/// - `MAX_USER_PROPERTIES`: The maximum amount of user properties that the client can send and receive in one packet. Must not
-///   be greater than 1021. This limitation currently exists to easily rule out any variable byte integer overflows.
+/// - `MAX_USER_PROPERTIES`: The maximum amount of user properties that the client can send and receive in one packet.
+///   - Must not be greater than 1021. This limitation currently exists to easily rule out any variable byte integer overflows.
+///   - It is recommended (but not strictly required) to use a value >= 1, because if the value is 0, the client does not
+///     guarantee to detect the protocol error and disconnect from the server when the request problem information property in
+///     CONNECT is 0 and the server sends user properties in a packet other than CONNACK, DISCONNECT or PUBLISH.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Client<
@@ -258,6 +261,8 @@ impl<
     ///   * the first received packet is something other than a CONNACK packet
     ///   * `client_identifier` is [`None`] and the server did not assign a client identifier
     ///   * the server causes a protocol error
+    ///   * the server sends Response Information despite `request_response_information` in [`ConnectOptions`]
+    ///     being 0
     /// * [`MqttError::Disconnect`] if the CONNACK packet's reason code is not successful (>= 0x80)
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
     /// * [`MqttError::Alloc`] if the underlying [`BufferProvider`] returned an error
@@ -303,6 +308,11 @@ impl<
         // Set client session expiry interval because it is relevant to determine
         // which session expiry interval can be sent in DISCONNECT packet.
         self.client_config.session_expiry_interval = options.session_expiry_interval;
+
+        // Set request problem information because it is required to detect protocol
+        // errors when server sends a reason string or user properties in any packet
+        // other than PUBLISH, CONNACK, or DISCONNECT
+        self.client_config.request_problem_information = options.request_problem_information;
 
         // Empirical maximum packet size mapping
         // -------------------------------------------------------------------------------------------------------
@@ -350,6 +360,7 @@ impl<
                 // code is only reached when `RECEIVE_MAXIMUM` is greater than 0.
                 unsafe { NonZero::new_unchecked(RECEIVE_MAXIMUM as u16) },
                 options.request_response_information,
+                options.request_problem_information,
                 options
                     .user_properties
                     .iter()
@@ -416,6 +427,12 @@ impl<
             response_information,
             server_reference,
         } = self.raw.recv_body(&header).await?;
+
+        if !options.request_response_information && response_information.is_some() {
+            error!("server sent response information when request response information was false");
+            self.raw.close_with(Some(ReasonCode::ProtocolError));
+            return Err(MqttError::Server);
+        }
 
         if reason_code.is_success() {
             debug!("CONNACK packet indicates success");
@@ -1153,6 +1170,17 @@ impl<
                     .raw
                     .recv_body::<SubackPacket<1, MAX_USER_PROPERTIES>>(&header)
                     .await?;
+
+                if !self.client_config.request_problem_information
+                    && (suback.reason_string.is_some() || !suback.user_properties.is_empty())
+                {
+                    error!(
+                        "server sent reason string or user properties when request problem information was false"
+                    );
+                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    return Err(MqttError::Server);
+                }
+
                 let pid = suback.packet_identifier;
 
                 if Self::remove_packet_identifier_if_exists(&mut self.pending_suback, pid) {
@@ -1166,6 +1194,7 @@ impl<
 
                     Event::Suback(Suback {
                         packet_identifier: pid,
+                        reason_string: suback.reason_string.map(Property::into_inner),
                         user_properties: suback
                             .user_properties
                             .into_iter()
@@ -1186,6 +1215,17 @@ impl<
                     .raw
                     .recv_body::<UnsubackPacket<1, MAX_USER_PROPERTIES>>(&header)
                     .await?;
+
+                if !self.client_config.request_problem_information
+                    && (unsuback.reason_string.is_some() || !unsuback.user_properties.is_empty())
+                {
+                    error!(
+                        "server sent reason string or user properties when request problem information was false"
+                    );
+                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    return Err(MqttError::Server);
+                }
+
                 let pid = unsuback.packet_identifier;
 
                 if Self::remove_packet_identifier_if_exists(&mut self.pending_unsuback, pid) {
@@ -1198,6 +1238,7 @@ impl<
 
                     Event::Unsuback(Suback {
                         packet_identifier: pid,
+                        reason_string: unsuback.reason_string.map(Property::into_inner),
                         user_properties: unsuback
                             .user_properties
                             .into_iter()
@@ -1313,6 +1354,17 @@ impl<
                     .raw
                     .recv_body::<PubackPacket<MAX_USER_PROPERTIES>>(&header)
                     .await?;
+
+                if !self.client_config.request_problem_information
+                    && (puback.reason_string.is_some() || !puback.user_properties.is_empty())
+                {
+                    error!(
+                        "server sent reason string or user properties when request problem information was false"
+                    );
+                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    return Err(MqttError::Server);
+                }
+
                 let pid = puback.packet_identifier;
                 let reason_code = puback.reason_code;
 
@@ -1355,6 +1407,17 @@ impl<
                     .raw
                     .recv_body::<PubrecPacket<MAX_USER_PROPERTIES>>(&header)
                     .await?;
+
+                if !self.client_config.request_problem_information
+                    && (pubrec.reason_string.is_some() || !pubrec.user_properties.is_empty())
+                {
+                    error!(
+                        "server sent reason string or user properties when request problem information was false"
+                    );
+                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    return Err(MqttError::Server);
+                }
+
                 let pid = pubrec.packet_identifier;
                 let reason_code = pubrec.reason_code;
 
@@ -1425,6 +1488,17 @@ impl<
                     .raw
                     .recv_body::<PubrelPacket<MAX_USER_PROPERTIES>>(&header)
                     .await?;
+
+                if !self.client_config.request_problem_information
+                    && (pubrel.reason_string.is_some() || !pubrel.user_properties.is_empty())
+                {
+                    error!(
+                        "server sent reason string or user properties when request problem information was false"
+                    );
+                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    return Err(MqttError::Server);
+                }
+
                 let pid = pubrel.packet_identifier;
                 let reason_code = pubrel.reason_code;
 
@@ -1470,6 +1544,17 @@ impl<
                     .raw
                     .recv_body::<PubcompPacket<MAX_USER_PROPERTIES>>(&header)
                     .await?;
+
+                if !self.client_config.request_problem_information
+                    && (pubcomp.reason_string.is_some() || !pubcomp.user_properties.is_empty())
+                {
+                    error!(
+                        "server sent reason string or user properties when request problem information was false"
+                    );
+                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    return Err(MqttError::Server);
+                }
+
                 let pid = pubcomp.packet_identifier;
                 let reason_code = pubcomp.reason_code;
 
