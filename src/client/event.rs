@@ -2,8 +2,6 @@
 
 use heapless::Vec;
 
-#[allow(unused_imports)]
-use crate::types::QoS;
 use crate::{
     bytes::Bytes,
     types::{
@@ -16,7 +14,7 @@ use crate::{
 /// Contains information taken from a connection handshake which the client does not have to
 /// store for correct operational behaviour.
 ///
-/// Does not include the reason code as it is always [`crate::types::ReasonCode::Success`]
+/// Does not include the [`ReasonCode`] as it is always [`ReasonCode::Success`]
 /// (0x00) if this event is returned.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -50,69 +48,82 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PRO
     /// The server sent a PUBLISH packet.
     ///
     /// The client has acted as follows:
-    /// - [`QoS`] 0: No action
-    /// - [`QoS`] 1: A PUBACK packet has been sent to the server.
-    /// - [`QoS`] 2: A PUBREC packet has been sent to the server and the packet identifier is tracked as in flight
+    /// - [`QoS::AtMostOnce`]: No action
+    /// - [`QoS::AtLeastOnce`]: A PUBACK packet has been sent to the server.
+    /// - [`QoS::ExactlyOnce`]: A PUBREC packet has been sent to the server and the packet
+    ///   identifier is tracked as in flight
+    ///
+    /// [`QoS::AtMostOnce`]: crate::types::QoS::AtMostOnce
+    /// [`QoS::AtLeastOnce`]: crate::types::QoS::AtLeastOnce
+    /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
     Publish(Publish<'e, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>),
 
     /// The server sent a SUBACK packet matching a SUBSCRIBE packet.
     ///
-    /// The subscription process is complete and was successful if the reason code indicates success.
-    /// The SUBSCRIBE packet won't have to be resent.
+    /// The subscription process is complete and was successful if the [`ReasonCode`] indicates
+    /// success. The SUBSCRIBE packet won't have to be resent.
     Suback(Suback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent an UNSUBACK packet matching an UNSUBSCRIBE packet.
     ///
-    /// The unsubscription process is complete and was successful if the reason code indicates success.
-    /// The UNSUBSCRIBE packet won't have to be resent.
+    /// The unsubscription process is complete and was successful if the [`ReasonCode`]
+    /// indicates success. The UNSUBSCRIBE packet won't have to be resent.
     Unsuback(Suback<'e, MAX_USER_PROPERTIES>),
 
-    /// The server sent a PUBACK or PUBREC with an erroneous reason code,
+    /// The server sent a PUBACK or PUBREC with an erroneous [`ReasonCode`],
     /// therefore rejecting the publication.
     ///
-    /// The included reason code is always erroneous.
+    /// The included [`ReasonCode`] is always erroneous.
     ///
     /// The publication process is aborted.
     PublishRejected(Pubrej<'e, MAX_USER_PROPERTIES>),
 
-    /// The server sent a PUBACK packet matching a [`QoS`] 1 PUBLISH packet
+    /// The server sent a PUBACK packet matching a [`QoS::AtLeastOnce`] PUBLISH packet
     /// confirming that the PUBLISH has been received.
     ///
-    /// The included reason code is always successful.
+    /// The included [`ReasonCode`] is always successful.
     ///
-    /// The [`QoS`] 1 publication process is complete,
+    /// The [`QoS::AtLeastOnce`] publication process is complete,
     /// the PUBLISH packet won't have to be resent.
+    ///
+    /// [`QoS::AtLeastOnce`]: crate::types::QoS::AtLeastOnce
     PublishAcknowledged(Puback<'e, MAX_USER_PROPERTIES>),
 
-    /// The server sent a PUBREC packet matching a [`QoS`] 2 PUBLISH packet
+    /// The server sent a PUBREC packet matching a [`QoS::ExactlyOnce`] PUBLISH packet
     /// confirming that the PUBLISH has been received.
     ///
-    /// The included reason code is always successful.
+    /// The included [`ReasonCode`] is always successful.
     ///
     /// The client has responded with a PUBREL packet.
     ///
-    /// The first handshake of the [`QoS`] 2 publication process is complete,
+    /// The first handshake of the [`QoS::ExactlyOnce`] publication process is complete,
     /// the PUBLISH packet won't have to be resent.
+    ///
+    /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
     PublishReceived(Puback<'e, MAX_USER_PROPERTIES>),
 
-    /// The server sent a PUBREL packet matching a [`QoS`] 2 PUBREC packet
+    /// The server sent a PUBREL packet matching a [`QoS::ExactlyOnce`] PUBREC packet
     /// confirming that the PUBREC has been received.
     ///
-    /// The included reason code is always successful.
+    /// The included [`ReasonCode`] is always successful.
     ///
     /// The client has responded with a PUBCOMP packet.
     ///
-    /// The [`QoS`] 2 publication process is complete,
+    /// The [`QoS::ExactlyOnce`] publication process is complete,
     /// the PUBREC packet won't have to be resent.
+    ///
+    /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
     PublishReleased(Puback<'e, MAX_USER_PROPERTIES>),
 
-    /// The server sent a PUBCOMP packet matching a [`QoS`] 2 PUBREL packet
+    /// The server sent a PUBCOMP packet matching a [`QoS::ExactlyOnce`] PUBREL packet
     /// confirming that the PUBREL has been received.
     ///
-    /// The included reason code is always successful.
+    /// The included [`ReasonCode`] is always successful.
     ///
-    /// The [`QoS`] 2 publication process is complete,
+    /// The [`QoS::ExactlyOnce`] publication process is complete,
     /// the PUBREL packet won't have to be resent.
+    ///
+    /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
     PublishComplete(Puback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a SUBACK, PUBACK, PUBREC, PUBREL or PUBCOMP
@@ -122,9 +133,11 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PRO
     /// to prevent a potential protocol deadlock.
     Ignored,
 
-    /// The server sent a [`QoS`] 2 PUBLISH packet which would cause a duplicate.
+    /// The server sent a [`QoS::ExactlyOnce`] PUBLISH packet which would cause a duplicate.
     ///
     /// The client has responded with a PUBREC packet.
+    ///
+    /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
     Duplicate,
 }
 

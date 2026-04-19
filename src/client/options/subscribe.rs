@@ -1,5 +1,3 @@
-#[allow(unused_imports)]
-use crate::client::Client;
 use crate::types::{MqttStringPair, QoS, VarByteInt};
 
 /// Options for subscription included for every topic.
@@ -34,11 +32,15 @@ pub struct Options<'s> {
     /// Must be [`None`] when the server does not support retain (can be checked via
     /// [`Client::server_config`]). The client will not subscribe if a violation occurs
     /// but prevent the protocol error and return an error.
+    ///
+    /// [`Client::server_config`]: crate::client::Client::server_config
     pub subscription_identifier: Option<VarByteInt>,
 
     /// Arbitrary key-value pairs of strings sent as the user property entries of the SUBSCRIBE packet.
-    /// Note that this slice's length must be less than [`crate::client::Client`]'s const generic
+    /// Note that this slice's length must be less than [`Client`]'s const generic
     /// parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     pub user_properties: &'s [MqttStringPair<'s>],
 }
 

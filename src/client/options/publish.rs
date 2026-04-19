@@ -2,8 +2,6 @@ use core::num::NonZero;
 
 use const_fn::const_fn;
 
-#[allow(unused_imports)]
-use crate::client::Client;
 use crate::types::{MqttBinary, MqttString, MqttStringPair, QoS, TopicName};
 
 /// Options for a publication.
@@ -18,6 +16,8 @@ pub struct Options<'p> {
     /// Must be less than or equal to the server's maximum quality of service level
     /// (can be checked via [`Client::server_config`]). The client will not publish
     /// if a violation occurs but prevent the protocol error and return an error.
+    ///
+    /// [`Client::server_config`]: crate::client::Client::server_config
     pub qos: QoS,
 
     /// Depicts the value of the retain flag in the PUBLISH packet.
@@ -28,6 +28,8 @@ pub struct Options<'p> {
     /// Must be false when the server does not support retain (can be checked via
     /// [`Client::server_config`]). The client will not publish if a violation occurs
     /// but prevent the protocol error and return an error.
+    ///
+    /// [`Client::server_config`]: crate::client::Client::server_config
     pub retain: bool,
 
     /// The topic that the message is published on. The topic can be referenced over
@@ -37,6 +39,8 @@ pub struct Options<'p> {
     /// If an alias is used, it must be less than or equal to the server's maximum topic
     /// alias (can be checked via [`Client::server_config`]). The client will not publish
     /// if a violation occurs but prevent the protocol error and return an error.
+    ///
+    /// [`Client::server_config`]: crate::client::Client::server_config
     pub topic: TopicReference<'p>,
 
     /// Indicates whether the message is valid UTF-8. If [`None`], there is no statement
@@ -57,7 +61,9 @@ pub struct Options<'p> {
     pub correlation_data: Option<MqttBinary<'p>>,
 
     /// Arbitrary key-value pairs of strings. Note that this slice's length must be less than
-    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    /// [`Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     pub user_properties: &'p [MqttStringPair<'p>],
 
     /// The custom content type of the message.

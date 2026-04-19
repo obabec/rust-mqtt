@@ -1,5 +1,3 @@
-#[allow(unused_imports)]
-use crate::config::ClientConfig;
 use crate::config::{KeepAlive, SessionExpiryInterval};
 
 /// Negotiated configuration valid for the duration of a connection.
@@ -15,5 +13,7 @@ pub struct Config {
     /// session expiry interval requested with the CONNECT packet (in [`ClientConfig`])
     /// is [`SessionExpiryInterval::EndOnDisconnect`] (a value of zero), a non-zero
     /// session expiry interval value in the DISCONNECT packet is not allowed.
+    ///
+    /// [`ClientConfig`]: crate::config::ClientConfig
     pub session_expiry_interval: SessionExpiryInterval,
 }

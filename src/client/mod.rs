@@ -707,8 +707,9 @@ impl<
     /// an error.
     ///
     /// # Returns:
-    /// - In case of [`QoS`] 0: [`None`]
-    /// - In case of [`QoS`] 1 or 2: [`Some`] with the packet identifier of the published packet
+    /// - In case of [`QoS::AtMostOnce`]: [`None`]
+    /// - In case of [`QoS::AtLeastOnce`] or [`QoS::ExactlyOnce`]: [`Some`] with the packet identifier
+    ///   of the published packet
     ///
     /// # Errors
     ///
@@ -1204,7 +1205,8 @@ impl<
     ///   * the server causes a protocol error
     ///   * the packet following this header exceeds the client's maximum packet size
     ///   * the server sends a PUBLISH packet with an invalid topic alias
-    ///   * the server exceeded the client's receive maximum with a new [`QoS`] 2 PUBLISH
+    ///   * the server exceeded the client's receive maximum with a new [`QoS::ExactlyOnce`]
+    ///     PUBLISH
     ///   * the server sends a PUBACK/PUBREC/PUBREL/PUBCOMP packet which mismatches what
     ///     the client expects for this packet identifier from its session state
     ///   * the fixed header has the packet type CONNECT/SUBSCRIBE/UNSUBSCRIBE/PINGREQ

@@ -1,5 +1,3 @@
-#[allow(unused_imports)]
-use crate::config::SharedConfig;
 use crate::{config::SessionExpiryInterval, types::VarByteInt};
 
 /// Configuration of the client which must be upheld by the server.
@@ -23,6 +21,8 @@ pub struct Config {
     ///
     /// This value is configured when calling [`crate::client::Client::connect`]
     /// from the value in [`crate::client::options::ConnectOptions`]
+    ///
+    /// [`SharedConfig`]: crate::config::SharedConfig
     pub session_expiry_interval: SessionExpiryInterval,
 
     /// The maximum packet size the client is willing to accept transformed into the
