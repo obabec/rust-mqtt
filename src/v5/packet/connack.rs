@@ -2,7 +2,7 @@ use heapless::Vec;
 
 use crate::{
     buffer::BufferProvider,
-    config::{MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
+    config::{MaximumPacketSize, SessionExpiryInterval},
     eio::Read,
     fmt::{trace, verbose},
     header::{FixedHeader, PacketType},
@@ -11,7 +11,7 @@ use crate::{
     types::{ReasonCode, VarByteInt},
     v5::property::{
         AssignedClientIdentifier, AtMostOnceProperty, MaximumQoS, PropertyType, ReasonString,
-        ResponseInformation, RetainAvailable, ServerKeepAlive, ServerReference,
+        ReceiveMaximum, ResponseInformation, RetainAvailable, ServerKeepAlive, ServerReference,
         SharedSubscriptionAvailable, SubscriptionIdentifierAvailable, TopicAliasMaximum,
         UserProperty, WildcardSubscriptionAvailable,
     },
@@ -216,16 +216,16 @@ mod unit {
     use core::num::NonZero;
 
     use crate::{
-        config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
+        config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
         test::rx::decode,
         types::{MqttString, MqttStringPair, QoS, ReasonCode},
         v5::{
             packet::ConnackPacket,
             property::{
-                AssignedClientIdentifier, MaximumQoS, ReasonString, ResponseInformation,
-                RetainAvailable, ServerKeepAlive, ServerReference, SharedSubscriptionAvailable,
-                SubscriptionIdentifierAvailable, TopicAliasMaximum, UserProperty,
-                WildcardSubscriptionAvailable,
+                AssignedClientIdentifier, MaximumQoS, ReasonString, ReceiveMaximum,
+                ResponseInformation, RetainAvailable, ServerKeepAlive, ServerReference,
+                SharedSubscriptionAvailable, SubscriptionIdentifierAvailable, TopicAliasMaximum,
+                UserProperty, WildcardSubscriptionAvailable,
             },
         },
     };

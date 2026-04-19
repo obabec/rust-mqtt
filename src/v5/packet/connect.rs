@@ -3,14 +3,14 @@ use core::{num::NonZero, ops::Not};
 use heapless::Vec;
 
 use crate::{
-    config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
+    config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
     eio::Write,
     header::{FixedHeader, PacketType},
     io::write::{Writable, wlen},
     packet::{Packet, TxError, TxPacket},
     types::{MqttBinary, MqttString, QoS, VarByteInt, Will},
     v5::property::{
-        AuthenticationData, AuthenticationMethod, RequestProblemInformation,
+        AuthenticationData, AuthenticationMethod, ReceiveMaximum, RequestProblemInformation,
         RequestResponseInformation, TopicAliasMaximum, UserProperty,
     },
 };

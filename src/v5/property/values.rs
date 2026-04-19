@@ -2,7 +2,7 @@ use core::num::NonZero;
 
 use crate::{
     buffer::BufferProvider,
-    config::{KeepAlive, MaximumPacketSize, ReceiveMaximum, SessionExpiryInterval},
+    config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
     eio::{Read, Write},
     fmt::verbose,
     io::{
@@ -119,6 +119,9 @@ property!(RequestResponseInformation, bool);
 property!(ResponseInformation<'c>, MqttString<'c>);
 property!(ServerReference<'c>, MqttString<'c>);
 property!(ReasonString<'c>, MqttString<'c>);
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct ReceiveMaximum(pub(crate) NonZero<u16>);
 property!(TopicAliasMaximum, u16);
 property!(TopicAlias, NonZero<u16>);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
