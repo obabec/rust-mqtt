@@ -13,20 +13,20 @@ use crate::{
     v5::{packet::GenericPubackPacket, property::Property},
 };
 
-/// Information taken from a connection handshake the client does not have to store
-/// for correct operational behaviour and does not store for optimization purposes.
+/// Contains information taken from a connection handshake which the client does not have to
+/// store for correct operational behaviour.
 ///
-/// Does not include the reason code as it is always [`crate::types::ReasonCode::Success`] (0x00)
-/// if this is returned.
+/// Does not include the reason code as it is always [`crate::types::ReasonCode::Success`]
+/// (0x00) if this event is returned.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Connected<'i, const MAX_USER_PROPERTIES: usize> {
-    /// If set to true, a previous session is continued by the server for this connection.
+    /// If set to true, a previous session has been continued by the server for this connection.
     pub session_present: bool,
 
     /// The server can assign a different client identifier than the one in the CONNECT packet
-    /// or must assign a client identifier if none was included in the CONNECT packet.
-    /// This is the final client identifier value used for this session.
+    /// or must assign a client identifier if none was included in the CONNECT packet. This is
+    /// the final client identifier value used for this session and connection.
     pub client_identifier: MqttString<'i>,
 
     /// The user property entries in the CONNACK packet. If the vector is full, this list might
