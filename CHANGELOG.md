@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prevent protocol error on exceedance of the server's maximum quality of service
 - Prevent protocol error on retained publications when retain is not available
 - Replace usage of `MqttError::InvalidTopicAlias` with `MqttError::UnsupportedByServer`
+- Move `ConnectInfo` into `crate::client::event` and rename to `Connected`
+- Replace `ReceiveMaximum` newtype with inlined `NonZero<u16>`
 
 ## 0.5.1 - 2026-04-10
 
