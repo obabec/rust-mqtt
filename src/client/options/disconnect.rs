@@ -10,9 +10,15 @@ pub struct Options<'d> {
     /// [`ReasonCode::DisconnectWithWillMessage`]: crate::types::ReasonCode::DisconnectWithWillMessage
     pub publish_will: bool,
 
-    /// The session expiry interval property. Not allowed to be set to a non-zero value
-    /// if the session expiry interval property in the CONNECT packet has been 0.
-    /// This value overrides the session expiry interval negotiated in the handshake.
+    /// The session expiry interval property. This value overrides the session expiry interval
+    /// negotiated in the handshake.
+    ///
+    /// Must not to a non-zero value (`Some(`[`SessionExpiryInterval::EndOnDisconnect`]`)`) if the
+    /// session expiry interval property in the CONNECT packet has been zero (can be checked via
+    /// [`Client::client_config`]). The client will not disconnect if a violation occurs but prevent
+    /// the protocol error and return an error.
+    ///
+    /// [`Client::client_config`]: crate::client::Client::client_config
     pub session_expiry_interval: Option<SessionExpiryInterval>,
 
     /// Arbitrary key-value pairs of strings sent as the user property entries of the DISCONNECT
