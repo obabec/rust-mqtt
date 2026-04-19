@@ -26,7 +26,7 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 - Flow control
 - Configuration & session tracking
 - Session recovery
-- Client- & serverside maximum packet size
+- Client- & server-side maximum packet size
 - Subscription identifiers
 - Shared & wildcard subscriptions
 - Message expiry interval

@@ -6,7 +6,7 @@ use crate::types::{MqttStringPair, QoS, VarByteInt};
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Options<'s> {
-    /// Serverside retain handling configuration for this subscription.
+    /// Server-side retain handling configuration for this subscription.
     pub retain_handling: RetainHandling,
 
     /// If set to true, the server sets the retain flag of a PUBLISH packet matching
@@ -79,7 +79,7 @@ impl<'s> Options<'s> {
     pub const fn exactly_once(self) -> Self {
         self.qos(QoS::ExactlyOnce)
     }
-    /// Sets the serverside retain handling configuration for this subscription.
+    /// Sets the server-side retain handling configuration for this subscription.
     #[must_use]
     pub const fn retain_handling(mut self, retain_handling: RetainHandling) -> Self {
         self.retain_handling = retain_handling;
@@ -114,7 +114,7 @@ impl<'s> Options<'s> {
     }
 }
 
-/// Serverside retain handling configuration for a subscription.
+/// Server-side retain handling configuration for a subscription.
 #[derive(Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RetainHandling {
