@@ -3,6 +3,7 @@ use core::num::NonZero;
 use crate::{config::MaximumPacketSize, types::QoS};
 
 /// Configuration of the server which must be upheld by the client.
+/// These values are used by the client to enforce protocol correctness.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
@@ -22,11 +23,11 @@ pub struct Config {
     /// Equal to the number of distinct topic aliases the server supports.
     pub topic_alias_maximum: u16,
 
-    /// Serverside support for wildcard subscriptions.
+    /// Server-side support for wildcard subscriptions.
     pub wildcard_subscription_supported: bool,
-    /// Serverside support for subscription identifiers.
+    /// Server-side support for subscription identifiers.
     pub subscription_identifiers_supported: bool,
-    /// Serverside support for shared subscriptions.
+    /// Server-side support for shared subscriptions.
     pub shared_subscription_supported: bool,
 }
 
