@@ -167,6 +167,11 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
     }
 
     /// Cancel-safe method to receive the fixed header of a packet
+    ///
+    /// On `ErrorKind::TimedOut`, the error is returned without
+    /// terminating the connection — `HeaderState` preserves partial
+    /// progress and can resume on the next call. All other errors
+    /// go through `handle_rx` which closes the connection.
     pub async fn recv_header(&mut self) -> Result<FixedHeader, RawError<B::ProvisionError>> {
         let net = self.n.get().inspect_err(|e| match e {
             NetStateError::Faulted => {
@@ -181,6 +186,15 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
             match self.header.update(net).await {
                 Ok(None) => {}
                 Ok(Some(h)) => return Ok(h),
+                Err(crate::io::err::ReadError::Read(ref e))
+                    if crate::eio::Error::kind(e) == crate::eio::ErrorKind::TimedOut =>
+                {
+                    // Read timeout is recoverable in recv_header because
+                    // HeaderState is cancel-safe (byte-at-a-time reads
+                    // with progress preserved). Don't kill the connection.
+                    debug!("read timeout (recoverable, connection preserved)");
+                    return Err(RawError::Network(crate::eio::ErrorKind::TimedOut));
+                }
                 Err(e) => {
                     let e: RxError<_, _> = e.into();
                     return Err(self.handle_rx(e));
@@ -269,9 +283,67 @@ mod unit {
     use crate::buffer::BumpBuffer;
     use crate::{
         client::raw::Raw,
+        eio::ErrorKind,
         header::{FixedHeader, PacketType},
         types::VarByteInt,
     };
+
+    /// Mock transport that returns `ErrorKind::TimedOut` on the first read,
+    /// then delegates to an inner transport for subsequent reads/writes.
+    struct TimeoutThenRead<T> {
+        inner: T,
+        timed_out: bool,
+    }
+
+    impl<T> TimeoutThenRead<T> {
+        fn new(inner: T) -> Self {
+            Self {
+                inner,
+                timed_out: false,
+            }
+        }
+    }
+
+    #[derive(Debug)]
+    struct TimedOutError;
+
+    impl core::fmt::Display for TimedOutError {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "timed out")
+        }
+    }
+
+    impl core::error::Error for TimedOutError {}
+
+    impl crate::eio::Error for TimedOutError {
+        fn kind(&self) -> ErrorKind {
+            ErrorKind::TimedOut
+        }
+    }
+
+    impl<T> crate::eio::ErrorType for TimeoutThenRead<T> {
+        type Error = TimedOutError;
+    }
+
+    impl<T: crate::eio::Read> crate::eio::Read for TimeoutThenRead<T> {
+        async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+            if !self.timed_out {
+                self.timed_out = true;
+                return Err(TimedOutError);
+            }
+            self.inner.read(buf).await.map_err(|_| TimedOutError)
+        }
+    }
+
+    impl<T: crate::eio::Write> crate::eio::Write for TimeoutThenRead<T> {
+        async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+            self.inner.write(buf).await.map_err(|_| TimedOutError)
+        }
+
+        async fn flush(&mut self) -> Result<(), Self::Error> {
+            self.inner.flush().await.map_err(|_| TimedOutError)
+        }
+    }
 
     #[tokio::test]
     #[test_log::test]
@@ -492,6 +564,51 @@ mod unit {
                     0x08,
                     VarByteInt::new(2_097_151u32).unwrap()
                 )
+            );
+        };
+
+        join!(rx, tx);
+    }
+
+    /// Verify that a transport-level `ErrorKind::TimedOut` error preserves
+    /// the connection — `recv_header` returns the error but the connection
+    /// remains usable for subsequent reads. This matches the cancel-safety
+    /// guarantee: `HeaderState` preserves partial progress, and a read
+    /// timeout is semantically equivalent to "no data available yet."
+    #[tokio::test]
+    #[test_log::test]
+    async fn recv_header_timeout_preserves_connection() {
+        #[cfg(feature = "alloc")]
+        let mut b = AllocBuffer;
+        #[cfg(feature = "bump")]
+        let mut b = [0; 64];
+        #[cfg(feature = "bump")]
+        let mut b = BumpBuffer::new(&mut b);
+        let (c, mut s) = duplex(64);
+        let r = FromTokio::new(c);
+        let timeout_transport = TimeoutThenRead::new(r);
+
+        let mut c = Raw::new_disconnected(&mut b);
+        c.set_net(timeout_transport);
+
+        let tx = async {
+            // Write a complete header — but the first read will return TimedOut
+            assert_ok!(s.write_all(&[0x10, 0x00]).await);
+        };
+        let rx = async {
+            // First recv_header hits TimedOut from the transport
+            let err = c.recv_header().await.unwrap_err();
+            assert_eq!(
+                err,
+                super::RawError::Network(ErrorKind::TimedOut),
+                "should return Network(TimedOut)"
+            );
+
+            // Connection is still alive — can receive normally after timeout
+            let h = assert_ok!(c.recv_header().await);
+            assert_eq!(
+                h,
+                FixedHeader::new(PacketType::Connect, 0x00, VarByteInt::from(0u8))
             );
         };
 
