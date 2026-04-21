@@ -71,12 +71,12 @@ impl<'s> Options<'s> {
         self.qos = qos;
         self
     }
-    /// Sets the Quality of Service level to 1 (At Least Once).
+    /// Sets the Quality of Service level to 1 ([`QoS::AtLeastOnce`]).
     #[must_use]
     pub const fn at_least_once(self) -> Self {
         self.qos(QoS::AtLeastOnce)
     }
-    /// Sets the Quality of Service level to 2 (Exactly Once).
+    /// Sets the Quality of Service level to 2 ([`QoS::ExactlyOnce`]).
     #[must_use]
     pub const fn exactly_once(self) -> Self {
         self.qos(QoS::ExactlyOnce)
