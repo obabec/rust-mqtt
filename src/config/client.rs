@@ -19,17 +19,22 @@ pub struct Config {
     /// This field is still required however to determine whether a non-zero session
     /// expiry interval can be used when disconnecting.
     ///
-    /// This value is configured when calling [`crate::client::Client::connect`]
-    /// from the value in [`crate::client::options::ConnectOptions`]
+    /// This value is configured when calling [`Client::connect`] from the value in
+    /// [`ConnectOptions`].
     ///
     /// [`SharedConfig`]: crate::config::SharedConfig
+    /// [`Client::connect`]: crate::client::Client::connect
+    /// [`ConnectOptions`]: crate::client::options::ConnectOptions
     pub session_expiry_interval: SessionExpiryInterval,
 
     /// The maximum packet size the client is willing to accept transformed into the
     /// maximum value of the remaining length that is therefore accepted.
     ///
-    /// This value is configured when calling [`crate::client::Client::connect`]
-    /// from the value in [`crate::client::options::ConnectOptions`]
+    /// This value is configured when calling [`Client::connect`] from the value in
+    /// [`ConnectOptions`].
+    ///
+    /// [`Client::connect`]: crate::client::Client::connect
+    /// [`ConnectOptions`]: crate::client::options::ConnectOptions
     pub maximum_accepted_remaining_length: u32,
 
     /// Whether reason strings and user properties are sent (by the server) in case
@@ -42,8 +47,11 @@ pub struct Config {
     ///
     /// [MQTTv5.0 3.1.2.11.7](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901053)
     ///
-    /// This value is configured when calling [`crate::client::Client::connect`]
-    /// from the value in [`crate::client::options::ConnectOptions`]
+    /// This value is configured when calling [`Client::connect`] from the value in
+    /// [`ConnectOptions`].
+    ///
+    /// [`Client::connect`]: crate::client::Client::connect
+    /// [`ConnectOptions`]: crate::client::options::ConnectOptions
     pub request_problem_information: bool,
 }
 

@@ -41,8 +41,10 @@ pub struct Options<'c> {
     pub request_problem_information: bool,
 
     /// Arbitrary key-value pairs of strings sent as the user property entries of the CONNECT packet.
-    /// Note that this slice's length must be less than [`crate::client::Client`]'s const generic
-    /// parameter `MAX_USER_PROPERTIES`.
+    /// Note that this slice's length must be less than [`Client`]'s const generic parameter
+    /// `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     pub user_properties: &'c [MqttStringPair<'c>],
 
     /// The user name the client wishes to authenticate with.
@@ -120,8 +122,10 @@ impl<'c> Options<'c> {
         self.request_problem_information = true;
         self
     }
-    /// Sets the user properties. Note that this slice's length must be less than
-    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    /// Sets the user properties. Note that this slice's length must be less than [`Client`]'s
+    /// const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     #[must_use]
     pub const fn user_properties(mut self, user_properties: &'c [MqttStringPair<'c>]) -> Self {
         self.user_properties = user_properties;

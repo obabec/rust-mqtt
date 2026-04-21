@@ -7,46 +7,61 @@ use crate::{
     types::{MqttString, MqttStringPair, ReasonCode, TooLargeToEncode},
 };
 
-/// The main error returned by [`crate::client::Client`].
+/// The main error returned by [`Client`].
 ///
 /// Distincts between unrecoverable and recoverable errors.
 /// Recoverability in this context refers to whether the current network connection can
 /// be used for further communication after the error has occured.
 ///
 /// # Recovery
-/// - For unrecoverable errors, [`crate::client::Client::abort`] can be called to send an optional DISCONNECT
+/// - For unrecoverable errors, [`Client::abort`] can be called to send an optional DISCONNECT
 ///   packet if allowed by specification. You can then try to recover the session by calling
-///   [`crate::client::Client::connect`] again without clean start.
+///   [`Client::connect`] again without clean start.
 /// - For recoverable errors, follow the error-specific behaviour.
+///
+/// [`Client`]: crate::client::Client
+/// [`Client::abort`]: crate::client::Client::abort
+/// [`Client::connect`]: crate::client::Client::connect
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// An underlying Read/Write method returned an error.
     ///
-    /// Unrecoverable error. [`crate::client::Client::abort`] should be called.
+    /// Unrecoverable error. [`Client::abort`] should be called.
+    ///
+    /// [`Client::abort`]: crate::client::Client::abort
     Network(ErrorKind),
 
     /// The remote server did something the client does not understand / does not match the specification.
     ///
-    /// Unrecoverable error. [`crate::client::Client::abort`] should be called.
+    /// Unrecoverable error. [`Client::abort`] should be called.
+    ///
+    /// [`Client::abort`]: crate::client::Client::abort
     Server,
 
-    /// A buffer provision by the [`crate::buffer::BufferProvider`] failed. Therefore a packet
-    /// could not be received correctly.
+    /// A buffer provision by the [`BufferProvider`] failed. Therefore a packet could not be received
+    /// correctly.
     ///
-    /// Unrecoverable error. [`crate::client::Client::abort`] should be called.
+    /// Unrecoverable error. [`Client::abort`] should be called.
+    ///
+    /// [`BufferProvider`]: crate::buffer::BufferProvider
+    /// [`Client::abort`]: crate::client::Client::abort
     Alloc,
 
     /// An AUTH packet header has been received by the client. AUTH packets are not supported by the client.
     /// The client has scheduled a DISCONNECT packet with [`ReasonCode::ImplementationSpecificError`].
     /// The packet body has not been decoded.
     ///
-    /// Unrecoverable error. [`crate::client::Client::abort`] should be called.
+    /// Unrecoverable error. [`Client::abort`] should be called.
+    ///
+    /// [`Client::abort`]: crate::client::Client::abort
     AuthPacketReceived,
 
     /// The client could not connect to the broker or the broker has sent a DISCONNECT packet.
     ///
-    /// Unrecoverable error. [`crate::client::Client::abort`] should be called.
+    /// Unrecoverable error. [`Client::abort`] should be called.
+    ///
+    /// [`Client::abort`]: crate::client::Client::abort
     Disconnect {
         /// The [`ReasonCode`] of the causing CONNACK or DISCONNECT packet. If the disconnection is caused
         /// by a CONNACK packet, the reason code ss always erroneous.
@@ -68,7 +83,9 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// Another unrecoverable error has been returned earlier. The underlying connection is in a state,
     /// in which it refuses/is not able to perform regular communication.
     ///
-    /// Unrecoverable error. [`crate::client::Client::abort`] should be called.
+    /// Unrecoverable error. [`Client::abort`] should be called.
+    ///
+    /// [`Client::abort`]: crate::client::Client::abort
     RecoveryRequired,
 
     /// A republish of a packet without an in flight entry was attempted.
@@ -90,10 +107,12 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
 
     /// A packet was too long to encode its length with the variable byte integer.
     ///
-    /// This can currently only be returned from [`crate::client::Client::publish`] or
-    /// [`crate::client::Client::republish`].
+    /// This can currently only be returned from [`Client::publish`] or [`Client::republish`].
     ///
     /// Recoverable error. No action has been taken by the client.
+    ///
+    /// [`Client::publish`]: crate::client::Client::publish
+    /// [`Client::republish`]: crate::client::Client::republish
     PacketMaximumLengthExceeded,
 
     /// A packet is too long and would exceed the servers maximum packet size.
@@ -103,21 +122,25 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
 
     /// An action was rejected because an internal buffer used for tracking session state is full.
     ///
-    /// Recoverable error. Try again after a [`crate::client::event::Event`] has been emitted that indicates
-    /// that buffer might be free again.
+    /// Recoverable error. Try again after a [`Event`] has been emitted that indicates that buffer
+    /// might be free again.
     ///
     /// Example:
-    ///     [`crate::client::Client::subscribe`] returns this error. Wait until a
-    ///     [`crate::client::event::Event::Suback`] is received.
+    ///     [`Client::subscribe`] returns this error. Wait until a [`Event::Suback`] is received.
     ///     This clears a spot in the subscribe packet identifiers.
+    ///
+    /// [`Event`]: crate::client::event::Event
+    /// [`Client::subscribe`]: crate::client::Client::subscribe
+    /// [`Event::Suback`]: crate::client::event::Event::Suback
     SessionBuffer,
 
     /// A publish now would exceed the server's receive maximum and ultimately cause a protocol error.
     ///
-    /// Recoverable error. Try again after either [`crate::client::event::Event::PublishAcknowledged`] or
-    /// [`crate::client::event::Event::PublishComplete`] has been emitted that indicates that buffer might be
-    /// free again.
-    /// been emitted that indicates that buffer might be free again.
+    /// Recoverable error. Try again after either [`Event::PublishAcknowledged`] or
+    /// [`Event::PublishComplete`] has been emitted that indicates that buffer might be free again.
+    ///
+    /// [`Event::PublishAcknowledged`]: crate::client::event::Event::PublishAcknowledged
+    /// [`Event::PublishComplete`]: crate::client::event::Event::PublishComplete
     SendQuotaExceeded,
 
     /// An operation was attempted which the server stated it does not support. If the requested operation
@@ -142,12 +165,15 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// A disconnect now with the given session expiry interval would cause a protocol error.
     ///
     /// A disconnection was attempted with a session expiry interval change where the session expiry interval in the
-    /// CONNECT packet was zero ([`crate::config::SessionExpiryInterval::EndOnDisconnect`]) and was
-    /// greater than zero ([`crate::config::SessionExpiryInterval::NeverEnd`] or
-    /// [`crate::config::SessionExpiryInterval::Seconds`]) in the DISCONNECT packet.
+    /// CONNECT packet was zero ([`SessionExpiryInterval::EndOnDisconnect`]) and was greater than zero
+    /// ([`SessionExpiryInterval::NeverEnd`] or [`SessionExpiryInterval::Seconds`]) in the DISCONNECT packet.
     ///
     /// Recoverable error. Try disconnecting again without an session expiry interval or with a
-    /// session expiry interval of zero ([`crate::config::SessionExpiryInterval::EndOnDisconnect`]).
+    /// session expiry interval of zero ([`SessionExpiryInterval::EndOnDisconnect`]).
+    ///
+    /// [`SessionExpiryInterval::EndOnDisconnect`]: crate::config::SessionExpiryInterval::EndOnDisconnect
+    /// [`SessionExpiryInterval::NeverEnd`]: crate::config::SessionExpiryInterval::NeverEnd
+    /// [`SessionExpiryInterval::Seconds`]: crate::config::SessionExpiryInterval::Seconds
     IllegalDisconnectSessionExpiryInterval,
 }
 

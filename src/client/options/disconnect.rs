@@ -22,8 +22,10 @@ pub struct Options<'d> {
     pub session_expiry_interval: Option<SessionExpiryInterval>,
 
     /// Arbitrary key-value pairs of strings sent as the user property entries of the DISCONNECT
-    /// packet. Note that this slice's length must be less than [`crate::client::Client`]'s const
-    /// generic parameter `MAX_USER_PROPERTIES`.
+    /// packet. Note that this slice's length must be less than [`Client`]'s const generic parameter
+    /// `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     pub user_properties: &'d [MqttStringPair<'d>],
 }
 
@@ -56,8 +58,10 @@ impl<'d> Options<'d> {
         self.session_expiry_interval = Some(interval);
         self
     }
-    /// Sets the user properties. Note that this slice's length must be less than
-    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    /// Sets the user properties. Note that this slice's length must be less than [`Client`]'s
+    /// const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     #[must_use]
     pub const fn user_properties(mut self, user_properties: &'d [MqttStringPair<'d>]) -> Self {
         self.user_properties = user_properties;

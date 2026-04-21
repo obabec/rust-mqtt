@@ -247,7 +247,9 @@ impl<'s> MqttString<'s> {
         unsafe { from_utf8_unchecked(self.0.as_bytes()) }
     }
 
-    /// Delegates to [`crate::Bytes::as_borrowed`].
+    /// Delegates to [`Bytes::as_borrowed`].
+    ///
+    /// [`Bytes::as_borrowed`]: crate::Bytes::as_borrowed
     #[inline]
     #[must_use]
     pub const fn as_borrowed(&'s self) -> Self {
@@ -293,7 +295,9 @@ impl<'s> MqttStringPair<'s> {
         Self { name, value }
     }
 
-    /// Delegates to [`crate::Bytes::as_borrowed`].
+    /// Delegates to [`Bytes::as_borrowed`].
+    ///
+    /// [`Bytes::as_borrowed`]: crate::Bytes::as_borrowed
     #[inline]
     #[must_use]
     pub const fn as_borrowed(&'s self) -> Self {

@@ -82,7 +82,9 @@ impl<'t> TopicName<'t> {
         Self(string)
     }
 
-    /// Delegates to [`crate::Bytes::as_borrowed`].
+    /// Delegates to [`Bytes::as_borrowed`].
+    ///
+    /// [`Bytes::as_borrowed`]: crate::Bytes::as_borrowed
     #[inline]
     #[must_use]
     pub const fn as_borrowed(&'t self) -> Self {
@@ -275,7 +277,9 @@ impl<'t> TopicFilter<'t> {
         Self(string)
     }
 
-    /// Delegates to [`crate::Bytes::as_borrowed`].
+    /// Delegates to [`Bytes::as_borrowed`].
+    ///
+    /// [`Bytes::as_borrowed`]: crate::Bytes::as_borrowed
     #[inline]
     #[must_use]
     pub const fn as_borrowed(&'t self) -> Self {

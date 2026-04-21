@@ -14,7 +14,9 @@ pub(crate) enum Error<B> {
     /// The network is in a faulty state.
     Disconnected,
 
-    /// A buffer provision by the [`crate::buffer::BufferProvider`] failed.
+    /// A buffer provision by the [`BufferProvider`] failed.
+    ///
+    /// [`BufferProvider`]: crate::buffer::BufferProvider
     Alloc(B),
 
     /// Malformed packet or Protocol Error.

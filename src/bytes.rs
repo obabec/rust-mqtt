@@ -3,7 +3,7 @@ use alloc::boxed::Box;
 use core::{borrow::Borrow, ops::Deref};
 
 /// Contiguous bytes in memory. Is either a [`u8`] slice or (with crate feature "alloc") an owned
-/// [`alloc::boxed::Box`]<[u8]>.
+/// [`Box`]<[u8]>.
 ///
 /// It is recommended to almost always use owned [`Bytes`] instead of a reference to [`Bytes`],
 /// as it makes this type compatible for code designed for both owned and borrowed variants.
@@ -11,7 +11,9 @@ use core::{borrow::Borrow, ops::Deref};
 /// Important: Cloning this will clone the underlying Box if it is an owned variant.
 /// You can however borrow another owned [`Bytes`] by calling [`Bytes::as_borrowed`].
 /// The [`Bytes::as_borrowed`] method is passed on through wrapper types, for example
-/// [`crate::types::MqttString`].
+/// [`MqttString`].
+///
+/// [`MqttString`]: crate::types::MqttString
 pub enum Bytes<'a> {
     /// Owned variant, only available with the `alloc` feature enabled.
     #[cfg(feature = "alloc")]

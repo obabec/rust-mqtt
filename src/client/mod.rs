@@ -1051,9 +1051,9 @@ impl<
     /// After an MQTT communication fails, usually either the client or the server closes the connection.
     ///
     /// This is not cancel-safe but you can set a timeout if reconnecting later anyway or you don't reuse the client.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// This function may panic if the client has not returned an unrecoverable error before.
     #[inline]
     pub async fn abort(&mut self) {

@@ -147,8 +147,10 @@ impl<'p> Options<'p> {
         self.correlation_data = Some(data);
         self
     }
-    /// Sets the user properties. Note that this slice's length must be less than
-    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    /// Sets the user properties. Note that this slice's length must be less than [`Client`]'s
+    /// const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     #[must_use]
     pub const fn user_properties(mut self, user_properties: &'p [MqttStringPair<'p>]) -> Self {
         self.user_properties = user_properties;
@@ -198,7 +200,9 @@ impl<'t> TopicReference<'t> {
         }
     }
 
-    /// Delegates to [`crate::Bytes::as_borrowed`].
+    /// Delegates to [`Bytes::as_borrowed`].
+    ///
+    /// [`Bytes::as_borrowed`]: crate::Bytes::as_borrowed
     #[must_use]
     pub fn as_borrowed(&'t self) -> Self {
         match self {
