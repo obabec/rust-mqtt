@@ -1013,7 +1013,7 @@ impl<
     /// or [`Client::republish`] (with [`QoS::ExactlyOnce`]) followed by a call to [`Client::poll`] or
     /// [`Client::poll_body`] returning [`Event::PublishReceived`], as this combination of events results in
     /// a new session entry that would be rereleased in this method, causing a protocol error (Compare
-    /// [Message delivery retry] (https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238),
+    /// [Message delivery retry](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238),
     /// \[MQTT-4.4.0-1\]).
     ///
     /// This method assumes that the server's receive maximum after the reconnection is great enough
