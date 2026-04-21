@@ -542,8 +542,9 @@ impl<
     /// * A topic filter of a shared subscriptions should only be used if the server
     ///   supports shared subscriptions.
     ///
-    /// If a violation occurs, the client will not subscribe but prevent the protocol
-    /// error and return an error.
+    /// The server support of these requirements can be checked via [`Client::server_config`].
+    /// If a violation occurs, the client will not subscribe but prevent the protocol error
+    /// and return an error.
     ///
     /// # Returns:
     /// The packet identifier of the sent SUBSCRIBE packet.
@@ -582,11 +583,13 @@ impl<
         if !self.server_config.wildcard_subscription_supported && topic_filter.has_wildcard() {
             return Err(MqttError::UnsupportedByServer);
         }
+
         if !self.server_config.subscription_identifiers_supported
             && options.subscription_identifier.is_some()
         {
             return Err(MqttError::UnsupportedByServer);
         }
+
         if !self.server_config.shared_subscription_supported && topic_filter.is_shared() {
             return Err(MqttError::UnsupportedByServer);
         }
@@ -695,21 +698,22 @@ impl<
         Ok(pid)
     }
 
-    /// Publish a message. If [`QoS`] is greater than 0, the packet identifier is also kept track of
-    /// by the client.
+    /// Publish a message. If [`QoS`] is greater than [`QoS::AtMostOnce`], the packet identifier is
+    /// also kept track of by the client.
     ///
     /// Note:
     /// * The [`QoS`] should be less than or equal to the server's maximum [`QoS`].
     /// * The retain flag should only be set if the server supports retain.
     /// * A topic alias must be less than or equal to the server's maximum topic alias.
     ///
-    /// If a violation occurs, the client will not publish but prevent the protocol error and return
-    /// an error.
+    /// The server support of these requirements can be checked via [`Client::server_config`].
+    /// If a violation occurs, the client will not publish but prevent the protocol error
+    /// and return an error.
     ///
     /// # Returns:
     /// - In case of [`QoS::AtMostOnce`]: [`None`]
     /// - In case of [`QoS::AtLeastOnce`] or [`QoS::ExactlyOnce`]: [`Some`] with the packet identifier
-    ///   of the published packet
+    ///   of the published packet. This value is required in case of a republication attempt.
     ///
     /// # Errors
     ///
@@ -843,11 +847,22 @@ impl<
     /// as resending packets at any other time is a protocol error.
     /// (Compare [Message delivery retry](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238), \[MQTT-4.4.0-1\]).
     ///
-    /// For a packet to be resent:
-    /// - it must have a quality of service > 0
-    /// - its packet identifier must have an in flight entry with a quality of service matching the
-    ///   quality of service in the options parameter
-    /// - in case of quality of service 2, it must not already be awaiting a PUBCOMP packet
+    /// Note:
+    /// * Server-side constraints:
+    ///   * The [`QoS`] should be less than or equal to the server's maximum [`QoS`].
+    ///   * The retain flag should only be set if the server supports retain.
+    ///   * A topic alias must be less than or equal to the server's maximum topic alias.
+    /// * Client-side preconditions:
+    ///   * The [`QoS`] must be [`QoS::AtLeastOnce`] or [`QoS::ExactlyOnce`] and must be the same as
+    ///     that of the original publication.
+    ///   * The packet identifier must have an in flight entry with the same [`QoS`] as the value
+    ///     in the options parameter.
+    ///   * If [`QoS`] is [`QoS::ExactlyOnce`], the in flight entry it must not already be awaiting
+    ///     the PUBCOMP packet.
+    ///
+    /// If a violation occurs, the client will not publish but prevent the protocol error
+    /// and return an error. The server support of these requirements can be checked via
+    /// [`Client::server_config`].
     ///
     /// # Errors
     ///
@@ -994,9 +1009,12 @@ impl<
 
     /// Resends all pending PUBREL packets.
     ///
-    /// This method must be called and must only be called after a reconnection
-    /// with clean start set to 0, as resending packets at any other time is a protocol error.
-    /// (Compare [Message delivery retry](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238), \[MQTT-4.4.0-1\]).
+    /// This method must only be called immediately upon reconnection before any call to [`Client::publish`]
+    /// or [`Client::republish`] (with [`QoS::ExactlyOnce`]) followed by a call to [`Client::poll`] or
+    /// [`Client::poll_body`] returning [`Event::PublishReceived`], as this combination of events results in
+    /// a new session entry that would be rereleased in this method, causing a protocol error (Compare
+    /// [Message delivery retry] (https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238),
+    /// \[MQTT-4.4.0-1\]).
     ///
     /// This method assumes that the server's receive maximum after the reconnection is great enough
     /// to handle as many publication flows as dragged between the two connections.
@@ -1033,6 +1051,10 @@ impl<
     /// After an MQTT communication fails, usually either the client or the server closes the connection.
     ///
     /// This is not cancel-safe but you can set a timeout if reconnecting later anyway or you don't reuse the client.
+    /// 
+    /// # Panics
+    /// 
+    /// This function may panic if the client has not returned an unrecoverable error before.
     #[inline]
     pub async fn abort(&mut self) {
         match self.raw.abort().await {
