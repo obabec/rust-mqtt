@@ -595,6 +595,9 @@ async fn keep_alive_not_kept_alive_idle_network() {
             server_reference: _,
         } | MqttError::Network(_)
     ));
+
+    // A non-recoverable poll error should always allow calling abort without panicking.
+    c.abort().await;
 }
 
 #[tokio::test]

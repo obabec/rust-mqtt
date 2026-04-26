@@ -1598,6 +1598,10 @@ impl<
                     .recv_body::<DisconnectPacket<MAX_USER_PROPERTIES>>(&header)
                     .await?;
 
+                // The server initiated the disconnect. We must close the transport on our side
+                // as well so that subsequent error handling (e.g. `abort`) sees a non-Ok network state.
+                self.raw.close_with(None);
+
                 return Err(MqttError::Disconnect {
                     reason: disconnect.reason_code,
                     reason_string: disconnect.reason_string.map(Property::into_inner),
