@@ -651,6 +651,8 @@ async fn keep_alive_not_kept_alive_incoming_qos0() {
             .await,
             "expected to be disconnected"
         );
+        // A non-recoverable poll error should always allow calling abort without panicking.
+        rx.abort().await;
     };
 
     join!(receiver, publisher);
@@ -702,6 +704,8 @@ async fn keep_alive_not_kept_alive_will_timing() {
             server_reference: _,
         } | MqttError::Network(_)
     ));
+    // A non-recoverable poll error should always allow calling abort without panicking.
+    tx.abort().await;
 
     disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
 }
