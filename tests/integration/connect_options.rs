@@ -638,11 +638,15 @@ async fn keep_alive_not_kept_alive_incoming_qos0() {
 
         assert_ok!(
             timeout(Duration::from_secs(4), async {
-                loop {
-                    if let Err(MqttError::Network(_)) = rx.poll().await {
-                        break;
-                    }
-                }
+                while !matches!(
+                    rx.poll().await,
+                    Err(MqttError::Disconnect {
+                        reason: ReasonCode::KeepAliveTimeout,
+                        reason_string: _,
+                        user_properties: _,
+                        server_reference: _,
+                    }) | Err(MqttError::Network(_))
+                ) {}
             })
             .await,
             "expected to be disconnected"
