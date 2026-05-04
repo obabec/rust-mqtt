@@ -37,8 +37,9 @@ async fn maximum_packet_size_not_exceeded() {
         .clone()
         .maximum_packet_size(NonZero::new(MAX_PACKET_SIZE).unwrap());
 
-    let topic_name = TopicName::new(MqttString::from_str("a").unwrap()).unwrap();
-    let topic_filter = TopicFilter::from(topic_name.clone());
+    let s = MqttString::from_str("a").unwrap();
+    let topic_name = TopicName::new(s.clone()).unwrap();
+    let topic_filter = TopicFilter::new(s).unwrap();
 
     let msg = [0u8; PAYLOAD_SIZE].as_slice();
 
@@ -85,8 +86,9 @@ async fn maximum_packet_size_barely_exceeded() {
         .clone()
         .maximum_packet_size(NonZero::new(MAX_PACKET_SIZE).unwrap());
 
-    let topic_name = TopicName::new(MqttString::from_str("b").unwrap()).unwrap();
-    let topic_filter = TopicFilter::from(topic_name.clone());
+    let s = MqttString::from_str("b").unwrap();
+    let topic_name = TopicName::new(s.clone()).unwrap();
+    let topic_filter = TopicFilter::new(s).unwrap();
 
     let msg = [0u8; PAYLOAD_SIZE].as_slice();
 
@@ -138,8 +140,9 @@ async fn maximum_packet_size_decently_exceeded() {
         .clone()
         .maximum_packet_size(NonZero::new(MAX_PACKET_SIZE).unwrap());
 
-    let topic_name = TopicName::new(MqttString::from_str("c").unwrap()).unwrap();
-    let topic_filter = TopicFilter::from(topic_name.clone());
+    let s = MqttString::from_str("c").unwrap();
+    let topic_name = TopicName::new(s.clone()).unwrap();
+    let topic_filter = TopicFilter::new(s).unwrap();
 
     let msg = [0u8; PAYLOAD_SIZE].as_slice();
 
@@ -193,8 +196,9 @@ async fn maximum_packet_size_at_varbyteint_boundary_not_exceeded() {
         .clone()
         .maximum_packet_size(NonZero::new(MAX_PACKET_SIZE).unwrap());
 
-    let topic_name = TopicName::new(MqttString::from_str("d").unwrap()).unwrap();
-    let topic_filter = TopicFilter::from(topic_name.clone());
+    let s = MqttString::from_str("d").unwrap();
+    let topic_name = TopicName::new(s.clone()).unwrap();
+    let topic_filter = TopicFilter::new(s).unwrap();
 
     let msg = [0u8; PAYLOAD_SIZE].as_slice();
 
@@ -240,8 +244,9 @@ async fn maximum_packet_size_at_varbyteint_boundary_exceeded() {
         .clone()
         .maximum_packet_size(NonZero::new(MAX_PACKET_SIZE).unwrap());
 
-    let topic_name = TopicName::new(MqttString::from_str("e").unwrap()).unwrap();
-    let topic_filter = TopicFilter::from(topic_name.clone());
+    let s = MqttString::from_str("e").unwrap();
+    let topic_name = TopicName::new(s.clone()).unwrap();
+    let topic_filter = TopicFilter::new(s).unwrap();
 
     let msg = [0u8; PAYLOAD_SIZE].as_slice();
 
@@ -786,7 +791,7 @@ async fn send_maximum_buffer_exceeded() {
 
     assert_ok!(c.connect(tcp, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let server_receive_maximum = c.server_config().receive_maximum.0.get();
+    let server_receive_maximum = c.server_config().receive_maximum.get();
     assert!(
         server_receive_maximum as usize > SEND_MAXIMUM_BUFFER_SIZE,
         "server receive maximum must be greater than {SEND_MAXIMUM_BUFFER_SIZE} for this test"
@@ -823,7 +828,7 @@ async fn server_receive_maximum_exceeded() {
 
     assert_ok!(c.connect(tcp, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let server_receive_maximum = c.server_config().receive_maximum.0.get();
+    let server_receive_maximum = c.server_config().receive_maximum.get();
     assert!(
         server_receive_maximum < 256,
         "server receive maximum must be less than 256 for this test"

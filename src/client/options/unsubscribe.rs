@@ -4,9 +4,11 @@ use crate::types::MqttStringPair;
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Options<'s> {
-    /// Arbitrary key-value pairs of strings sent as the user property entries of the UNSUBSCRIBE packet.
-    /// Note that this slice's length must be less than [`crate::client::Client`]'s const generic
-    /// parameter `MAX_USER_PROPERTIES`.
+    /// Arbitrary key-value pairs of strings sent as the user property entries of the
+    /// UNSUBSCRIBE packet. Note that this slice's length must be less than [`Client`]'s
+    /// const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     pub user_properties: &'s [MqttStringPair<'s>],
 }
 
@@ -25,8 +27,10 @@ impl<'s> Options<'s> {
         }
     }
 
-    /// Sets the user properties. Note that this slice's length must be less than
-    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    /// Sets the user properties. Note that this slice's length must be less than [`Client`]'s
+    /// const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     #[must_use]
     pub const fn user_properties(mut self, user_properties: &'s [MqttStringPair<'s>]) -> Self {
         self.user_properties = user_properties;

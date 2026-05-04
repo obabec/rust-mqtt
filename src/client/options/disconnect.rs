@@ -1,24 +1,31 @@
 use crate::{config::SessionExpiryInterval, types::MqttStringPair};
 
-#[allow(unused_imports)]
-use crate::types::ReasonCode;
-
 /// Options for a disconnection to the server with a DISCONNECT packet.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Options<'d> {
     /// If set to true, the client uses [`ReasonCode::DisconnectWithWillMessage`] in the
     /// DISCONNECT packet and the server publishes the will message.
+    ///
+    /// [`ReasonCode::DisconnectWithWillMessage`]: crate::types::ReasonCode::DisconnectWithWillMessage
     pub publish_will: bool,
 
-    /// The session expiry interval property. Not allowed to be set to a non-zero value
-    /// if the session expiry interval property in the CONNECT packet has been 0.
-    /// This value overrides the session expiry interval negotiated in the handshake.
+    /// The session expiry interval property. This value overrides the session expiry interval
+    /// negotiated in the handshake.
+    ///
+    /// Must not to a non-zero value (`Some(`[`SessionExpiryInterval::EndOnDisconnect`]`)`) if the
+    /// session expiry interval property in the CONNECT packet has been zero (can be checked via
+    /// [`Client::client_config`]). The client will not disconnect if a violation occurs but prevent
+    /// the protocol error and return an error.
+    ///
+    /// [`Client::client_config`]: crate::client::Client::client_config
     pub session_expiry_interval: Option<SessionExpiryInterval>,
 
     /// Arbitrary key-value pairs of strings sent as the user property entries of the DISCONNECT
-    /// packet. Note that this slice's length must be less than [`crate::client::Client`]'s const
-    /// generic parameter `MAX_USER_PROPERTIES`.
+    /// packet. Note that this slice's length must be less than [`Client`]'s const generic parameter
+    /// `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     pub user_properties: &'d [MqttStringPair<'d>],
 }
 
@@ -51,8 +58,10 @@ impl<'d> Options<'d> {
         self.session_expiry_interval = Some(interval);
         self
     }
-    /// Sets the user properties. Note that this slice's length must be less than
-    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    /// Sets the user properties. Note that this slice's length must be less than [`Client`]'s
+    /// const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     #[must_use]
     pub const fn user_properties(mut self, user_properties: &'d [MqttStringPair<'d>]) -> Self {
         self.user_properties = user_properties;

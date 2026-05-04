@@ -82,7 +82,9 @@ impl<'t> TopicName<'t> {
         Self(string)
     }
 
-    /// Delegates to [`crate::Bytes::as_borrowed`].
+    /// Delegates to [`Bytes::as_borrowed`].
+    ///
+    /// [`Bytes::as_borrowed`]: crate::Bytes::as_borrowed
     #[inline]
     #[must_use]
     pub const fn as_borrowed(&'t self) -> Self {
@@ -121,9 +123,33 @@ impl<'t> TopicFilter<'t> {
             return false;
         }
 
-        let mut i = 0;
+        let is_shared = s.len() >= 6
+            && s[0] == b'$'
+            && s[1] == b's'
+            && s[2] == b'h'
+            && s[3] == b'a'
+            && s[4] == b'r'
+            && s[5] == b'e';
+
+        if is_shared {
+            // Minimal shared filter "$share/a/a" has length 10
+            if s.len() < 10 {
+                return false;
+            }
+            // Check first '/' so that checking the sharename is simpler in the loop
+            if s[6] != b'/' {
+                return false;
+            }
+        }
+
+        let mut i = match is_shared {
+            true => 7,
+            false => 0,
+        };
         let mut level_len = 0;
         let mut level_contains_wildcard = false;
+
+        let mut checking_share_name = is_shared;
 
         while i < s.len() {
             let b = s[i];
@@ -148,6 +174,28 @@ impl<'t> TopicFilter<'t> {
             }
 
             if b == b'/' {
+                if checking_share_name {
+                    // ... a ShareName that is at least one character long [MQTT-4.8.2-1].
+                    if level_len == 0 {
+                        return false;
+                    }
+
+                    // The ShareName MUST NOT contain the characters "/", "+" or "#", but MUST be
+                    // followed by a "/" character. ...
+                    // Topic Filter [MQTT-4.8.2-2]
+                    if level_contains_wildcard {
+                        return false;
+                    }
+
+                    // ... but MUST be followed by a "/" character. This "/" character MUST be
+                    // followed by a Topic Filter [MQTT-4.8.2-2]
+                    if i + 1 == s.len() {
+                        return false;
+                    }
+
+                    checking_share_name = false;
+                }
+
                 level_len = 0;
                 level_contains_wildcard = false;
             } else {
@@ -168,7 +216,40 @@ impl<'t> TopicFilter<'t> {
         true
     }
 
-    /// Creates a new topic filter while checking for correct syntax of the topic filter string
+    /// Returns whether the topic filter is the topic filter of a shared subscription.
+    pub const fn is_shared(&self) -> bool {
+        let s = self.0.as_str().as_bytes();
+
+        s.len() >= 10
+            && s[0] == b'$'
+            && s[1] == b's'
+            && s[2] == b'h'
+            && s[3] == b'a'
+            && s[4] == b'r'
+            && s[5] == b'e'
+    }
+
+    /// Returns whether the topic filter contains one or more of the wildcard characters `#` or `+`.
+    pub const fn has_wildcard(&self) -> bool {
+        let s = self.0.as_str().as_bytes();
+
+        let mut i = 0;
+        while i < s.len() {
+            let b = s[i];
+
+            if b == b'#' || b == b'+' {
+                return true;
+            }
+
+            i += 1;
+        }
+
+        false
+    }
+
+    /// Creates a new topic filter while checking for correct syntax of the topic filter string.
+    /// If the filter starts with "$share", the constraints for a shared subscription's topic
+    /// filter are also enforced.
     #[const_fn(cfg(not(feature = "alloc")))]
     #[must_use]
     pub fn new(string: MqttString<'t>) -> Option<Self> {
@@ -196,7 +277,9 @@ impl<'t> TopicFilter<'t> {
         Self(string)
     }
 
-    /// Delegates to [`crate::Bytes::as_borrowed`].
+    /// Delegates to [`Bytes::as_borrowed`].
+    ///
+    /// [`Bytes::as_borrowed`]: crate::Bytes::as_borrowed
     #[inline]
     #[must_use]
     pub const fn as_borrowed(&'t self) -> Self {
@@ -212,11 +295,6 @@ impl<'t> AsRef<MqttString<'t>> for TopicFilter<'t> {
 impl<'t> From<TopicFilter<'t>> for MqttString<'t> {
     fn from(value: TopicFilter<'t>) -> Self {
         value.0
-    }
-}
-impl<'t> From<TopicName<'t>> for TopicFilter<'t> {
-    fn from(value: TopicName<'t>) -> Self {
-        Self(value.0)
     }
 }
 
@@ -282,15 +360,41 @@ mod unit {
     use crate::types::{MqttString, TopicFilter, TopicName};
 
     macro_rules! assert_valid {
-        ($t:ty, $l:literal) => {
-            let s = assert_ok!(MqttString::from_str($l));
-            assert!(<$t>::new(s).is_some())
-        };
+        ($t:ty, $l:literal) => {{
+            let s = assert_ok!(MqttString::from_str($l), "{}", $l);
+            let t = <$t>::new(s);
+            assert!(t.is_some(), "{}", $l);
+            let t = t.unwrap();
+
+            t
+        }};
+    }
+    macro_rules! assert_valid_shared {
+        ($t:ty, $l:literal) => {{
+            let s = assert_ok!(MqttString::from_str($l), "{}", $l);
+            let t = <$t>::new(s);
+            assert!(t.is_some(), "{}", $l);
+            let t = t.unwrap();
+            assert!(t.is_shared(), "{}", $l);
+
+            t
+        }};
+    }
+    macro_rules! assert_valid_non_shared {
+        ($t:ty, $l:literal) => {{
+            let s = assert_ok!(MqttString::from_str($l), "{}", $l);
+            let t = <$t>::new(s);
+            assert!(t.is_some(), "{}", $l);
+            let t = t.unwrap();
+            assert!(!t.is_shared(), "{}", $l);
+
+            t
+        }};
     }
     macro_rules! assert_invalid {
         ($t:ty, $l:literal) => {
             match MqttString::from_str($l) {
-                Ok(s) => assert!(<$t>::new(s).is_none()),
+                Ok(s) => assert!(<$t>::new(s).is_none(), "{}", $l),
                 Err(_) => {}
             }
         };
@@ -369,26 +473,96 @@ mod unit {
 
     #[test]
     fn topic_filter_valid() {
-        assert_valid!(TopicFilter, "#");
-        assert_valid!(TopicFilter, "/#");
-        assert_valid!(TopicFilter, "a/#");
+        assert_valid_non_shared!(TopicFilter, "#");
+        assert_valid_non_shared!(TopicFilter, "/#");
+        assert_valid_non_shared!(TopicFilter, "a/#");
 
-        assert_valid!(TopicFilter, "+");
-        assert_valid!(TopicFilter, "/+");
-        assert_valid!(TopicFilter, "+/");
-        assert_valid!(TopicFilter, "a/+");
-        assert_valid!(TopicFilter, "+/a");
+        assert_valid_non_shared!(TopicFilter, "+");
+        assert_valid_non_shared!(TopicFilter, "/+");
+        assert_valid_non_shared!(TopicFilter, "+/");
+        assert_valid_non_shared!(TopicFilter, "a/+");
+        assert_valid_non_shared!(TopicFilter, "+/a");
 
-        assert_valid!(TopicFilter, "/");
-        assert_valid!(TopicFilter, "//");
-        assert_valid!(TopicFilter, "r");
+        assert_valid_non_shared!(TopicFilter, "/");
+        assert_valid_non_shared!(TopicFilter, "//");
+        assert_valid_non_shared!(TopicFilter, "r");
 
-        assert_valid!(TopicFilter, "r/i/g/+/t");
-        assert_valid!(TopicFilter, "correct/+/path");
-        assert_valid!(TopicFilter, "right/path/#");
-        assert_valid!(TopicFilter, "right");
-        assert_valid!(TopicFilter, "sport/tennis/player1");
-        assert_valid!(TopicFilter, "sport/tennis/player1/ranking");
-        assert_valid!(TopicFilter, "sport/tennis/player1/score/wimbledon");
+        assert_valid_non_shared!(TopicFilter, "fshare/");
+        assert_valid_non_shared!(TopicFilter, "$fhare/");
+        assert_valid_non_shared!(TopicFilter, "$sfare/");
+        assert_valid_non_shared!(TopicFilter, "$shfre/");
+        assert_valid_non_shared!(TopicFilter, "$shafe/");
+        assert_valid_non_shared!(TopicFilter, "$sharf/");
+        assert_valid_non_shared!(TopicFilter, "share/");
+        assert_valid_non_shared!(TopicFilter, "$hare/");
+        assert_valid_non_shared!(TopicFilter, "$sare/");
+        assert_valid_non_shared!(TopicFilter, "$shre/");
+        assert_valid_non_shared!(TopicFilter, "$shae/");
+
+        assert_valid_non_shared!(TopicFilter, "r/i/g/+/t");
+        assert_valid_non_shared!(TopicFilter, "correct/+/path");
+        assert_valid_non_shared!(TopicFilter, "right/path/#");
+        assert_valid_non_shared!(TopicFilter, "right");
+        assert_valid_non_shared!(TopicFilter, "sport/tennis/player1");
+        assert_valid_non_shared!(TopicFilter, "sport/tennis/player1/ranking");
+        assert_valid_non_shared!(TopicFilter, "sport/tennis/player1/score/wimbledon");
+    }
+
+    #[test]
+    fn topic_filter_shared_no_share_name() {
+        assert_invalid!(TopicFilter, "$share");
+        assert_invalid!(TopicFilter, "$share/");
+        assert_invalid!(TopicFilter, "$share//");
+    }
+
+    #[test]
+    fn topic_filter_shared_invalid_share_name() {
+        assert_invalid!(TopicFilter, "$share/+/");
+        assert_invalid!(TopicFilter, "$share/#/a");
+        assert_invalid!(TopicFilter, "$share/a+a/a");
+        assert_invalid!(TopicFilter, "$share/a+/a");
+        assert_invalid!(TopicFilter, "$share/+a/a");
+        assert_invalid!(TopicFilter, "$share/a#a/a");
+        assert_invalid!(TopicFilter, "$share/a#/a");
+        assert_invalid!(TopicFilter, "$share/#a/a");
+        assert_invalid!(TopicFilter, "$share///a");
+    }
+
+    #[test]
+    fn topic_filter_shared_no_topic_filter() {
+        assert_invalid!(TopicFilter, "$share/a/");
+    }
+
+    #[test]
+    fn topic_filter_shared_valid() {
+        assert_valid_shared!(TopicFilter, "$share/a/a");
+        assert_valid_shared!(TopicFilter, "$share/a/+");
+        assert_valid_shared!(TopicFilter, "$share/a/#");
+        assert_valid_shared!(TopicFilter, "$share/a//");
+        assert_valid_shared!(TopicFilter, "$share/consumer1/sport/tennis/+");
+        assert_valid_shared!(TopicFilter, "$share/consumer2/sport/tennis/+");
+        assert_valid_shared!(TopicFilter, "$share/consumer1//finance");
+        assert_valid_shared!(TopicFilter, "$share/consumer1/+/finance");
+    }
+
+    #[test]
+    fn topic_filter_has_wildcard() {
+        assert!(!assert_valid!(TopicFilter, "a").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "/").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "//").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "/a/").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "$").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "$a/$/").has_wildcard());
+        assert!(!assert_valid!(TopicFilter, "$share/consumer1//finance").has_wildcard());
+
+        assert!(assert_valid!(TopicFilter, "#").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "+").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "/+/").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "+/").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "/#").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "/+").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "/+").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "$share/consumer1/+/finance").has_wildcard());
+        assert!(assert_valid!(TopicFilter, "$share/consumer1/#").has_wildcard());
     }
 }

@@ -8,8 +8,7 @@ use crate::{
     buffer::BufferProvider,
     bytes::Bytes,
     client::{
-        event::{Event, Puback, Publish, Pubrej, Suback},
-        info::ConnectInfo,
+        event::{Connected, Event, Puback, Publish, Pubrej, Suback},
         options::{
             ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions,
             TopicReference, UnsubscriptionOptions,
@@ -39,7 +38,6 @@ use crate::{
 mod err;
 
 pub mod event;
-pub mod info;
 pub mod options;
 pub mod raw;
 
@@ -157,7 +155,7 @@ impl<
     /// Returns the amount of publications the client is allowed to make according to the server's
     /// receive maximum. Does not account local space for storing publication state.
     fn remaining_send_quota(&self) -> u16 {
-        self.server_config.receive_maximum.into_inner().get() - self.session.in_flight_cpublishes()
+        self.server_config.receive_maximum.get() - self.session.in_flight_cpublishes()
     }
 
     fn is_packet_identifier_used(&self, packet_identifier: PacketIdentifier) -> bool {
@@ -277,7 +275,7 @@ impl<
         net: N,
         options: &ConnectOptions<'_>,
         client_identifier: Option<MqttString<'d>>,
-    ) -> Result<ConnectInfo<'d, MAX_USER_PROPERTIES>, MqttError<'c, MAX_USER_PROPERTIES>>
+    ) -> Result<Connected<'d, MAX_USER_PROPERTIES>, MqttError<'c, MAX_USER_PROPERTIES>>
     where
         'c: 'd,
     {
@@ -457,7 +455,7 @@ impl<
                 server_keep_alive.map_or(options.keep_alive, Property::into_inner);
 
             if let Some(r) = receive_maximum {
-                self.server_config.receive_maximum = r;
+                self.server_config.receive_maximum = r.into_inner();
             }
             if let Some(m) = maximum_qos {
                 self.server_config.maximum_qos = m.into_inner();
@@ -483,7 +481,7 @@ impl<
 
             info!("connected to server (session present: {})", session_present);
 
-            Ok(ConnectInfo {
+            Ok(Connected {
                 session_present,
                 client_identifier,
                 user_properties: user_properties
@@ -536,10 +534,17 @@ impl<
     /// If no [`Event::Suback`] is received within a custom time,
     /// this method can be used to send the SUBSCRIBE packet again.
     ///
-    /// A subscription identifier should only be set if the server supports
-    /// subscription identifiers (Can be checked with [`Self::server_config`]).
-    /// The client does not double-check whether this feature is supported and will
-    /// always include the subscription identifier argument if present.
+    /// Note:
+    /// * A topic filter with one or more wildcards should only be used if the server
+    ///   supports wildcard subscriptions.
+    /// * A subscription identifier should only be set if the server supports
+    ///   subscription identifiers.
+    /// * A topic filter of a shared subscriptions should only be used if the server
+    ///   supports shared subscriptions.
+    ///
+    /// The server support of these requirements can be checked via [`Client::server_config`].
+    /// If a violation occurs, the client will not subscribe but prevent the protocol error
+    /// and return an error.
     ///
     /// # Returns:
     /// The packet identifier of the sent SUBSCRIBE packet.
@@ -551,6 +556,13 @@ impl<
     /// * [`MqttError::SessionBuffer`] if the buffer for outgoing SUBSCRIBE packet identifiers is full
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this SUBSCRIBE packet
+    /// * [`MqttError::UnsupportedByServer`]
+    ///   * if the server specified in its CONNACK that wildcard subscriptions are not available and
+    ///     the topic filter is the topic filter of a shared subscription
+    ///   * if the server specified in its CONNACK that subscription identifiers are not available and
+    ///     the [`SubscriptionOptions`] include a subscription identifier
+    ///   * if the server specified in its CONNACK that shared subscriptions are not available and the
+    ///     topic filter is the topic filter of a shared subscription
     ///
     /// # Panics
     ///
@@ -567,6 +579,20 @@ impl<
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
+
+        if !self.server_config.wildcard_subscription_supported && topic_filter.has_wildcard() {
+            return Err(MqttError::UnsupportedByServer);
+        }
+
+        if !self.server_config.subscription_identifiers_supported
+            && options.subscription_identifier.is_some()
+        {
+            return Err(MqttError::UnsupportedByServer);
+        }
+
+        if !self.server_config.shared_subscription_supported && topic_filter.is_shared() {
+            return Err(MqttError::UnsupportedByServer);
+        }
 
         if self.pending_suback.is_full() {
             info!("maximum concurrent subscriptions reached");
@@ -672,11 +698,22 @@ impl<
         Ok(pid)
     }
 
-    /// Publish a message. If [`QoS`] is greater than 0, the packet identifier is also kept track of by the client
+    /// Publish a message. If [`QoS`] is greater than [`QoS::AtMostOnce`], the packet identifier is
+    /// also kept track of by the client.
+    ///
+    /// Note:
+    /// * The [`QoS`] should be less than or equal to the server's maximum [`QoS`].
+    /// * The retain flag should only be set if the server supports retain.
+    /// * A topic alias must be less than or equal to the server's maximum topic alias.
+    ///
+    /// The server support of these requirements can be checked via [`Client::server_config`].
+    /// If a violation occurs, the client will not publish but prevent the protocol error
+    /// and return an error.
     ///
     /// # Returns:
-    /// - In case of [`QoS`] 0: [`None`]
-    /// - In case of [`QoS`] 1 or 2: [`Some`] with the packet identifier of the published packet
+    /// - In case of [`QoS::AtMostOnce`]: [`None`]
+    /// - In case of [`QoS::AtLeastOnce`] or [`QoS::ExactlyOnce`]: [`Some`] with the packet identifier
+    ///   of the published packet. This value is required in case of a republication attempt.
     ///
     /// # Errors
     ///
@@ -685,13 +722,17 @@ impl<
     /// * [`MqttError::SendQuotaExceeded`] if the server's control flow limit is reached and sending
     ///   the PUBLISH would exceed the limit causing a protocol error
     /// * [`MqttError::SessionBuffer`] if the buffer for outgoing PUBLISH packet identifiers is full
-    /// * [`MqttError::InvalidTopicAlias`] if a topic alias is used and
-    ///   * its value is 0
-    ///   * its value is greater than the server's maximum topic alias
     /// * [`MqttError::PacketMaximumLengthExceeded`] if the PUBLISH packet is too long to be encoded
     ///   with MQTT's [`VarByteInt`]
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this PUBLISH packet
+    /// * [`MqttError::UnsupportedByServer`]
+    ///   * if the quality of service level in the [`PublicationOptions`] is greater than the maximum
+    ///     value specified in the server's CONNACK packet
+    ///   * if the server specified in its CONNACK that retain is not available and a publication with
+    ///     the retain flag set to true is attempted
+    ///   * if a topic alias is used and its value is greater than the maximum value specified in the
+    ///     server's CONNACK packet
     ///
     /// # Panics
     ///
@@ -709,6 +750,23 @@ impl<
             MAX_USER_PROPERTIES
         );
 
+        if options.qos > self.server_config.maximum_qos {
+            return Err(MqttError::UnsupportedByServer);
+        }
+
+        if !self.server_config.retain_supported && options.retain {
+            return Err(MqttError::UnsupportedByServer);
+        }
+
+        if options
+            .topic
+            .alias()
+            .map(NonZero::get)
+            .is_some_and(|a| a > self.server_config.topic_alias_maximum)
+        {
+            return Err(MqttError::UnsupportedByServer);
+        }
+
         if options.qos > QoS::AtMostOnce {
             if self.remaining_send_quota() == 0 {
                 info!("server receive maximum reached");
@@ -725,14 +783,6 @@ impl<
             QoS::AtLeastOnce => IdentifiedQoS::AtLeastOnce(self.packet_identifier()),
             QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(self.packet_identifier()),
         };
-
-        if options
-            .topic
-            .alias()
-            .is_some_and(|a| !(1..=self.server_config.topic_alias_maximum).contains(&a))
-        {
-            return Err(MqttError::InvalidTopicAlias);
-        }
 
         let packet = PublishPacket::<0, MAX_USER_PROPERTIES>::new(
             false,
@@ -797,11 +847,22 @@ impl<
     /// as resending packets at any other time is a protocol error.
     /// (Compare [Message delivery retry](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238), \[MQTT-4.4.0-1\]).
     ///
-    /// For a packet to be resent:
-    /// - it must have a quality of service > 0
-    /// - its packet identifier must have an in flight entry with a quality of service matching the
-    ///   quality of service in the options parameter
-    /// - in case of quality of service 2, it must not already be awaiting a PUBCOMP packet
+    /// Note:
+    /// * Server-side constraints:
+    ///   * The [`QoS`] should be less than or equal to the server's maximum [`QoS`].
+    ///   * The retain flag should only be set if the server supports retain.
+    ///   * A topic alias must be less than or equal to the server's maximum topic alias.
+    /// * Client-side preconditions:
+    ///   * The [`QoS`] must be [`QoS::AtLeastOnce`] or [`QoS::ExactlyOnce`] and must be the same as
+    ///     that of the original publication.
+    ///   * The packet identifier must have an in flight entry with the same [`QoS`] as the value
+    ///     in the options parameter.
+    ///   * If [`QoS`] is [`QoS::ExactlyOnce`], the in flight entry it must not already be awaiting
+    ///     the PUBCOMP packet.
+    ///
+    /// If a violation occurs, the client will not publish but prevent the protocol error
+    /// and return an error. The server support of these requirements can be checked via
+    /// [`Client::server_config`].
     ///
     /// # Errors
     ///
@@ -813,13 +874,17 @@ impl<
     ///   has already been received and the server has therefore already received the PUBLISH
     /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in the
     ///   client's session
-    /// * [`MqttError::InvalidTopicAlias`] if a topic alias is used and
-    ///   * its value is 0
-    ///   * its value is greater than the server's maximum topic alias
     /// * [`MqttError::PacketMaximumLengthExceeded`] if the PUBLISH packet is too long to be encoded
     ///   with MQTT's [`VarByteInt`]
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
     ///   exceeded by sending this PUBLISH packet
+    /// * [`MqttError::UnsupportedByServer`]
+    ///   * if the quality of service level in the [`PublicationOptions`] is greater than the maximum
+    ///     value specified in the server's CONNACK packet
+    ///   * if the server specified in its CONNACK that retain is not available and a publication with
+    ///     the retain flag set to true is attempted
+    ///   * if a topic alias is used and its value is greater than the maximum value specified in the
+    ///     server's CONNACK packet
     ///
     /// # Panics
     ///
@@ -839,8 +904,27 @@ impl<
             MAX_USER_PROPERTIES
         );
 
-        if options.qos == QoS::AtMostOnce {
-            panic!("QoS 0 packets cannot be republished");
+        assert_ne!(
+            options.qos,
+            QoS::AtMostOnce,
+            "QoS 0 packets cannot be republished"
+        );
+
+        if options.qos > self.server_config.maximum_qos {
+            return Err(MqttError::UnsupportedByServer);
+        }
+
+        if !self.server_config.retain_supported && options.retain {
+            return Err(MqttError::UnsupportedByServer);
+        }
+
+        if options
+            .topic
+            .alias()
+            .map(NonZero::get)
+            .is_some_and(|a| a > self.server_config.topic_alias_maximum)
+        {
+            return Err(MqttError::UnsupportedByServer);
         }
 
         let identified_qos = match self.session.cpublish_flight_state(packet_identifier) {
@@ -877,14 +961,6 @@ impl<
                 return Err(MqttError::PacketIdentifierNotInFlight);
             }
         };
-
-        if options
-            .topic
-            .alias()
-            .is_some_and(|a| !(1..=self.server_config.topic_alias_maximum).contains(&a))
-        {
-            return Err(MqttError::InvalidTopicAlias);
-        }
 
         let packet = PublishPacket::<0, MAX_USER_PROPERTIES>::new(
             true,
@@ -933,9 +1009,12 @@ impl<
 
     /// Resends all pending PUBREL packets.
     ///
-    /// This method must be called and must only be called after a reconnection
-    /// with clean start set to 0, as resending packets at any other time is a protocol error.
-    /// (Compare [Message delivery retry](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238), \[MQTT-4.4.0-1\]).
+    /// This method must only be called immediately upon reconnection before any call to [`Client::publish`]
+    /// or [`Client::republish`] (with [`QoS::ExactlyOnce`]) followed by a call to [`Client::poll`] or
+    /// [`Client::poll_body`] returning [`Event::PublishReceived`], as this combination of events results in
+    /// a new session entry that would be rereleased in this method, causing a protocol error (Compare
+    /// [Message delivery retry](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238),
+    /// \[MQTT-4.4.0-1\]).
     ///
     /// This method assumes that the server's receive maximum after the reconnection is great enough
     /// to handle as many publication flows as dragged between the two connections.
@@ -972,6 +1051,10 @@ impl<
     /// After an MQTT communication fails, usually either the client or the server closes the connection.
     ///
     /// This is not cancel-safe but you can set a timeout if reconnecting later anyway or you don't reuse the client.
+    ///
+    /// # Panics
+    ///
+    /// This function may panic if the client has not returned an unrecoverable error before.
     #[inline]
     pub async fn abort(&mut self) {
         match self.raw.abort().await {
@@ -1144,7 +1227,8 @@ impl<
     ///   * the server causes a protocol error
     ///   * the packet following this header exceeds the client's maximum packet size
     ///   * the server sends a PUBLISH packet with an invalid topic alias
-    ///   * the server exceeded the client's receive maximum with a new [`QoS`] 2 PUBLISH
+    ///   * the server exceeded the client's receive maximum with a new [`QoS::ExactlyOnce`]
+    ///     PUBLISH
     ///   * the server sends a PUBACK/PUBREC/PUBREL/PUBCOMP packet which mismatches what
     ///     the client expects for this packet identifier from its session state
     ///   * the fixed header has the packet type CONNECT/SUBSCRIBE/UNSUBSCRIBE/PINGREQ

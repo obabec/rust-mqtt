@@ -1,3 +1,5 @@
+use core::num::NonZero;
+
 use const_fn::const_fn;
 
 use crate::types::{MqttBinary, MqttString, MqttStringPair, QoS, TopicName};
@@ -10,17 +12,35 @@ pub struct Options<'p> {
     /// The quality of service level used by the server to send this publication
     /// to subscribed clients is the minimum of this value and the quality of service
     /// value of the receiving client's subscription.
+    ///
+    /// Must be less than or equal to the server's maximum quality of service level
+    /// (can be checked via [`Client::server_config`]). The client will not publish
+    /// if a violation occurs but prevent the protocol error and return an error.
+    ///
+    /// [`Client::server_config`]: crate::client::Client::server_config
     pub qos: QoS,
 
     /// Depicts the value of the retain flag in the PUBLISH packet.
     /// If set to 1, the server should retain the message on this topic.
     /// Retained messages with quality of service 0 can be discarded
     /// at any time by the server.
+    ///
+    /// Must be false when the server does not support retain (can be checked via
+    /// [`Client::server_config`]). The client will not publish if a violation occurs
+    /// but prevent the protocol error and return an error.
+    ///
+    /// [`Client::server_config`]: crate::client::Client::server_config
     pub retain: bool,
 
     /// The topic that the message is published on. The topic can be referenced over
     /// an existing topic alias mapping or by specifying the topic name and optionally
     /// mapping a topic alias to it.
+    ///
+    /// If an alias is used, it must be less than or equal to the server's maximum topic
+    /// alias (can be checked via [`Client::server_config`]). The client will not publish
+    /// if a violation occurs but prevent the protocol error and return an error.
+    ///
+    /// [`Client::server_config`]: crate::client::Client::server_config
     pub topic: TopicReference<'p>,
 
     /// Indicates whether the message is valid UTF-8. If [`None`], there is no statement
@@ -41,7 +61,9 @@ pub struct Options<'p> {
     pub correlation_data: Option<MqttBinary<'p>>,
 
     /// Arbitrary key-value pairs of strings. Note that this slice's length must be less than
-    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    /// [`Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     pub user_properties: &'p [MqttStringPair<'p>],
 
     /// The custom content type of the message.
@@ -67,22 +89,33 @@ impl<'p> Options<'p> {
     }
 
     /// Sets the Quality of Service level.
+    ///
+    /// Note that this level must be less than or equal to the server's
+    /// maximum quality of service level.
     #[must_use]
     pub const fn qos(mut self, qos: QoS) -> Self {
         self.qos = qos;
         self
     }
-    /// Sets the Quality of Service level to 1 (At Least Once).
+    /// Sets the Quality of Service level to 1 ([`QoS::AtLeastOnce`]).
+    ///
+    /// Note that this is only allowed if the server's maximum quality
+    /// of service is 1 or 2.
     #[must_use]
     pub const fn at_least_once(self) -> Self {
         self.qos(QoS::AtLeastOnce)
     }
-    /// Sets the Quality of Service level to 2 (Exactly Once).
+    /// Sets the Quality of Service level to 2 ([`QoS::ExactlyOnce`]).
+    ///
+    /// Note that this is only allowed if the server's maximum quality
+    /// of service is 2.
     #[must_use]
     pub const fn exactly_once(self) -> Self {
         self.qos(QoS::ExactlyOnce)
     }
     /// Sets the retain flag to true.
+    ///
+    /// Note that this is only allowed if the server supports retain.
     #[must_use]
     pub const fn retain(mut self) -> Self {
         self.retain = true;
@@ -114,8 +147,10 @@ impl<'p> Options<'p> {
         self.correlation_data = Some(data);
         self
     }
-    /// Sets the user properties. Note that this slice's length must be less than
-    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    /// Sets the user properties. Note that this slice's length must be less than [`Client`]'s
+    /// const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     #[must_use]
     pub const fn user_properties(mut self, user_properties: &'p [MqttStringPair<'p>]) -> Self {
         self.user_properties = user_properties;
@@ -142,15 +177,15 @@ pub enum TopicReference<'t> {
 
     /// Publish to an already mapped topic alias. The alias must have been defined earlier
     /// in the network connection.
-    Alias(u16),
+    Alias(NonZero<u16>),
 
     /// Create a new topic alias or replace an existing topic alias.
     /// The alias lasts until the end of the network connection.
-    Mapping(TopicName<'t>, u16),
+    Mapping(TopicName<'t>, NonZero<u16>),
 }
 
 impl<'t> TopicReference<'t> {
-    pub(crate) fn alias(&self) -> Option<u16> {
+    pub(crate) fn alias(&self) -> Option<NonZero<u16>> {
         match self {
             Self::Name(_) => None,
             Self::Alias(alias) => Some(*alias),
@@ -165,7 +200,9 @@ impl<'t> TopicReference<'t> {
         }
     }
 
-    /// Delegates to [`crate::Bytes::as_borrowed`].
+    /// Delegates to [`Bytes::as_borrowed`].
+    ///
+    /// [`Bytes::as_borrowed`]: crate::Bytes::as_borrowed
     #[must_use]
     pub fn as_borrowed(&'t self) -> Self {
         match self {

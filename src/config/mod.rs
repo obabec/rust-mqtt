@@ -50,8 +50,10 @@ pub enum SessionExpiryInterval {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum MaximumPacketSize {
-    /// There is no imposed limit on how large packets can be.
-    /// The technical limit is [`crate::types::VarByteInt::MAX_ENCODABLE`] + 5 (size of fixed header).
+    /// There is no imposed limit on how large packets can be. The technical limit is
+    /// [`VarByteInt::MAX_ENCODABLE`] + 5 (size of fixed header).
+    ///
+    /// [`VarByteInt::MAX_ENCODABLE`]: crate::types::VarByteInt::MAX_ENCODABLE
     #[default]
     Unlimited,
 
@@ -69,10 +71,3 @@ impl MaximumPacketSize {
         }
     }
 }
-
-/// Maximum concurrent publications with a Quality of Service > 0.
-///
-/// Default is 65536 / [`u16::MAX`] and is used when no receive maximum is present. Can't be zero.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub struct ReceiveMaximum(pub NonZero<u16>);

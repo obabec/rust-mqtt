@@ -39,13 +39,10 @@ fn unique_number() -> u64 {
 pub fn unique_topic() -> (TopicName<'static>, TopicFilter<'static>) {
     let s = format!("rust/mqtt/is-amazing/{}", unique_number());
     let b = s.into_bytes().into_boxed_slice();
-    let s = MqttBinary::from_bytes(Bytes::Owned(b))
-        .unwrap()
-        .try_into()
-        .unwrap();
+    let s = MqttString::from_utf8_binary(MqttBinary::from_bytes(Bytes::Owned(b)).unwrap()).unwrap();
 
-    let n = TopicName::new(s).unwrap();
-    let f = n.clone().into();
+    let n = TopicName::new(s.clone()).unwrap();
+    let f = TopicFilter::new(s).unwrap();
 
     (n, f)
 }

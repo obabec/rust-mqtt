@@ -445,7 +445,7 @@ mod unit {
             true,
             IdentifiedQoS::ExactlyOnce(PacketIdentifier::new(NonZero::new(9624).unwrap())),
             true,
-            TopicReference::Alias(23408),
+            TopicReference::Alias(NonZero::new(23408).unwrap()),
             Some(false.into()),
             Some(481123u32.into()),
             Some(TopicName::new(MqttString::from_str("uno, dos, tres, catorce").unwrap()).unwrap()),
@@ -634,7 +634,7 @@ mod unit {
             packet.topic,
             TopicReference::Mapping(
                 TopicName::new(MqttString::try_from("test").unwrap()).unwrap(),
-                10,
+                NonZero::new(10).unwrap(),
             )
         );
         assert_eq!(packet.message, Bytes::from("hello".as_bytes()));

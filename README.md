@@ -26,8 +26,9 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 - Flow control
 - Configuration & session tracking
 - Session recovery
-- Client- & serverside maximum packet size
+- Client- & server-side maximum packet size
 - Subscription identifiers
+- Shared & wildcard subscriptions
 - Message expiry interval
 - Topic alias in outgoing publications
 - Request/Response
@@ -78,7 +79,7 @@ async fn main() {
         .clean_start()
         .session_expiry_interval(SessionExpiryInterval::NeverEnd)
         .user_name(MqttString::from_str("user").unwrap())
-        .password(MqttBinary::from_slice("pass").unwrap());
+        .password(MqttBinary::from_slice(b"pass").unwrap());
 
     client.connect(
         transport,
@@ -86,15 +87,17 @@ async fn main() {
         Some(MqttString::from_str("rust-mqtt-demo").unwrap()),
     ).await.unwrap();
 
-    let topic = TopicName::new(MqttString::from_str("demo/topic").unwrap()).unwrap();
+    let topic = MqttString::from_str("demo/topic").unwrap();
 
     client.subscribe(
-        topic.as_borrowed().into(),
-        SubscriptionOptions::new().exactly_once(),
+        TopicFilter::new(topic.as_borrowed()).unwrap(),
+        &SubscriptionOptions::new().exactly_once(),
     ).await.unwrap();
 
+    let topic_reference = TopicReference::Name(TopicName::new(topic).unwrap());
+
     let packet_identifier = client.publish(
-        &PublicationOptions::new(topic.as_borrowed().into()).exactly_once(),
+        &PublicationOptions::new(topic_reference.as_borrowed()).exactly_once(),
         "Hello World!".into(),
     ).await.unwrap().unwrap();
 
@@ -124,7 +127,7 @@ async fn main() {
         // - Republish if PUBLISH / PUBREC may have been lost
         Some(CPublishFlightState::AwaitingPubrec) => client.republish(
             packet_identifier,
-            &PublicationOptions::new(topic.into()).exactly_once(),
+            &PublicationOptions::new(topic_reference).exactly_once(),
             "Hello World!".into(),
         ).await.unwrap(),
         // - Re-release if PUBREL / PUBCOMP may have been lost

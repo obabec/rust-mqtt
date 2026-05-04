@@ -4,7 +4,7 @@ use crate::types::{MqttStringPair, QoS, VarByteInt};
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Options<'s> {
-    /// Serverside retain handling configuration for this subscription.
+    /// Server-side retain handling configuration for this subscription.
     pub retain_handling: RetainHandling,
 
     /// If set to true, the server sets the retain flag of a PUBLISH packet matching
@@ -20,19 +20,27 @@ pub struct Options<'s> {
     /// If set to true on a shared subscription, a protocol error is triggered.
     pub no_local: bool,
 
-    /// The maximum quality of service that the server can forward publications
-    /// matching this subscription with to the client. A quality of service level
+    /// The maximum quality of service that the server is allowed to forward publications
+    /// at matching this subscription with to the client. A quality of service level
     /// lower than this can be granted by the server.
     pub qos: QoS,
 
     /// The subscription identifier of the subscription. The server will set
     /// subscription identifier properties in its PUBLISH packets to the values of
     /// all matching subscriptions with a subscription identifier.
+    ///
+    /// Must be [`None`] when the server does not support retain (can be checked via
+    /// [`Client::server_config`]). The client will not subscribe if a violation occurs
+    /// but prevent the protocol error and return an error.
+    ///
+    /// [`Client::server_config`]: crate::client::Client::server_config
     pub subscription_identifier: Option<VarByteInt>,
 
-    /// Arbitrary key-value pairs of strings sent as the user property entries of the SUBSCRIBE packet.
-    /// Note that this slice's length must be less than [`crate::client::Client`]'s const generic
-    /// parameter `MAX_USER_PROPERTIES`.
+    /// Arbitrary key-value pairs of strings sent as the user property entries of the
+    /// SUBSCRIBE packet. Note that this slice's length must be less than [`Client`]'s
+    /// const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     pub user_properties: &'s [MqttStringPair<'s>],
 }
 
@@ -63,17 +71,17 @@ impl<'s> Options<'s> {
         self.qos = qos;
         self
     }
-    /// Sets the Quality of Service level to 1 (At Least Once).
+    /// Sets the Quality of Service level to 1 ([`QoS::AtLeastOnce`]).
     #[must_use]
     pub const fn at_least_once(self) -> Self {
         self.qos(QoS::AtLeastOnce)
     }
-    /// Sets the Quality of Service level to 2 (Exactly Once).
+    /// Sets the Quality of Service level to 2 ([`QoS::ExactlyOnce`]).
     #[must_use]
     pub const fn exactly_once(self) -> Self {
         self.qos(QoS::ExactlyOnce)
     }
-    /// Sets the serverside retain handling configuration for this subscription.
+    /// Sets the server-side retain handling configuration for this subscription.
     #[must_use]
     pub const fn retain_handling(mut self, retain_handling: RetainHandling) -> Self {
         self.retain_handling = retain_handling;
@@ -92,13 +100,17 @@ impl<'s> Options<'s> {
         self
     }
     /// Sets the subscription identifier property.
+    ///
+    /// Note that this is only allowed if the server supports subscription identifiers.
     #[must_use]
     pub const fn subscription_identifier(mut self, subscription_identifier: VarByteInt) -> Self {
         self.subscription_identifier = Some(subscription_identifier);
         self
     }
-    /// Sets the user properties. Note that this slice's length must be less than
-    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    /// Sets the user properties. Note that this slice's length must be less than [`Client`]'s
+    /// const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     #[must_use]
     pub const fn user_properties(mut self, user_properties: &'s [MqttStringPair<'s>]) -> Self {
         self.user_properties = user_properties;
@@ -106,7 +118,7 @@ impl<'s> Options<'s> {
     }
 }
 
-/// Serverside retain handling configuration for a subscription.
+/// Server-side retain handling configuration for a subscription.
 #[derive(Debug, Clone, Copy, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RetainHandling {

@@ -52,7 +52,9 @@ pub struct Options<'c> {
     pub correlation_data: Option<MqttBinary<'c>>,
 
     /// The user properties in the will publication. Note that this slice's length must be less than
-    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    /// [`Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     pub user_properties: &'c [MqttStringPair<'c>],
 
     /// The payload of the will publication.
@@ -85,12 +87,12 @@ impl<'c> Options<'c> {
         self.will_qos = qos;
         self
     }
-    /// Sets the Quality of Service level to 1 (At Least Once).
+    /// Sets the Quality of Service level to 1 ([`QoS::AtLeastOnce`]).
     #[must_use]
     pub const fn at_least_once(self) -> Self {
         self.qos(QoS::AtLeastOnce)
     }
-    /// Sets the Quality of Service level to 2 (Exactly Once).
+    /// Sets the Quality of Service level to 2 ([`QoS::ExactlyOnce`]).
     #[must_use]
     pub const fn exactly_once(self) -> Self {
         self.qos(QoS::ExactlyOnce)
@@ -141,8 +143,10 @@ impl<'c> Options<'c> {
         self.correlation_data = Some(correlation_data);
         self
     }
-    /// Sets the user properties. Note that this slice's length must be less than
-    /// [`crate::client::Client`]'s const generic parameter `MAX_USER_PROPERTIES`.
+    /// Sets the user properties. Note that this slice's length must be less than [`Client`]'s
+    /// const generic parameter `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Client`]: crate::client::Client
     #[must_use]
     pub const fn user_properties(mut self, user_properties: &'c [MqttStringPair<'c>]) -> Self {
         self.user_properties = user_properties;
