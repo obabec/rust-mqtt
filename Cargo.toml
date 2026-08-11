@@ -75,4 +75,7 @@ log-verbose = ["log-level-trace"]
 name = "demo"
 
 [[example]]
+name = "manual_ack"
+
+[[example]]
 name = "tls"
