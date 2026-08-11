@@ -3,9 +3,12 @@ use std::time::Duration;
 use rust_mqtt::{
     client::{
         Client,
-        options::{PublicationOptions, RetainHandling, TopicReference},
+        options::{
+            PublicationOptions, RetainHandling, SubscriptionOptions, TopicReference,
+            UnsubscriptionOptions,
+        },
     },
-    types::{MqttString, VarByteInt},
+    types::{MqttString, MqttStringPair, VarByteInt},
 };
 use tokio::time::{sleep, timeout};
 use tokio_test::assert_err;
@@ -329,4 +332,96 @@ async fn subscription_identifier() {
 
     disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
     disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn sub_user_properties() {
+    let user_properties: [_; 16] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let mut c =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    assert_ok!(
+        c.subscribe(
+            unique_topic().1,
+            &SubscriptionOptions::new().user_properties(&user_properties),
+        )
+        .await
+    );
+
+    disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
+}
+
+#[should_panic]
+#[tokio::test]
+#[test_log::test]
+async fn sub_too_many_user_properties() {
+    let user_properties: [_; 17] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let mut c =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let _ = c
+        .subscribe(
+            unique_topic().1,
+            &SubscriptionOptions::new().user_properties(&user_properties),
+        )
+        .await;
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn unsub_user_properties() {
+    let user_properties: [_; 16] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let mut c =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    assert_ok!(
+        c.unsubscribe(
+            unique_topic().1,
+            &UnsubscriptionOptions::new().user_properties(&user_properties),
+        )
+        .await
+    );
+
+    disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
+}
+
+#[should_panic]
+#[tokio::test]
+#[test_log::test]
+async fn unsub_too_many_user_properties() {
+    let user_properties: [_; 17] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let mut c =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let _ = c
+        .unsubscribe(
+            unique_topic().1,
+            &UnsubscriptionOptions::new().user_properties(&user_properties),
+        )
+        .await;
 }

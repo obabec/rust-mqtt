@@ -335,6 +335,79 @@ async fn properties() {
 
 #[tokio::test]
 #[test_log::test]
+async fn max_user_properties() {
+    let (will_topic_name, will_topic_filter) = unique_topic();
+
+    let will_msg = "I want to die peacefully in my sleep, just like my grandfather. Not screaming in terror like the passengers in his car.";
+    let will_user_properties: [_; 16] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let will = WillOptions::new(
+        will_topic_name.clone(),
+        MqttBinary::from_slice(will_msg.as_bytes()).unwrap(),
+    )
+    .user_properties(&will_user_properties);
+
+    let will_connect_options = NO_SESSION_CONNECT_OPTIONS.clone().will(will);
+
+    let mut tx = assert_ok!(connected_client(BROKER_ADDRESS, &will_connect_options, None).await);
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        sleep(Duration::from_secs(1)).await;
+        assert_ok!(tx.disconnect(DEFAULT_DC_OPTIONS).await);
+    };
+
+    let receiver = async {
+        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, will_topic_filter);
+
+        let Publish {
+            message,
+            user_properties,
+            ..
+        } = assert_recv_excl!(rx, will_topic_name);
+
+        assert_eq!(&*message, will_msg.as_bytes());
+        assert_eq!(user_properties.as_slice(), will_user_properties);
+
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+#[should_panic]
+#[tokio::test]
+#[test_log::test]
+async fn too_many_user_properties() {
+    let (will_topic_name, _) = unique_topic();
+
+    let will_msg = "I’m spending my children’s inheritance one test case at a time.";
+    let will_user_properties: [_; 17] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let will = WillOptions::new(
+        will_topic_name.clone(),
+        MqttBinary::from_slice(will_msg.as_bytes()).unwrap(),
+    )
+    .user_properties(&will_user_properties);
+
+    let will_connect_options = NO_SESSION_CONNECT_OPTIONS.clone().will(will);
+
+    let _ = connected_client(BROKER_ADDRESS, &will_connect_options, None).await;
+}
+
+#[tokio::test]
+#[test_log::test]
 async fn qos0() {
     let (will_topic_name, will_topic_filter) = unique_topic();
 

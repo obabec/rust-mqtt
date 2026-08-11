@@ -60,8 +60,9 @@ async fn session_continue_regular_disconnect() {
 
     assert!(info.session_present);
 
-    let dc_options =
-        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options = DEFAULT_DC_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 }
 
@@ -115,8 +116,9 @@ async fn session_continue_connection_dropped() {
     ));
     assert!(info.session_present);
 
-    let dc_options =
-        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options = DEFAULT_DC_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 }
 
@@ -153,8 +155,9 @@ async fn session_discontinued_clean_start() {
     ));
     assert!(!info.session_present);
 
-    let dc_options =
-        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options = DEFAULT_DC_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 }
 
@@ -200,8 +203,9 @@ async fn session_expired() {
     ));
     assert!(!info.session_present);
 
-    let dc_options =
-        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options = DEFAULT_DC_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 }
 
@@ -218,7 +222,7 @@ async fn session_shortened_and_expired() {
         connected_client(BROKER_ADDRESS, &connect_options, Some(id.as_borrowed())).await
     );
 
-    let mut dc_options = *DEFAULT_DC_OPTIONS;
+    let mut dc_options = DEFAULT_DC_OPTIONS.clone();
     dc_options.session_expiry_interval = Some(SessionExpiryInterval::Seconds(3));
     disconnect(&mut c, &dc_options).await;
 
@@ -238,8 +242,9 @@ async fn session_shortened_and_expired() {
     );
     assert!(!info.session_present);
 
-    let dc_options =
-        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options = DEFAULT_DC_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 
     // Session ends right away, try to continue it directly
@@ -252,7 +257,8 @@ async fn session_shortened_and_expired() {
     );
     assert!(!info.session_present);
 
-    let dc_options =
-        DEFAULT_DC_OPTIONS.session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
+    let dc_options = DEFAULT_DC_OPTIONS
+        .clone()
+        .session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
     disconnect(&mut c, &dc_options).await;
 }

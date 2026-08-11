@@ -8,7 +8,7 @@ use rust_mqtt::{
         options::{PublicationOptions, SubscriptionOptions, TopicReference, WillOptions},
     },
     config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
-    types::{MqttBinary, MqttString, ReasonCode, TopicFilter, TopicName},
+    types::{MqttBinary, MqttString, MqttStringPair, ReasonCode, TopicFilter, TopicName},
 };
 use tokio::{
     join,
@@ -854,4 +854,40 @@ async fn server_receive_maximum_exceeded() {
         }
     }
     assert_ok!(c.disconnect(DEFAULT_DC_OPTIONS).await);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn user_properties() {
+    let user_properties: [_; 16] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .user_properties(&user_properties);
+
+    let mut c = assert_ok!(connected_client(BROKER_ADDRESS, &connect_options, None).await);
+    disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
+}
+
+#[should_panic]
+#[tokio::test]
+#[test_log::test]
+async fn too_many_user_properties() {
+    let user_properties: [_; 17] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .user_properties(&user_properties);
+
+    let _ = connected_client(BROKER_ADDRESS, &connect_options, None).await;
 }
