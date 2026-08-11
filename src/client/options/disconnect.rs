@@ -1,7 +1,12 @@
-use crate::{config::SessionExpiryInterval, types::MqttStringPair};
+use const_fn::const_fn;
+
+use crate::{
+    config::SessionExpiryInterval,
+    types::{MqttString, MqttStringPair},
+};
 
 /// Options for a disconnection to the server with a DISCONNECT packet.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Options<'d> {
     /// If set to true, the client uses [`ReasonCode::DisconnectWithWillMessage`] in the
@@ -20,6 +25,9 @@ pub struct Options<'d> {
     ///
     /// [`Client::client_config`]: crate::client::Client::client_config
     pub session_expiry_interval: Option<SessionExpiryInterval>,
+
+    /// The reason string property of the DISCONNECT packet.
+    pub reason_string: Option<MqttString<'d>>,
 
     /// Arbitrary key-value pairs of strings sent as the user property entries of the DISCONNECT
     /// packet. Note that this slice's length must be less than [`Client`]'s const generic parameter
@@ -42,6 +50,7 @@ impl<'d> Options<'d> {
         Self {
             publish_will: false,
             session_expiry_interval: None,
+            reason_string: None,
             user_properties: &[],
         }
     }
@@ -56,6 +65,13 @@ impl<'d> Options<'d> {
     #[must_use]
     pub const fn session_expiry_interval(mut self, interval: SessionExpiryInterval) -> Self {
         self.session_expiry_interval = Some(interval);
+        self
+    }
+    /// Sets the reason string property.
+    #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
+    pub const fn reason_string(mut self, reason_string: MqttString<'d>) -> Self {
+        self.reason_string = Some(reason_string);
         self
     }
     /// Sets the user properties. Note that this slice's length must be less than [`Client`]'s

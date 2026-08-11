@@ -1604,8 +1604,14 @@ impl<
             ReasonCode::Success
         };
 
-        let mut packet = DisconnectPacket::<MAX_USER_PROPERTIES>::new(
+        let packet = DisconnectPacket::<MAX_USER_PROPERTIES>::new(
             reason_code,
+            options.session_expiry_interval,
+            options
+                .reason_string
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
             options
                 .user_properties
                 .iter()
@@ -1613,9 +1619,6 @@ impl<
                 .map(Into::into)
                 .collect(),
         );
-        if let Some(s) = options.session_expiry_interval {
-            packet.add_session_expiry_interval(s);
-        }
 
         debug!("sending DISCONNECT packet");
 

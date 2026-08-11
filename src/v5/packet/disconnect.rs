@@ -1,7 +1,5 @@
 use heapless::Vec;
 
-#[cfg(test)]
-use crate::types::MqttString;
 use crate::{
     buffer::BufferProvider,
     config::SessionExpiryInterval,
@@ -201,24 +199,17 @@ impl<const MAX_USER_PROPERTIES: usize> TxPacket for DisconnectPacket<'_, MAX_USE
 impl<'p, const MAX_USER_PROPERTIES: usize> DisconnectPacket<'p, MAX_USER_PROPERTIES> {
     pub const fn new(
         reason_code: ReasonCode,
+        session_expiry_interval: Option<SessionExpiryInterval>,
+        reason_string: Option<ReasonString<'p>>,
         user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
     ) -> Self {
         Self {
             reason_code,
-            session_expiry_interval: None,
-            reason_string: None,
+            session_expiry_interval,
+            reason_string,
             user_properties,
             server_reference: None,
         }
-    }
-
-    pub fn add_session_expiry_interval(&mut self, session_expiry_interval: SessionExpiryInterval) {
-        self.session_expiry_interval = Some(session_expiry_interval);
-    }
-
-    #[cfg(test)]
-    pub fn add_reason_string(&mut self, reason_string: MqttString<'p>) {
-        self.reason_string = Some(reason_string.into());
     }
 
     fn properties_length(&self) -> VarByteInt {
@@ -259,7 +250,8 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_simple() {
-        let packet = DisconnectPacket::<16>::new(ReasonCode::MaximumConnectTime, Vec::new());
+        let packet =
+            DisconnectPacket::<16>::new(ReasonCode::MaximumConnectTime, None, None, Vec::new());
 
         #[rustfmt::skip]
         encode!(packet, [
@@ -273,8 +265,10 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_properties() {
-        let mut packet = DisconnectPacket::<16>::new(
+        let packet = DisconnectPacket::<16>::new(
             ReasonCode::MaximumConnectTime,
+            Some(SessionExpiryInterval::Seconds(23089475)),
+            Some(MqttString::try_from("Accroitre Momentum").unwrap().into()),
             [
                 UserProperty(MqttStringPair::new(
                     MqttString::from_str("status").unwrap(),
@@ -287,8 +281,6 @@ mod unit {
             ]
             .into(),
         );
-        packet.add_session_expiry_interval(SessionExpiryInterval::Seconds(23089475));
-        packet.add_reason_string(MqttString::try_from("Accroitre Momentum").unwrap());
 
         #[rustfmt::skip]
         encode!(packet, [
@@ -296,21 +288,21 @@ mod unit {
                 0x48, // remaining length
                 0xA0, // reason code
                 0x46, // property length
-                
+
                 // Session Expiry Interval
-                0x11, 0x01, 0x60, 0x51, 0x43, 
-                
+                0x11, 0x01, 0x60, 0x51, 0x43,
+
                 // Reason String
                 0x1F, 0x00, 0x12, b'A', b'c', b'c', b'r', b'o', b'i', b't', b'r', b'e', b' ', b'M',
                 b'o', b'm', b'e', b'n', b't', b'u', b'm',
 
                 0x26,       // User property
-                0x00, 0x06, b's', b't', b'a', b't', b'u', b's', 
+                0x00, 0x06, b's', b't', b'a', b't', b'u', b's',
                 0x00, 0x04, b'd', b'e', b'a', b'd',
 
                 0x26,       // User property
-                0x00, 0x05, b'c', b'a', b'u', b's', b'e', 
-                0x00, 0x13, b't', b'r', b'i', b'p', b'p', b'e', b'd', b' ', b'o', b'n', b' ', b't', b'h', b'e', b' ', b'w', b'i', b'f', b'i', 
+                0x00, 0x05, b'c', b'a', b'u', b's', b'e',
+                0x00, 0x13, b't', b'r', b'i', b'p', b'p', b'e', b'd', b' ', b'o', b'n', b' ', b't', b'h', b'e', b' ', b'w', b'i', b'f', b'i',
             ]
         );
     }
@@ -318,8 +310,12 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_zero_session_expiry_interval() {
-        let mut packet = DisconnectPacket::<16>::new(ReasonCode::MaximumConnectTime, Vec::new());
-        packet.add_session_expiry_interval(SessionExpiryInterval::EndOnDisconnect);
+        let packet = DisconnectPacket::<16>::new(
+            ReasonCode::MaximumConnectTime,
+            Some(SessionExpiryInterval::EndOnDisconnect),
+            None,
+            Vec::new(),
+        );
 
         #[rustfmt::skip]
         encode!(packet, [
