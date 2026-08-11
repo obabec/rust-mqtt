@@ -9,7 +9,7 @@ use heapless::Vec;
 use crate::{
     buffer::BufferProvider,
     eio::{Read, Write},
-    fmt::{trace, verbose},
+    fmt::{const_assert, trace, verbose},
     header::{FixedHeader, PacketType},
     io::{
         read::{BodyReader, Readable},
@@ -196,6 +196,10 @@ impl<'p, T: PubackPacketType, const MAX_USER_PROPERTIES: usize>
         reason_string: Option<ReasonString<'p>>,
         user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
     ) -> Self {
+        const {
+            const_assert!(MAX_USER_PROPERTIES <= 2047);
+        }
+
         Self {
             packet_identifier,
             reason_code,

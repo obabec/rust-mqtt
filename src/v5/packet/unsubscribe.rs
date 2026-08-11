@@ -68,7 +68,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize, const MAX_USER_PROPERTIES: usize>
             topic_filters,
         };
 
-        // Reference to `UnsubscribePacket::remaining_len_raw` as to why this is true.
+        // Refer to `UnsubscribePacket::remaining_len_raw` as to why this is true.
         if MAX_USER_PROPERTIES <= 1021 && MAX_TOPIC_FILTERS <= 2053 {
             Ok(p)
         } else {
@@ -229,7 +229,7 @@ mod unit {
                 // Payload
                 0x00, 0x2B, b'h', b't', b't', b'p', b's', b':', b'/', b'/', b'w', b'w', b'w', b'.', b'y',
                 b'o', b'u', b't', b'u', b'b', b'e', b'.', b'c', b'o', b'm', b'/', b'w', b'a', b't', b'c',
-                b'h', b'?', b'v', b'=', b'd', b'Q', b'w', b'4', b'w', b'9', b'W', b'g', b'X', b'c', b'Q', 
+                b'h', b'?', b'v', b'=', b'd', b'Q', b'w', b'4', b'w', b'9', b'W', b'g', b'X', b'c', b'Q',
             ]
         );
     }

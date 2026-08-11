@@ -4,7 +4,7 @@ use crate::{
     buffer::BufferProvider,
     config::SessionExpiryInterval,
     eio::{Read, Write},
-    fmt::{trace, verbose},
+    fmt::{const_assert, trace, verbose},
     header::{FixedHeader, PacketType},
     io::{
         read::{BodyReader, Readable},
@@ -203,6 +203,10 @@ impl<'p, const MAX_USER_PROPERTIES: usize> DisconnectPacket<'p, MAX_USER_PROPERT
         reason_string: Option<ReasonString<'p>>,
         user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
     ) -> Self {
+        const {
+            const_assert!(MAX_USER_PROPERTIES <= 2046);
+        }
+
         Self {
             reason_code,
             session_expiry_interval,

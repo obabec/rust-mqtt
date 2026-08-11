@@ -5,6 +5,7 @@ use heapless::Vec;
 use crate::{
     config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
     eio::Write,
+    fmt::const_assert,
     header::{FixedHeader, PacketType},
     io::write::{Writable, wlen},
     packet::{Packet, TxError, TxPacket},
@@ -139,6 +140,10 @@ impl<'p, const MAX_USER_PROPERTIES: usize> ConnectPacket<'p, MAX_USER_PROPERTIES
         request_problem_information: bool,
         user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
     ) -> Self {
+        const {
+            const_assert!(MAX_USER_PROPERTIES <= 1021);
+        }
+
         Self {
             will_retain: false,
             will_qos: QoS::AtMostOnce,
@@ -336,13 +341,13 @@ mod unit {
             0x00,
 
             0x26,       // User property
-            0x00, 0x08, b't', b'r', b'i', b'p', b'l', b'e', b' ', b'1', 
+            0x00, 0x08, b't', b'r', b'i', b'p', b'l', b'e', b' ', b'1',
             0x00, 0x04, b't', b'i', b'c', b'k',
             0x26,       // User property
-            0x00, 0x08, b't', b'r', b'i', b'p', b'l', b'e', b' ', b'2', 
+            0x00, 0x08, b't', b'r', b'i', b'p', b'l', b'e', b' ', b'2',
             0x00, 0x05, b't', b'r', b'i', b'c', b'k',
             0x26,       // User property
-            0x00, 0x08, b't', b'r', b'i', b'p', b'l', b'e', b' ', b'3', 
+            0x00, 0x08, b't', b'r', b'i', b'p', b'l', b'e', b' ', b'3',
             0x00, 0x05, b't', b'r', b'a', b'c', b'k',
 
             0x00,       // Client identifier len MSB
@@ -505,7 +510,7 @@ mod unit {
                 b'a',       //
                 b'n',       //
                 b'z',       // Username
-                
+
                 0x00,       // Password len MSB
                 0x09,       // Password len LSB
                 b's',       // Password

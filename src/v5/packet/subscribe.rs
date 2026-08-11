@@ -69,7 +69,7 @@ impl<'p, const MAX_TOPIC_FILTERS: usize, const MAX_USER_PROPERTIES: usize>
             subscribe_filters,
         };
 
-        // Reference to `SubscribePacket::remaining_len_raw` as to why this is true.
+        // Refer to `SubscribePacket::remaining_len_raw` as to why this is true.
         if MAX_USER_PROPERTIES <= 1021 && MAX_TOPIC_FILTERS <= 2053 {
             Ok(p)
         } else {
@@ -258,7 +258,7 @@ mod unit {
                 0x26,
                 0x00, 0x05, b'c', b'h', b'a', b'o', b's',
                 0x00, 0x07, b'm', b'a', b'x', b'i', b'm', b'u', b'm',
-                
+
                 // Payload - Topic Filter
                 0x00, 0x07, b'a', b'b', b'c', b'/', b'+', b'/', b'y', 0x18,
             ]
