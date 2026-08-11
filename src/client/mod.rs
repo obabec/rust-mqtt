@@ -1220,12 +1220,24 @@ impl<
     ///   the server has not resent the PUBLISH in this network connection.
     /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in
     ///   an incoming publication in the client's session
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`AckOptions`] is
+    /// greater than `MAX_USER_PROPERTIES`.
     pub async fn manual_acknowledge(
         &mut self,
         packet_identifier: PacketIdentifier,
         reason_code: ReasonCode,
         options: &AckOptions<'_>,
     ) -> Result<(), MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "attempted to send PUBACK with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         // Not allowed:
         // ReasonCode::NoMatchingSubscribers - only sent by the server
         if !matches!(
@@ -1300,12 +1312,24 @@ impl<
     ///     connection
     /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in
     ///   an incoming publication in the client's session
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`AckOptions`] is
+    /// greater than `MAX_USER_PROPERTIES`.
     pub async fn manual_receive(
         &mut self,
         packet_identifier: PacketIdentifier,
         reason_code: ReasonCode,
         options: &AckOptions<'_>,
     ) -> Result<(), MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "attempted to send PUBREC with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
         // Not allowed:
         // ReasonCode::NoMatchingSubscribers - only sent by the server
         if !matches!(
@@ -1376,12 +1400,24 @@ impl<
     ///   * if a PUBREL has already been sent for this packet identifier in this network connection
     /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in
     ///   an incoming publication in the client's session
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`AckOptions`] is
+    /// greater than `MAX_USER_PROPERTIES`.
     pub async fn manual_release(
         &mut self,
         packet_identifier: PacketIdentifier,
         options: &AckOptions<'_>,
     ) -> Result<(), MqttError<'c, 0>> {
         const REASON_CODE: ReasonCode = ReasonCode::Success;
+
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "attempted to send PUBREL with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
 
         self.session
             .outbound_pubrel(packet_identifier)
@@ -1436,12 +1472,24 @@ impl<
     ///   the server for this packet identifier in this network connection
     /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in
     ///   an incoming publication in the client's session
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`AckOptions`] is
+    /// greater than `MAX_USER_PROPERTIES`.
     pub async fn manual_complete(
         &mut self,
         packet_identifier: PacketIdentifier,
         options: &AckOptions<'_>,
     ) -> Result<(), MqttError<'c, 0>> {
         const REASON_CODE: ReasonCode = ReasonCode::Success;
+
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "attempted to send PUBCOMP with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
 
         self.session
             .outbound_pubcomp(packet_identifier)
