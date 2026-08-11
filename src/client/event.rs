@@ -216,8 +216,10 @@ pub struct Suback<'s, const MAX_USER_PROPERTIES: usize> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PROPERTIES: usize>
 {
-    /// The acknowledgement mode the client has determined with its given function to use for this
-    /// publication flow.
+    /// The acknowledgement mode the client has determined with its given predicate to use for this
+    /// publication flow. If this is the content of an [`Event::Duplicate`], this value is not the
+    /// one determined for this PUBLISH packet through the predicate but the value of the original
+    /// [`Event::Publish`] event.
     pub ack_mode: AckMode,
 
     /// The DUP flag in the PUBLISH packet. If set to false, it indicates that this is the first occasion
