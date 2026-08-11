@@ -1604,7 +1604,7 @@ impl<
             ReasonCode::Success
         };
 
-        let mut packet = DisconnectPacket::<0>::new(
+        let mut packet = DisconnectPacket::<MAX_USER_PROPERTIES>::new(
             reason_code,
             options
                 .user_properties
