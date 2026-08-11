@@ -1,5 +1,5 @@
 #[cfg(feature = "alloc")]
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
 use core::{borrow::Borrow, ops::Deref};
 
 /// Contiguous bytes in memory. Is either a [`u8`] slice or (with crate feature "alloc") an owned
@@ -147,6 +147,12 @@ impl<'a> From<&'a str> for Bytes<'a> {
 impl From<Box<[u8]>> for Bytes<'_> {
     fn from(value: Box<[u8]>) -> Self {
         Self::Owned(value)
+    }
+}
+#[cfg(feature = "alloc")]
+impl From<Vec<u8>> for Bytes<'_> {
+    fn from(value: Vec<u8>) -> Self {
+        Self::Owned(value.into_boxed_slice())
     }
 }
 

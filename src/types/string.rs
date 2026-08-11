@@ -1,3 +1,5 @@
+#[cfg(feature = "alloc")]
+use alloc::{boxed::Box, string::String, vec::Vec};
 use core::str::{Utf8Error, from_utf8, from_utf8_unchecked};
 
 use const_fn::const_fn;
@@ -80,6 +82,18 @@ impl From<TooLargeToEncode> for MqttStringError {
 /// let s = unsafe { MqttString::from_utf8_binary_unchecked(b) };
 /// assert_eq!(s.as_str(), slice);
 ///
+/// let from_string = MqttString::try_from("abc".to_string())?;
+/// assert_eq!(from_string.as_str(), "abc");
+///
+/// let from_vec = MqttString::try_from(vec![b'd', b'e', b'f'])?;
+/// assert_eq!(from_vec.as_str(), "def");
+///
+/// let from_boxed_str = MqttString::try_from(Box::<str>::from("ghi"))?;
+/// assert_eq!(from_boxed_str.as_str(), "ghi");
+///
+/// let from_boxed_byte_slice = MqttString::try_from(vec![b'j', b'k', b'l'].into_boxed_slice())?;
+/// assert_eq!(from_boxed_byte_slice.as_str(), "jkl");
+///
 /// # Ok::<(), MqttStringError>(())
 /// ```
 #[derive(Default, Clone, PartialEq, Eq)]
@@ -110,6 +124,48 @@ impl<'s> TryFrom<&'s str> for MqttString<'s> {
 
     fn try_from(value: &'s str) -> Result<Self, Self::Error> {
         Self::from_str(value)
+    }
+}
+#[cfg(feature = "alloc")]
+impl TryFrom<String> for MqttString<'_> {
+    type Error = MqttStringError;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        MqttBinary::try_from(value.into_bytes())
+            .map_err(|_| MqttStringError::TooLargeToEncode)
+            .and_then(|b| {
+                (!b.as_bytes().contains(&0))
+                    // Safety: String contains valid UTF-8
+                    // Invariants: we checked for null characters
+                    .then(|| unsafe { MqttString::from_utf8_binary_unchecked(b) })
+                    .ok_or(MqttStringError::NullCharacter)
+            })
+    }
+}
+#[cfg(feature = "alloc")]
+impl TryFrom<Vec<u8>> for MqttString<'_> {
+    type Error = MqttStringError;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        String::try_from(value)
+            .map_err(|e| MqttStringError::Utf8Error(e.utf8_error()))
+            .and_then(Self::try_from)
+    }
+}
+#[cfg(feature = "alloc")]
+impl TryFrom<Box<str>> for MqttString<'_> {
+    type Error = MqttStringError;
+
+    fn try_from(value: Box<str>) -> Result<Self, Self::Error> {
+        Self::try_from(value.into_string())
+    }
+}
+#[cfg(feature = "alloc")]
+impl TryFrom<Box<[u8]>> for MqttString<'_> {
+    type Error = MqttStringError;
+
+    fn try_from(value: Box<[u8]>) -> Result<Self, Self::Error> {
+        Self::try_from(value.into_vec())
     }
 }
 
