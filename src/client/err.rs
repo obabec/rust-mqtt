@@ -1,3 +1,5 @@
+use core::matches;
+
 use heapless::Vec;
 
 use crate::{
@@ -88,22 +90,81 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// [`Client::abort`]: crate::client::Client::abort
     RecoveryRequired,
 
-    /// A republish of a packet without an in flight entry was attempted.
+    /// A republish or an acknowledgement has been attempted for a packet identifier without an
+    /// in flight entry in the session state.
     ///
     /// Recoverable error. No action has been taken by the client.
     PacketIdentifierNotInFlight,
 
-    /// A republish of a packet with a quality of service that does not match the quality of
-    /// service of the original publication was attempted.
+    /// The requested operation requires a free, unused packet identifier which is not available
+    /// at the time of the request. The operation may be retried after an indication of a freed
+    /// packet identifier such as:
+    /// - A completed or aborted outgoing [`QoS::AtLeastOnce`] or [`QoS::ExactlyOnce`]
+    ///   publication flow
+    /// - A completed or due to disconnection aborted SUBACK / UNSUBACK handshake.
     ///
     /// Recoverable error. No action has been taken by the client.
-    RepublishQoSNotMatching,
+    ///
+    /// [`QoS::AtLeastOnce`]: crate::types::QoS::AtLeastOnce
+    /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
+    AllPacketIdentifiersUsed,
 
-    /// A republish of a packet whose corresponding PUBREL packet has already been sent was attempted.
-    /// Sending the PUBLISH packet in this case would result in a protocol violation.
+    /// [`AckMode::Manual`] is not applicable for outgoing [`QoS::AtMostOnce`] or [`QoS::AtLeastOnce`]
+    /// because there are no acknowledgements sent by the client. The same operation will not fail with
+    /// this error if requested with [`AckMode::Automatic`].
     ///
     /// Recoverable error. No action has been taken by the client.
-    PacketIdentifierAwaitingPubcomp,
+    ///
+    /// [`AckMode::Manual`]: crate::client::options::AckMode::Manual
+    /// [`AckMode::Automatic`]: crate::client::options::AckMode::Automatic
+    /// [`QoS::AtMostOnce`]: crate::types::QoS::AtMostOnce
+    /// [`QoS::AtLeastOnce`]: crate::types::QoS::AtLeastOnce
+    ManualAckNotAllowed,
+
+    /// The requested operation of a publication flow is not allowed for this packet identifier because
+    /// it uses a different quality of service. This applies in the following cases:
+    /// - A republish of a packet with a quality of service that does not match the quality of service
+    ///   of the original publication was attempted.
+    /// - A manual PUBACK, PUBREC, PUBREL or PUBCOMP was attempted that does not match the quality of
+    ///   service of the original publication.
+    ///
+    /// Recoverable error. No action has been taken by the client.
+    QoSMismatched,
+
+    /// The requested operation of a publication flow is not allowed at this stage of its quality of
+    /// service specific handshake and would result in a protocol violation if carried out. For the exact
+    /// rules of manual acknowledgements, refer to TODO. An exemplary list of cases (potentially missing
+    /// some) when this applies is as follows:
+    /// - Automatic acknowledgements:
+    ///   - A republish of a packet whose corresponding PUBREL packet has already been sent was
+    ///     attempted.
+    ///   - A republish of a packet is attempted despite there being no disconnection/reconnection
+    ///     between the last transmission of the PUBLISH packet.
+    /// - Manual acknowledgements:
+    ///   - The cases that are true for automatic acknowledgements.
+    ///   - A manual PUBACK was attempted after a reconnection, before having received the retransmitted
+    ///     PUBLISH packet.
+    ///   - A manual PUBREC was attempted after a reconnection, before having received the retransmitted
+    ///     PUBLISH packet.
+    ///   - A manual PUBREC was attempted despite the PUBREC having been sent before (whether that was
+    ///     in automatic or manual mode doesn't matter here) and the is client waiting for the PUBREL.
+    ///   - A manual PUBREC was attempted despite the client already having received a PUBREL and having
+    ///     to send a PUBCOMP as the next step in the handshake.
+    ///   - A manual PUBREL was attempted despite not having received a PUBREC yet.
+    ///   - A manual PUBREL was attempted despite the PUBREL having been sent before in the same network
+    ///     connection.
+    ///   - A manual PUBCOMP was attempted after a reconnection, before having received the
+    ///     (re-)transmitted PUBREL packet.
+    ///   - A manual PUBCOMP was attempted despite not having received a PUBREL yet.
+    ///
+    /// Recoverable error. No action has been taken by the client.
+    HandshakeStateMismatched,
+
+    /// A reason code not allowed for the requested operation was supplied. Refer to the
+    /// documentation of the attempted operation about which reason codes are allowed.
+    ///
+    /// Recoverable error. No action has been taken by the client.
+    IllegalReasonCode,
 
     /// A packet was too long to encode its length with the variable byte integer.
     ///
@@ -184,8 +245,11 @@ impl<const MAX_USER_PROPERTIES: usize> Error<'_, MAX_USER_PROPERTIES> {
         matches!(
             self,
             Self::PacketIdentifierNotInFlight
-                | Self::RepublishQoSNotMatching
-                | Self::PacketIdentifierAwaitingPubcomp
+                | Self::AllPacketIdentifiersUsed
+                | Self::ManualAckNotAllowed
+                | Self::QoSMismatched
+                | Self::HandshakeStateMismatched
+                | Self::IllegalReasonCode
                 | Self::PacketMaximumLengthExceeded
                 | Self::ServerMaximumPacketSizeExceeded
                 | Self::SessionBuffer
@@ -221,8 +285,11 @@ impl<'e> Error<'e, 0> {
             },
             Self::RecoveryRequired => Error::RecoveryRequired,
             Self::PacketIdentifierNotInFlight => Error::PacketIdentifierNotInFlight,
-            Self::RepublishQoSNotMatching => Error::RepublishQoSNotMatching,
-            Self::PacketIdentifierAwaitingPubcomp => Error::PacketIdentifierAwaitingPubcomp,
+            Self::AllPacketIdentifiersUsed => Error::AllPacketIdentifiersUsed,
+            Self::ManualAckNotAllowed => Error::ManualAckNotAllowed,
+            Self::QoSMismatched => Error::QoSMismatched,
+            Self::HandshakeStateMismatched => Error::HandshakeStateMismatched,
+            Self::IllegalReasonCode => Error::IllegalReasonCode,
             Self::PacketMaximumLengthExceeded => Error::PacketMaximumLengthExceeded,
             Self::ServerMaximumPacketSizeExceeded => Error::ServerMaximumPacketSizeExceeded,
             Self::SessionBuffer => Error::SessionBuffer,

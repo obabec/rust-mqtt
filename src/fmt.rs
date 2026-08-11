@@ -55,6 +55,18 @@ macro_rules! debug_assert_eq_ {
 }
 
 #[clippy::format_args]
+macro_rules! assert_ne_ {
+    ($($x:tt)*) => {
+        {
+            #[cfg(not(feature = "defmt"))]
+            ::core::assert_ne!($($x)*);
+            #[cfg(feature = "defmt")]
+            ::defmt::assert_ne!($($x)*);
+        }
+    };
+}
+
+#[clippy::format_args]
 macro_rules! debug_assert_ne_ {
     ($($x:tt)*) => {
         {
@@ -203,6 +215,7 @@ pub(crate) use const_assert_ as const_assert;
 pub(crate) use const_debug_assert_ as const_debug_assert;
 
 pub(crate) use assert_ as assert;
+pub(crate) use assert_ne_ as assert_ne;
 
 pub(crate) use debug_assert_ as debug_assert;
 pub(crate) use debug_assert_eq_ as debug_assert_eq;

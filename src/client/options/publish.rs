@@ -2,12 +2,24 @@ use core::num::NonZero;
 
 use const_fn::const_fn;
 
-use crate::types::{MqttBinary, MqttString, MqttStringPair, QoS, TopicName};
+use crate::{
+    client::AckMode,
+    types::{MqttBinary, MqttString, MqttStringPair, QoS, TopicName},
+};
 
 /// Options for a publication.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Options<'p> {
+    /// In case of [`QoS::ExactlyOnce`], whether the PUBREL acknowledgement
+    /// packet of this flow is sent automatically by the client or must be
+    /// sent manually by the user with [`Client::manual_release`]. In case
+    /// of [`QoS::AtMostOnce`] or [`QoS::AtLeastOnce`] this option has no
+    /// effect.
+    ///
+    /// [`Client::manual_release`]: crate::client::Client::manual_release
+    pub ack_mode: AckMode,
+
     /// The quality of service that the message is published with to the server.
     /// The quality of service level used by the server to send this publication
     /// to subscribed clients is the minimum of this value and the quality of service
@@ -76,6 +88,7 @@ impl<'p> Options<'p> {
     #[must_use]
     pub const fn new(topic: TopicReference<'p>) -> Options<'p> {
         Options {
+            ack_mode: AckMode::Automatic,
             qos: QoS::AtMostOnce,
             retain: false,
             topic,
@@ -88,6 +101,12 @@ impl<'p> Options<'p> {
         }
     }
 
+    /// Sets the acknowledgement mode to manual acknowledgements.
+    #[must_use]
+    pub const fn ack_manually(mut self) -> Self {
+        self.ack_mode = AckMode::Manual;
+        self
+    }
     /// Sets the Quality of Service level.
     ///
     /// Note that this level must be less than or equal to the server's

@@ -23,11 +23,25 @@ use crate::{
 };
 
 /// An MQTT Client offering a low level api for sending and receiving packets
-#[derive(Debug)]
 pub(crate) struct Raw<'b, N: Transport, B: BufferProvider<'b>> {
     n: NetState<N>,
     buf: &'b mut B,
     header: HeaderState,
+}
+
+impl<'b, N: Transport, B: BufferProvider<'b>> core::fmt::Debug for Raw<'b, N, B> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Raw")
+            .field("header", &self.header)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<'b, N: Transport, B: BufferProvider<'b>> defmt::Format for Raw<'b, N, B> {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "Raw {{ header: {:?}, .. }}", self.header);
+    }
 }
 
 impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {

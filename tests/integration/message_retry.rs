@@ -4,10 +4,10 @@ use rust_mqtt::{
     client::{
         Client,
         event::{Event, Puback, Publish, Suback},
-        options::{PublicationOptions, TopicReference},
+        options::{AckMode, PublicationOptions, TopicReference},
     },
     config::SessionExpiryInterval,
-    session::{CPublishFlightState, InFlightPublish},
+    session::LocalPublishState,
     types::{IdentifiedQoS, MqttString, QoS, TopicFilter, TopicName},
 };
 use tokio::{
@@ -80,6 +80,7 @@ async fn outgoing_qos1_retry() {
                 loop {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishAcknowledged(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -168,6 +169,7 @@ async fn outgoing_qos2_retry_publish() {
                 loop {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishComplete(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -234,6 +236,7 @@ async fn outgoing_qos2_retry_pubrel() {
                 loop {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishReceived(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -270,6 +273,7 @@ async fn outgoing_qos2_retry_pubrel() {
                 loop {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishComplete(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -371,6 +375,7 @@ async fn incoming_qos2_retry_pubcomp() {
                 loop {
                     match assert_ok!(rx.poll().await) {
                         Event::PublishReleased(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -450,6 +455,7 @@ async fn outgoing_qos1_write_fail_retry() {
                     // Cannot fail on receiving messages
                     match assert_ok!(tx.poll().await) {
                         Event::PublishAcknowledged(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -464,7 +470,11 @@ async fn outgoing_qos1_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let pid = session.pending_client_publishes.first().copied();
+                let pid = session
+                    .outbound_publishes
+                    .iter()
+                    .next()
+                    .map(|(p, s)| (*p, *s));
 
                 let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
@@ -475,10 +485,7 @@ async fn outgoing_qos1_write_fail_retry() {
                 );
 
                 let pid = match pid {
-                    Some(InFlightPublish {
-                        packet_identifier,
-                        state: _,
-                    }) => {
+                    Some((packet_identifier, _)) => {
                         assert_ok!(
                             tx.republish(
                                 packet_identifier,
@@ -495,6 +502,7 @@ async fn outgoing_qos1_write_fail_retry() {
 
                 match assert_ok!(tx.poll().await) {
                     Event::PublishAcknowledged(Puback {
+                        ack_mode: _,
                         packet_identifier,
                         reason_code: _,
                         reason_string: _,
@@ -567,6 +575,7 @@ async fn outgoing_qos1_read_fail_retry() {
 
                     match tx.poll().await {
                         Ok(Event::PublishAcknowledged(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -585,11 +594,7 @@ async fn outgoing_qos1_read_fail_retry() {
 
                 // Complete publish
 
-                let pid = session
-                    .pending_client_publishes
-                    .first()
-                    .unwrap()
-                    .packet_identifier;
+                let pid = session.outbound_publishes.first().unwrap().0;
 
                 let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
@@ -606,6 +611,7 @@ async fn outgoing_qos1_read_fail_retry() {
 
                 match assert_ok!(tx.poll().await) {
                     Event::PublishAcknowledged(Puback {
+                        ack_mode: _,
                         packet_identifier,
                         reason_code: _,
                         reason_string: _,
@@ -681,6 +687,7 @@ async fn outgoing_qos2_write_fail_retry() {
                     // Can fail because we have to responde with PUBREL
                     match tx.poll().await {
                         Ok(Event::PublishReceived(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -696,6 +703,7 @@ async fn outgoing_qos2_write_fail_retry() {
                     // Cannot fail because PUBCOMP is unanswered
                     match assert_ok!(tx.poll().await) {
                         Event::PublishComplete(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -710,7 +718,11 @@ async fn outgoing_qos2_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let pid = session.pending_client_publishes.first().copied();
+                let pid = session
+                    .outbound_publishes
+                    .iter()
+                    .next()
+                    .map(|(p, s)| (*p, *s));
 
                 let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
@@ -721,10 +733,7 @@ async fn outgoing_qos2_write_fail_retry() {
                 );
 
                 let (pid, wait_for_pubrec) = match pid {
-                    Some(InFlightPublish {
-                        packet_identifier,
-                        state: CPublishFlightState::AwaitingPubrec,
-                    }) => {
+                    Some((packet_identifier, LocalPublishState::AwaitRec(AckMode::Automatic))) => {
                         assert_ok!(
                             tx.republish(
                                 packet_identifier,
@@ -735,10 +744,7 @@ async fn outgoing_qos2_write_fail_retry() {
                         );
                         (packet_identifier, true)
                     }
-                    Some(InFlightPublish {
-                        packet_identifier,
-                        state: CPublishFlightState::AwaitingPubcomp,
-                    }) => {
+                    Some((packet_identifier, LocalPublishState::AwaitComp(AckMode::Automatic))) => {
                         assert_ok!(tx.rerelease().await);
                         (packet_identifier, false)
                     }
@@ -753,6 +759,7 @@ async fn outgoing_qos2_write_fail_retry() {
                 if wait_for_pubrec {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishReceived(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -764,6 +771,7 @@ async fn outgoing_qos2_write_fail_retry() {
 
                 match assert_ok!(tx.poll().await) {
                     Event::PublishComplete(Puback {
+                        ack_mode: _,
                         packet_identifier,
                         reason_code: _,
                         reason_string: _,
@@ -835,6 +843,7 @@ async fn outgoing_qos2_read_fail_retry() {
 
                     match tx.poll().await {
                         Ok(Event::PublishReceived(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -849,6 +858,7 @@ async fn outgoing_qos2_read_fail_retry() {
 
                     match tx.poll().await {
                         Ok(Event::PublishComplete(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -867,7 +877,11 @@ async fn outgoing_qos2_read_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let pid = session.pending_client_publishes.first().copied();
+                let pid = session
+                    .outbound_publishes
+                    .iter()
+                    .next()
+                    .map(|(p, s)| (*p, *s));
 
                 let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
@@ -878,10 +892,7 @@ async fn outgoing_qos2_read_fail_retry() {
                 );
 
                 let (pid, wait_for_pubrec) = match pid {
-                    Some(InFlightPublish {
-                        packet_identifier,
-                        state: CPublishFlightState::AwaitingPubrec,
-                    }) => {
+                    Some((packet_identifier, LocalPublishState::AwaitRec(AckMode::Automatic))) => {
                         assert_ok!(
                             tx.republish(
                                 packet_identifier,
@@ -892,10 +903,7 @@ async fn outgoing_qos2_read_fail_retry() {
                         );
                         (packet_identifier, true)
                     }
-                    Some(InFlightPublish {
-                        packet_identifier,
-                        state: CPublishFlightState::AwaitingPubcomp,
-                    }) => {
+                    Some((packet_identifier, LocalPublishState::AwaitComp(AckMode::Automatic))) => {
                         assert_ok!(tx.rerelease().await);
                         (packet_identifier, false)
                     }
@@ -910,6 +918,7 @@ async fn outgoing_qos2_read_fail_retry() {
                 if wait_for_pubrec {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishReceived(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -921,6 +930,7 @@ async fn outgoing_qos2_read_fail_retry() {
 
                 match assert_ok!(tx.poll().await) {
                     Event::PublishComplete(Puback {
+                        ack_mode: _,
                         packet_identifier,
                         reason_code: _,
                         reason_string: _,
@@ -1277,6 +1287,7 @@ async fn incoming_qos2_write_fail_retry() {
 
                     match rx.poll().await {
                         Ok(Event::PublishReleased(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -1295,10 +1306,7 @@ async fn incoming_qos2_write_fail_retry() {
 
                 // Complete publish using infallible connection
                 // This is only Some(pid) when we haven't received PUBREL yet.
-                let pid = session
-                    .pending_server_publishes
-                    .first()
-                    .map(|c| c.packet_identifier);
+                let pid = session.inbound_publishes.first().copied();
 
                 let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
@@ -1310,9 +1318,10 @@ async fn incoming_qos2_write_fail_retry() {
 
                 loop {
                     match pid {
-                        Some(pid) => match assert_ok!(rx.poll().await) {
-                            Event::Duplicate => {}
+                        Some((pid, _)) => match assert_ok!(rx.poll().await) {
+                            Event::Duplicate(_) => {}
                             Event::PublishReleased(Puback {
+                                ack_mode: _,
                                 packet_identifier,
                                 reason_code: _,
                                 reason_string: _,
@@ -1421,6 +1430,7 @@ async fn incoming_qos2_read_fail_retry() {
 
                     match rx.poll().await {
                         Ok(Event::PublishReleased(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -1439,10 +1449,7 @@ async fn incoming_qos2_read_fail_retry() {
 
                 // Complete publish using infallible connection
                 // This is only Some(pid) when we haven't received PUBREL yet.
-                let pid = session
-                    .pending_server_publishes
-                    .first()
-                    .map(|c| c.packet_identifier);
+                let pid = session.inbound_publishes.first().copied();
 
                 let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
@@ -1457,11 +1464,12 @@ async fn incoming_qos2_read_fail_retry() {
                         // We received the missing PUBCOMP
                         Event::Ignored => break 'complete,
                         Event::PublishReleased(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
                             user_properties: _,
-                        }) if packet_identifier == pid.unwrap() => break 'complete,
+                        }) if packet_identifier == pid.unwrap().0 => break 'complete,
                         Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
                         Event::Publish(Publish {
                             identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
@@ -1474,6 +1482,7 @@ async fn incoming_qos2_read_fail_retry() {
 
                     match assert_ok!(rx.poll().await) {
                         Event::PublishReleased(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,

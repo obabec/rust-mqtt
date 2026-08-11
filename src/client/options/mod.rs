@@ -1,5 +1,6 @@
 //! Contains user-facing option types for configuring client actions.
 
+mod ack;
 mod connect;
 mod disconnect;
 mod publish;
@@ -7,6 +8,7 @@ mod subscribe;
 mod unsubscribe;
 mod will;
 
+pub use ack::{Mode as AckMode, Options as AckOptions};
 pub use connect::Options as ConnectOptions;
 pub use disconnect::Options as DisconnectOptions;
 pub use publish::{Options as PublicationOptions, TopicReference};
