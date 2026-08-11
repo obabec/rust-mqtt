@@ -1,3 +1,4 @@
+mod ack_options;
 mod connect_options;
 mod creds;
 mod disconnect_options;
