@@ -239,6 +239,8 @@ impl<'p, const MAX_USER_PROPERTIES: usize> DisconnectPacket<'p, MAX_USER_PROPERT
 
 #[cfg(test)]
 mod unit {
+    use core::num::NonZero;
+
     use heapless::Vec;
 
     use crate::{
@@ -271,7 +273,9 @@ mod unit {
     async fn encode_properties() {
         let packet = DisconnectPacket::<16>::new(
             ReasonCode::MaximumConnectTime,
-            Some(SessionExpiryInterval::Seconds(23089475)),
+            Some(SessionExpiryInterval::Seconds(
+                NonZero::new(23089475).unwrap(),
+            )),
             Some(MqttString::try_from("Accroitre Momentum").unwrap().into()),
             [
                 UserProperty(MqttStringPair::new(

@@ -44,7 +44,7 @@ async fn main() {
             connection,
             &ConnectOptions::new()
                 .clean_start()
-                .session_expiry_interval(SessionExpiryInterval::Seconds(5))
+                .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(5).unwrap()))
                 .keep_alive(KeepAlive::Seconds(NonZero::new(5).unwrap()))
                 .user_name(MqttString::try_from("test").unwrap())
                 .password(MqttBinary::try_from("testPass").unwrap())

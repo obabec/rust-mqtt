@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZero, time::Duration};
 
 use rust_mqtt::{
     client::{
@@ -158,7 +158,7 @@ async fn disconnect_with_will_message_recovered() {
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(10))
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(10).unwrap()))
         .will(will);
 
     let mut tx = assert_ok!(
@@ -709,7 +709,7 @@ async fn session_expires_before_will_delay_interval() {
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(5))
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(5).unwrap()))
         .will(will);
 
     let mut tx = assert_ok!(connected_client(BROKER_ADDRESS, &will_connect_options, None).await);
@@ -804,7 +804,7 @@ async fn clean_start_override_before_will_scheduled() {
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
         .will(will)
-        .session_expiry_interval(SessionExpiryInterval::Seconds(100));
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(100).unwrap()));
 
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, &will_connect_options, Some(id.clone())).await);
@@ -869,7 +869,7 @@ async fn will_existing_session_taken_over_with_session_expiry() {
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(100))
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(100).unwrap()))
         .will(will);
 
     let mut tx =
@@ -1002,7 +1002,7 @@ async fn will_existing_session_taken_over_with_clean_start() {
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(100))
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(100).unwrap()))
         .will(will);
 
     let mut tx =
@@ -1063,7 +1063,7 @@ async fn no_will_existing_session_taken_over() {
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(1))
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(1).unwrap()))
         .will(will);
 
     let mut tx =
@@ -1131,7 +1131,7 @@ async fn session_recovered_before_session_expires() {
     let mut will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
         .will(will)
-        .session_expiry_interval(SessionExpiryInterval::Seconds(5));
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(5).unwrap()));
 
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, &will_connect_options, Some(id.clone())).await);
@@ -1192,7 +1192,7 @@ async fn session_recovered_before_will_delay_interval() {
     let mut will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
         .will(will)
-        .session_expiry_interval(SessionExpiryInterval::Seconds(10));
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(10).unwrap()));
 
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, &will_connect_options, Some(id.clone())).await);

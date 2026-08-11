@@ -204,8 +204,9 @@ impl<R: Read> Readable<R> for SessionExpiryInterval {
 
         Ok(match value {
             0 => Self::EndOnDisconnect,
+            // Safety: the value is in the range 1..u32::MAX which does not include zero
+            1..u32::MAX => Self::Seconds(unsafe { NonZero::new_unchecked(value) }),
             u32::MAX => Self::NeverEnd,
-            s => Self::Seconds(s),
         })
     }
 }
@@ -218,7 +219,7 @@ impl Writable for SessionExpiryInterval {
         let value = match self {
             Self::EndOnDisconnect => 0,
             Self::NeverEnd => u32::MAX,
-            Self::Seconds(s) => *s,
+            Self::Seconds(s) => s.get(),
         };
 
         Self::TYPE.write(write).await?;

@@ -1,4 +1,4 @@
-use std::{assert_eq, format};
+use std::{assert_eq, format, num::NonZero};
 
 use rust_mqtt::{
     client::{MqttError, options::DisconnectOptions},
@@ -24,8 +24,8 @@ async fn connect_session_expiry_zero_disconnect_session_expiry_non_zero() {
     let e = assert_err!(c.disconnect(&options).await);
     assert_eq!(e, MqttError::IllegalDisconnectSessionExpiryInterval);
 
-    let options =
-        DisconnectOptions::new().session_expiry_interval(SessionExpiryInterval::Seconds(1));
+    let options = DisconnectOptions::new()
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(1).unwrap()));
 
     let e = assert_err!(c.disconnect(&options).await);
     assert_eq!(e, MqttError::IllegalDisconnectSessionExpiryInterval);

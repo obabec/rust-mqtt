@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZero, time::Duration};
 
 use rust_mqtt::{client::Client, config::SessionExpiryInterval, types::MqttString};
 use tokio::time::sleep;
@@ -29,7 +29,7 @@ async fn session_continue_regular_disconnect() {
 
     let mut connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(3));
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(3).unwrap()));
     connect_options.clean_start = false;
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -86,7 +86,7 @@ async fn session_continue_connection_dropped() {
 
     let mut connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(3));
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(3).unwrap()));
     connect_options.clean_start = false;
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -168,7 +168,7 @@ async fn session_expired() {
 
     let mut connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(3));
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(3).unwrap()));
 
     let mut c = assert_ok!(
         connected_client(BROKER_ADDRESS, &connect_options, Some(id.as_borrowed())).await
@@ -223,7 +223,8 @@ async fn session_shortened_and_expired() {
     );
 
     let mut dc_options = DEFAULT_DC_OPTIONS.clone();
-    dc_options.session_expiry_interval = Some(SessionExpiryInterval::Seconds(3));
+    dc_options.session_expiry_interval =
+        Some(SessionExpiryInterval::Seconds(NonZero::new(3).unwrap()));
     disconnect(&mut c, &dc_options).await;
 
     // Sleep long enough for the session expiry interval set in disconnect to expire
@@ -232,7 +233,7 @@ async fn session_shortened_and_expired() {
     // Try to continue the previous session
     let mut connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(10));
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(10).unwrap()));
     connect_options.clean_start = false;
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
