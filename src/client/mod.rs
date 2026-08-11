@@ -577,7 +577,7 @@ impl<
                     self.session.reconnect();
                 }
             } else {
-                #[expect(clippy::if_same_then_else)]
+                #[allow(clippy::if_same_then_else)]
                 if options.clean_start {
                     info!("connected to server");
                 } else {
