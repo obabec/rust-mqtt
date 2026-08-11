@@ -14,8 +14,9 @@ pub struct Options<'p> {
     /// In case of [`QoS::ExactlyOnce`], whether the PUBREL acknowledgement
     /// packet of this flow is sent automatically by the client or must be
     /// sent manually by the user with [`Client::manual_release`]. In case
-    /// of [`QoS::AtMostOnce`] or [`QoS::AtLeastOnce`] this option has no
-    /// effect.
+    /// of [`QoS::AtMostOnce`] or [`QoS::AtLeastOnce`] this value being set
+    /// to [`AckMode::Manual`] has no effect and causes a recoverable error
+    /// by the client.
     ///
     /// [`Client::manual_release`]: crate::client::Client::manual_release
     pub ack_mode: AckMode,

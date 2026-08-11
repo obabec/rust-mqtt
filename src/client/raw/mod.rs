@@ -56,7 +56,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
     pub fn set_net(&mut self, net: N) {
         debug_assert!(
             !self.n.is_ok(),
-            "Network must not be in Ok() state to replace it."
+            "network must not be in Ok() state to replace it."
         );
         self.n.replace(net);
     }
@@ -85,7 +85,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
     pub async fn abort(&mut self) -> Result<(), RawError<B::ProvisionError>> {
         debug_assert!(
             !self.n.is_ok(),
-            "Network must not be in Ok() state to disconnect due to an error."
+            "network must not be in Ok() state to disconnect due to an error."
         );
 
         match &mut self.n {

@@ -301,12 +301,12 @@ impl<
         s
     }
 
-    /// Sets the predicate which selects whether the quality of service handshakes of a publication
-    /// are executed automatically by the client or manually by the user. If the predicate returns
-    /// [`false`] for an incoming [`QoS::AtLeastOnce`] or [`QoS::ExactlyOnce`] PUBLISH packet, its
-    /// handshake flow will be acknowledged automatically. If the predicate returns [`true`], the
-    /// acknowledgement packets of its handshake must be sent manually mostly. Refer to the
-    /// documentation of [`Client`] for a detailed description of these cases.
+    /// Sets the predicate which selects whether the quality of service handshakes of an incoming
+    /// publication are executed automatically by the client or manually by the user. If the
+    /// predicate returns [`false`] for an incoming [`QoS::AtLeastOnce`] or [`QoS::ExactlyOnce`]
+    /// PUBLISH packet, its handshake flow will be acknowledged automatically. If the predicate
+    /// returns [`true`], the acknowledgement packets of its handshake must be sent manually mostly.
+    /// Refer to the documentation of [`Client`] for a detailed description of these cases.
     pub fn ack_manually_when(
         &mut self,
         predicate: &'c dyn Fn(
@@ -411,14 +411,14 @@ impl<
     {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to send CONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to send CONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
         if let Some(ref will) = options.will {
             assert!(
                 will.user_properties.len() <= MAX_USER_PROPERTIES,
-                "Attempted to send Will with {} > {} (MAX_USER_PROPERTIES) properties",
+                "attempted to send Will with {} > {} (MAX_USER_PROPERTIES) properties",
                 will.user_properties.len(),
                 MAX_USER_PROPERTIES
             );
@@ -450,7 +450,7 @@ impl<
             MaximumPacketSize::Limit(l) => match l.get() {
                 0 => unreachable!("NonZero invariant"),
                 1 => panic!(
-                    "Every MQTT packet is at least 2 bytes long, a smaller maximum packet size makes no sense"
+                    "every MQTT packet is at least 2 bytes long, a smaller maximum packet size makes no sense"
                 ),
                 2..=129 => l.get() - 2,
                 130..=16_386 => l.get() - 3,
@@ -712,7 +712,7 @@ impl<
     ) -> Result<PacketIdentifier, MqttError<'c, 0>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to send SUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to send SUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
@@ -798,7 +798,7 @@ impl<
     ) -> Result<PacketIdentifier, MqttError<'c, 0>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to send UNSUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to send UNSUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
@@ -891,7 +891,7 @@ impl<
     ) -> Result<Option<PacketIdentifier>, MqttError<'c, 0>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
@@ -1060,7 +1060,7 @@ impl<
     ) -> Result<(), MqttError<'c, 0>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
@@ -1569,7 +1569,7 @@ impl<
     ) -> Result<(), MqttError<'c, 0>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to send DISCONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to send DISCONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
