@@ -95,7 +95,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
                 debug!("sending DISCONNECT packet with reason code: {:?}", r);
 
                 // Don't check whether length exceeds servers maximum packet size because we don't
-                // add a reason string to the DISCONNECT packet -> length is always in the 4..=6 range in bytes.
+                // add properties to the DISCONNECT packet -> length is always in the 4..=6 range in bytes.
                 // The server really shouldn't reject this.
                 let r = packet
                     .send(n)

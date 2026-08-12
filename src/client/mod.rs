@@ -1184,8 +1184,8 @@ impl<
                 debug!("sending PUBREL packet {}", pubrel.packet_identifier);
 
                 // Don't check whether length exceeds servers maximum packet size because we don't
-                // add properties to PUBREL packets -> length is always minimal at 6 bytes.
-                // The server really shouldn't reject this.
+                // add properties to automatically retransmitted PUBREL packets -> length is always
+                // minimal at 6 bytes. The server really shouldn't reject this.
                 self.raw.send(&pubrel).await?;
             }
             if let Some(next) = handle.next() {
@@ -1214,6 +1214,8 @@ impl<
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
     /// * [`MqttError::IllegalReasonCode`] if the selected reason code is not allowed
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would
+    ///   be exceeded by sending this PUBACK packet
     /// * [`MqttError::QoSMismatched`] if this packet identifier is actually part of an incoming
     ///   [`QoS::ExactlyOnce`] publication
     /// * [`MqttError::HandshakeStateMismatched`] if a reconnection occured and this
@@ -1254,16 +1256,7 @@ impl<
             return Err(MqttError::IllegalReasonCode);
         }
 
-        self.session
-            .outbound_puback(packet_identifier)
-            .map_err(|e| match e {
-                SmError::NoCapacity => unreachable!(),
-                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
-                SmError::QoSMismatched => MqttError::QoSMismatched,
-                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
-            })?;
-
-        let puback = PubackPacket::<MAX_USER_PROPERTIES>::new(
+        let packet = PubackPacket::<MAX_USER_PROPERTIES>::new(
             packet_identifier,
             reason_code,
             options
@@ -1279,12 +1272,22 @@ impl<
                 .collect(),
         );
 
-        debug!("sending PUBACK packet {}", puback.packet_identifier);
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
+        }
 
-        // Don't check whether length exceeds servers maximum packet size because we don't
-        // add properties to PUBACK packets -> length is always minimal at 6 bytes.
-        // The server really shouldn't reject this.
-        self.raw.send(&puback).await?;
+        self.session
+            .outbound_puback(packet_identifier)
+            .map_err(|e| match e {
+                SmError::NoCapacity => unreachable!(),
+                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
+                SmError::QoSMismatched => MqttError::QoSMismatched,
+                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
+            })?;
+
+        debug!("sending PUBACK packet {}", packet.packet_identifier);
+
+        self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
         Ok(())
@@ -1304,6 +1307,8 @@ impl<
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
     /// * [`MqttError::IllegalReasonCode`] if the selected reason code is not allowed
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would
+    ///   be exceeded by sending this PUBREC packet
     /// * [`MqttError::QoSMismatched`] if this packet identifier is actually part of an incoming
     ///   [`QoS::AtLeastOnce`] publication
     /// * [`MqttError::HandshakeStateMismatched`]
@@ -1346,16 +1351,7 @@ impl<
             return Err(MqttError::IllegalReasonCode);
         }
 
-        self.session
-            .outbound_pubrec(packet_identifier, reason_code)
-            .map_err(|e| match e {
-                SmError::NoCapacity => unreachable!(),
-                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
-                SmError::QoSMismatched => MqttError::QoSMismatched,
-                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
-            })?;
-
-        let pubrec = PubrecPacket::<MAX_USER_PROPERTIES>::new(
+        let packet = PubrecPacket::<MAX_USER_PROPERTIES>::new(
             packet_identifier,
             reason_code,
             options
@@ -1371,12 +1367,22 @@ impl<
                 .collect(),
         );
 
-        debug!("sending PUBREC packet {}", pubrec.packet_identifier);
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
+        }
 
-        // Don't check whether length exceeds servers maximum packet size because we don't
-        // add properties to PUBREC packets -> length is always minimal at 6 bytes.
-        // The server really shouldn't reject this.
-        self.raw.send(&pubrec).await?;
+        self.session
+            .outbound_pubrec(packet_identifier, reason_code)
+            .map_err(|e| match e {
+                SmError::NoCapacity => unreachable!(),
+                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
+                SmError::QoSMismatched => MqttError::QoSMismatched,
+                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
+            })?;
+
+        debug!("sending PUBREC packet {}", packet.packet_identifier);
+
+        self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
         Ok(())
@@ -1393,6 +1399,8 @@ impl<
     ///
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would
+    ///   be exceeded by sending this PUBREL packet
     /// * [`MqttError::QoSMismatched`] if this packet identifier is actually part of an outgoing
     ///   [`QoS::AtLeastOnce`] publication
     /// * [`MqttError::HandshakeStateMismatched`]
@@ -1419,16 +1427,7 @@ impl<
             MAX_USER_PROPERTIES
         );
 
-        self.session
-            .outbound_pubrel(packet_identifier)
-            .map_err(|e| match e {
-                SmError::NoCapacity => unreachable!(),
-                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
-                SmError::QoSMismatched => MqttError::QoSMismatched,
-                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
-            })?;
-
-        let pubrel = PubrelPacket::<MAX_USER_PROPERTIES>::new(
+        let packet = PubrelPacket::<MAX_USER_PROPERTIES>::new(
             packet_identifier,
             REASON_CODE,
             options
@@ -1444,12 +1443,22 @@ impl<
                 .collect(),
         );
 
-        debug!("sending PUBREL packet {}", pubrel.packet_identifier);
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
+        }
 
-        // Don't check whether length exceeds servers maximum packet size because we don't
-        // add properties to PUBREL packets -> length is always minimal at 6 bytes.
-        // The server really shouldn't reject this.
-        self.raw.send(&pubrel).await?;
+        self.session
+            .outbound_pubrel(packet_identifier)
+            .map_err(|e| match e {
+                SmError::NoCapacity => unreachable!(),
+                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
+                SmError::QoSMismatched => MqttError::QoSMismatched,
+                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
+            })?;
+
+        debug!("sending PUBREL packet {}", packet.packet_identifier);
+
+        self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
         Ok(())
@@ -1466,6 +1475,8 @@ impl<
     ///
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would
+    ///   be exceeded by sending this PUBCOMP packet
     /// * [`MqttError::QoSMismatched`] if this packet identifier is actually part of an outgoing
     ///   [`QoS::AtLeastOnce`] publication
     /// * [`MqttError::HandshakeStateMismatched`] if the client hasn't yet received a PUBREL from
@@ -1491,16 +1502,7 @@ impl<
             MAX_USER_PROPERTIES
         );
 
-        self.session
-            .outbound_pubcomp(packet_identifier)
-            .map_err(|e| match e {
-                SmError::NoCapacity => unreachable!(),
-                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
-                SmError::QoSMismatched => MqttError::QoSMismatched,
-                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
-            })?;
-
-        let pubcomp = PubcompPacket::<MAX_USER_PROPERTIES>::new(
+        let packet = PubcompPacket::<MAX_USER_PROPERTIES>::new(
             packet_identifier,
             REASON_CODE,
             options
@@ -1516,12 +1518,22 @@ impl<
                 .collect(),
         );
 
-        debug!("sending PUBCOMP packet {}", pubcomp.packet_identifier);
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
+        }
 
-        // Don't check whether length exceeds servers maximum packet size because we don't
-        // add properties to PUBCOMP packets -> length is always minimal at 6 bytes.
-        // The server really shouldn't reject this.
-        self.raw.send(&pubcomp).await?;
+        self.session
+            .outbound_pubcomp(packet_identifier)
+            .map_err(|e| match e {
+                SmError::NoCapacity => unreachable!(),
+                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
+                SmError::QoSMismatched => MqttError::QoSMismatched,
+                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
+            })?;
+
+        debug!("sending PUBCOMP packet {}", packet.packet_identifier);
+
+        self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
         Ok(())
@@ -1891,8 +1903,8 @@ impl<
                         debug!("sending PUBACK packet {}", puback.packet_identifier);
 
                         // Don't check whether length exceeds servers maximum packet size because we don't
-                        // add properties to PUBACK packets -> length is always minimal at 6 bytes.
-                        // The server really shouldn't reject this.
+                        // add properties to automatically sent PUBACK packets -> length is always minimal
+                        // at 6 bytes. The server really shouldn't reject this.
                         self.raw.send(&puback).await?;
                         self.raw.flush().await?;
                     }
@@ -1904,8 +1916,8 @@ impl<
                         debug!("sending PUBREC packet {}", pubrec.packet_identifier);
 
                         // Don't check whether length exceeds servers maximum packet size because we don't
-                        // add properties to PUBREC packets -> length is always minimal at 6 bytes.
-                        // The server really shouldn't reject this.
+                        // add properties to automatically sent PUBREC packets -> length is always minimal
+                        // at 6 bytes. The server really shouldn't reject this.
                         self.raw.send(&pubrec).await?;
                         self.raw.flush().await?;
                     }
@@ -2017,8 +2029,8 @@ impl<
                         debug!("sending PUBREL packet {}", pubrel.packet_identifier);
 
                         // Don't check whether length exceeds servers maximum packet size because we don't
-                        // add properties to PUBREL packets -> length is always minimal at 6 bytes.
-                        // The server really shouldn't reject this.
+                        // add properties to automatically sent PUBREL packets -> length is always minimal
+                        // at 6 bytes. The server really shouldn't reject this.
                         self.raw.send(&pubrel).await?;
                         self.raw.flush().await?;
                     }
@@ -2075,8 +2087,8 @@ impl<
                         debug!("sending PUBCOMP packet {}", pubcomp.packet_identifier);
 
                         // Don't check whether length exceeds servers maximum packet size because we don't
-                        // add properties to PUBCOMP packets -> length is always minimal at 6 bytes.
-                        // The server really shouldn't reject this.
+                        // add properties to automatically sent PUBCOMP packets -> length is always minimal
+                        // at 6 bytes. The server really shouldn't reject this.
                         self.raw.send(&pubcomp).await?;
                         self.raw.flush().await?;
                     }
