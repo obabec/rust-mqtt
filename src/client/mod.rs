@@ -21,7 +21,7 @@ use crate::{
     session::{Error as SmError, Event as SmEvent, LocalPublishState, Response, Session},
     types::{
         IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, PacketIdentifier, QoS, ReasonCode,
-        SubscriptionFilter, TopicFilter, TopicName, VarByteInt,
+        NoLocalSharedSubscription, SubscriptionFilter, TopicFilter, TopicName, VarByteInt,
     },
     v5::{
         packet::{
@@ -731,6 +731,10 @@ impl<
             return Err(MqttError::UnsupportedByServer);
         }
 
+        let subscribe_filter = SubscriptionFilter::new(topic_filter, options)
+            .map_err(|NoLocalSharedSubscription| MqttError::IllegalNoLocalSharedSubscription)?;
+        let subscribe_filters = [subscribe_filter].into();
+
         let Some(handle) = self.session.free_handle() else {
             info!("no free packet identifier");
             return Err(MqttError::SessionBuffer);
@@ -742,9 +746,6 @@ impl<
             MqttError::SessionBuffer
         })?;
 
-        let subscribe_filter = SubscriptionFilter::new(topic_filter, options);
-
-        let subscribe_filters = [subscribe_filter].into();
         let packet = SubscribePacket::<1, MAX_USER_PROPERTIES>::new(
             pid,
             options.subscription_identifier.map(Into::into),
