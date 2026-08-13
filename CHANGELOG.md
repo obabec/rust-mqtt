@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add reason string to outgoing DISCONNECT packets
 - Use `NonZero<u32>` for `SessionExpiryInterval::Seconds`
 - Allow any valid reason code to be sent in DISCONNECT packets
+- Prevent protocol error on shared subscription with no local set to true
 
 ## 0.5.1 - 2026-04-10
 
