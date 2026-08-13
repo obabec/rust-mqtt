@@ -74,7 +74,7 @@ async fn maximum_packet_size_not_exceeded() {
 #[ignore = "enable this once mosquitto v2.1.3 is used, see https://github.com/eclipse-mosquitto/mosquitto/issues/3503"]
 #[tokio::test]
 #[test_log::test]
-async fn maximum_packet_size_barely_exceeded() {
+async fn maximum_packet_size_barely_exceeded_hive_only() {
     // Has to be a reasonable value not too close to 0, otherwise broker might not reply or something similar
     const MAX_PACKET_SIZE: u32 = 100;
     const PACKET_SIZE: usize = MAX_PACKET_SIZE as usize + 1;

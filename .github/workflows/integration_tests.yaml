@@ -25,9 +25,20 @@ jobs:
           chmod 700 .ci/mqtt_pass_hashed.txt
           mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
           mosquitto -c .ci/mosquitto.conf -d
+          sleep 1
 
       - name: Run integration tests
         run: RUST_LOG=trace cargo test integration --features "log" -- --show-output
+
+      - name: Restart Mosquitto
+        run: |
+          pkill mosquitto || true
+          sleep 1
+          mosquitto -c .ci/mosquitto.conf -d
+          sleep 1
+
+      - name: Run mosquitto-only integration tests
+        run: RUST_LOG=trace cargo test mosquitto_only --features "log" -- --show-output --ignored
 
   integration_tests_hive:
     runs-on: ubuntu-latest
@@ -49,6 +60,17 @@ jobs:
           cp .ci/hive_cred.xml hivemq-ce-2025.5/extensions/hivemq-file-rbac-extension/credentials.xml
           cp .ci/hive_extension_config.xml hivemq-ce-2025.5/extensions/hivemq-file-rbac-extension/conf/config.xml
           hivemq-ce-2025.5/bin/run.sh &
+          sleep 3
 
       - name: Run integration tests
         run: RUST_LOG=trace cargo test integration --features "log" -- --show-output
+
+      - name: Restart HiveMQ
+        run: |
+          pkill -f hivemq-ce || true
+          sleep 5
+          hivemq-ce-2025.5/bin/run.sh &
+          sleep 3
+
+      - name: Run hive-only integration tests
+        run: RUST_LOG=trace cargo test hive_only --features "log" -- --show-output --ignored

@@ -658,7 +658,7 @@ async fn will_delay_interval_basic() {
 #[ignore = "enable this test once the fix of https://github.com/eclipse-mosquitto/mosquitto/issues/3505 (mosquitto v2.1.3) is available"]
 #[tokio::test]
 #[test_log::test]
-async fn session_expires_right_after_disconnect() {
+async fn session_expires_right_after_disconnect_hive_only() {
     let (will_topic_name, will_topic_filter) = unique_topic();
     let will_msg = "Death may be the greatest of all human blessings";
 
@@ -789,7 +789,7 @@ async fn will_delay_interval_completely_expired() {
 #[ignore = "enable this test once mosquitto v2.1.3 is used"]
 #[tokio::test]
 #[test_log::test]
-async fn clean_start_override_before_will_scheduled() {
+async fn clean_start_override_before_will_scheduled_hive_only() {
     let id = MqttString::from_str("WILL_CLEAN_START_BEFORE_WILL_SCHEDULED").unwrap();
 
     let (will_topic_name, will_topic_filter) = unique_topic();
@@ -921,7 +921,7 @@ async fn will_existing_session_taken_over_with_session_expiry() {
 #[ignore = "enable this test once mosquitto v2.1.3 is used"]
 #[tokio::test]
 #[test_log::test]
-async fn will_existing_session_taken_over_with_will_delay() {
+async fn will_existing_session_taken_over_with_will_delay_hive_only() {
     let id = MqttString::from_str("WILL_EXISTING_SESSION_TAKEN_OVER_WITH_WILL_DELAY").unwrap();
 
     let (will_topic_name, will_topic_filter) = unique_topic();
@@ -988,7 +988,7 @@ async fn will_existing_session_taken_over_with_will_delay() {
 #[ignore = "enable this test once mosquitto v2.1.3 is used"]
 #[tokio::test]
 #[test_log::test]
-async fn will_existing_session_taken_over_with_clean_start() {
+async fn will_existing_session_taken_over_with_clean_start_hive_only() {
     let id = MqttString::from_str("WILL_EXISTING_SESSION_TAKEN_OVER_WITH_CLEAN_START").unwrap();
 
     let (will_topic_name, will_topic_filter) = unique_topic();
