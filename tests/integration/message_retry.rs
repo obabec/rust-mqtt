@@ -4,11 +4,11 @@ use rust_mqtt::{
     client::{
         Client,
         event::{Event, Puback, Publish, Suback},
-        options::{PublicationOptions, TopicReference},
+        options::{AckMode, AckOptions, PublicationOptions, TopicReference},
     },
     config::SessionExpiryInterval,
-    session::{CPublishFlightState, InFlightPublish},
-    types::{IdentifiedQoS, MqttString, QoS, TopicFilter, TopicName},
+    session::LocalPublishState,
+    types::{IdentifiedQoS, MqttString, QoS, ReasonCode, TopicFilter, TopicName},
 };
 use tokio::{
     join,
@@ -30,10 +30,10 @@ use crate::common::{
 
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_qos1_retry() {
+async fn outgoing_automatic_qos1_retry() {
     let (topic_name, topic_filter) = unique_topic();
     let msg = "test message";
-    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS1_TX_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS1_TX_CLIENT").unwrap();
 
     let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
@@ -80,6 +80,7 @@ async fn outgoing_qos1_retry() {
                 loop {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishAcknowledged(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -118,10 +119,10 @@ async fn outgoing_qos1_retry() {
 
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_qos2_retry_publish() {
+async fn outgoing_automatic_qos2_retry_publish() {
     let (topic_name, topic_filter) = unique_topic();
     let msg = "test message";
-    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS2_PUBLISH_TX_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS2_PUBLISH_TX_CLIENT").unwrap();
 
     let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
@@ -168,6 +169,7 @@ async fn outgoing_qos2_retry_publish() {
                 loop {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishComplete(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -202,10 +204,108 @@ async fn outgoing_qos2_retry_publish() {
 
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_qos2_retry_pubrel() {
+async fn outgoing_manual_qos2_retry_publish() {
     let (topic_name, topic_filter) = unique_topic();
     let msg = "test message";
-    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS2_PUBREL_TX_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_MANUAL_QOS2_PUBLISH_TX_CLIENT").unwrap();
+
+    let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+    tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+
+    let mut tx = assert_ok!(
+        connected_client(
+            BROKER_ADDRESS,
+            &tx_connect_options,
+            Some(tx_id.as_borrowed())
+        )
+        .await
+    );
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        sleep(Duration::from_secs(1)).await;
+
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+            .exactly_once()
+            .ack_manually();
+
+        let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await).unwrap();
+        let session = tx.session().clone();
+
+        drop(tx);
+
+        let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+        connect_options.session_expiry_interval = SessionExpiryInterval::EndOnDisconnect;
+        connect_options.clean_start = false;
+
+        let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+        let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
+        let info = assert_ok!(warn_inspect!(
+            tx.connect(tcp, &connect_options, Some(tx_id.as_borrowed()))
+                .await,
+            "Client::connect() failed"
+        ));
+        assert!(info.session_present);
+
+        assert_ok!(tx.republish(pid, &pub_options, msg.into()).await);
+
+        assert_ok!(
+            timeout(Duration::from_secs(5), async {
+                loop {
+                    match assert_ok!(tx.poll().await) {
+                        Event::PublishReceived(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if packet_identifier == pid => {
+                            assert_ok!(
+                                tx.manual_release(packet_identifier, &AckOptions::new())
+                                    .await
+                            );
+                        }
+                        Event::PublishComplete(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if packet_identifier == pid => break,
+                        _ => {}
+                    }
+                }
+            })
+            .await
+        );
+
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
+        assert_subscribe!(rx, &sub_options, topic_filter.clone());
+        let p = assert_ok!(assert_ok!(
+            timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
+        ));
+        assert_eq!(p.topic, topic_name.as_borrowed());
+        assert_eq!(p.message, msg.into());
+
+        assert_err!(timeout(Duration::from_secs(5), receive_publish(&mut rx)).await);
+
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn outgoing_automatic_qos2_retry_pubrel() {
+    let (topic_name, topic_filter) = unique_topic();
+    let msg = "test message";
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS2_PUBREL_TX_CLIENT").unwrap();
 
     let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
@@ -234,6 +334,7 @@ async fn outgoing_qos2_retry_pubrel() {
                 loop {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishReceived(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -270,6 +371,7 @@ async fn outgoing_qos2_retry_pubrel() {
                 loop {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishComplete(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -304,10 +406,121 @@ async fn outgoing_qos2_retry_pubrel() {
 
 #[tokio::test]
 #[test_log::test]
-async fn incoming_qos2_retry_pubcomp() {
+async fn outgoing_manual_qos2_retry_pubrel() {
     let (topic_name, topic_filter) = unique_topic();
     let msg = "test message";
-    let rx_id = MqttString::from_str("RETRY_INCOMING_QOS2_RX_CLIENT").unwrap();
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_MANUAL_QOS2_PUBREL_TX_CLIENT").unwrap();
+
+    let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+    tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+
+    let mut tx = assert_ok!(
+        connected_client(
+            BROKER_ADDRESS,
+            &tx_connect_options,
+            Some(tx_id.as_borrowed())
+        )
+        .await
+    );
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        sleep(Duration::from_secs(1)).await;
+
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+            .exactly_once()
+            .ack_manually();
+
+        let pid = assert_ok!(tx.publish(&pub_options, msg.into()).await).unwrap();
+
+        assert_ok!(
+            timeout(Duration::from_secs(5), async {
+                loop {
+                    match assert_ok!(tx.poll().await) {
+                        Event::PublishReceived(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if packet_identifier == pid => {
+                            assert_ok!(
+                                tx.manual_release(packet_identifier, &AckOptions::new())
+                                    .await
+                            );
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            })
+            .await
+        );
+
+        let session = tx.session().clone();
+
+        drop(tx);
+
+        let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+        connect_options.session_expiry_interval = SessionExpiryInterval::EndOnDisconnect;
+        connect_options.clean_start = false;
+
+        let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+        let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
+        let info = assert_ok!(warn_inspect!(
+            tx.connect(tcp, &connect_options, Some(tx_id.as_borrowed()))
+                .await,
+            "Client::connect() failed"
+        ));
+        assert!(info.session_present);
+
+        assert_ok!(tx.manual_release(pid, &AckOptions::new()).await);
+
+        assert_ok!(
+            timeout(Duration::from_secs(5), async {
+                loop {
+                    match assert_ok!(tx.poll().await) {
+                        Event::PublishComplete(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if packet_identifier == pid => break,
+                        _ => {}
+                    }
+                }
+            })
+            .await
+        );
+
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
+        assert_subscribe!(rx, &sub_options, topic_filter.clone());
+        let p = assert_ok!(assert_ok!(
+            timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
+        ));
+        assert_eq!(p.topic, topic_name.as_borrowed());
+        assert_eq!(p.message, msg.into());
+
+        assert_err!(timeout(Duration::from_secs(5), receive_publish(&mut rx)).await);
+
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn incoming_automatic_qos2_retry_pubcomp() {
+    let (topic_name, topic_filter) = unique_topic();
+    let msg = "test message";
+    let rx_id = MqttString::from_str("RETRY_INCOMING_AUTOMATIC_QOS2_RX_CLIENT").unwrap();
 
     let mut rx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
     rx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
@@ -371,6 +584,7 @@ async fn incoming_qos2_retry_pubcomp() {
                 loop {
                     match assert_ok!(rx.poll().await) {
                         Event::PublishReleased(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -394,8 +608,109 @@ async fn incoming_qos2_retry_pubcomp() {
 
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_qos1_write_fail_retry() {
-    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS1_WRITE_FAIL_CLIENT").unwrap();
+async fn incoming_manual_qos2_retry_pubcomp() {
+    let (topic_name, topic_filter) = unique_topic();
+    let msg = "test message";
+    let rx_id = MqttString::from_str("RETRY_INCOMING_MANUAL_QOS2_RX_CLIENT").unwrap();
+
+    let mut rx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+    rx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    let mut rx = assert_ok!(
+        connected_client(
+            BROKER_ADDRESS,
+            &rx_connect_options,
+            Some(rx_id.as_borrowed())
+        )
+        .await
+    );
+    rx.ack_manually_when(&|_| true);
+
+    let publisher = async {
+        sleep(Duration::from_secs(1)).await;
+
+        let pub_options =
+            PublicationOptions::new(TopicReference::Name(topic_name.clone())).exactly_once();
+
+        assert_published!(tx, &pub_options, msg.into());
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
+        assert_subscribe!(rx, &sub_options, topic_filter.clone());
+
+        let publish = assert_ok!(assert_ok!(
+            timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
+        ));
+        assert_eq!(
+            <IdentifiedQoS as Into<QoS>>::into(publish.identified_qos),
+            QoS::ExactlyOnce
+        );
+        assert!(publish.identified_qos.packet_identifier().is_some());
+        let pid = publish.identified_qos.packet_identifier().unwrap();
+        assert_eq!(publish.topic, topic_name.as_borrowed());
+        assert_eq!(publish.message, msg.into());
+
+        assert_ok!(
+            rx.manual_receive(pid, ReasonCode::Success, &AckOptions::new())
+                .await
+        );
+
+        let session = rx.session().clone();
+
+        drop(rx);
+
+        let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+        connect_options.session_expiry_interval = SessionExpiryInterval::EndOnDisconnect;
+        connect_options.clean_start = false;
+
+        let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+        let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
+        let info = assert_ok!(warn_inspect!(
+            rx.connect(tcp, &connect_options, Some(rx_id.as_borrowed()))
+                .await,
+            "Client::connect() failed"
+        ));
+        assert!(info.session_present);
+
+        assert_ok!(
+            timeout(Duration::from_secs(5), async {
+                loop {
+                    match assert_ok!(rx.poll().await) {
+                        Event::PublishReleased(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if packet_identifier == pid => {
+                            assert_ok!(
+                                rx.manual_complete(packet_identifier, &AckOptions::new())
+                                    .await
+                            );
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            })
+            .await
+        );
+        assert_err!(timeout(Duration::from_secs(5), receive_publish(&mut rx)).await);
+
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn outgoing_automatic_qos1_write_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS1_WRITE_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
     let (messages, rx_messages) = mpsc::channel(1);
@@ -450,6 +765,7 @@ async fn outgoing_qos1_write_fail_retry() {
                     // Cannot fail on receiving messages
                     match assert_ok!(tx.poll().await) {
                         Event::PublishAcknowledged(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -464,8 +780,6 @@ async fn outgoing_qos1_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let pid = session.pending_client_publishes.first().copied();
-
                 let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -474,11 +788,15 @@ async fn outgoing_qos1_write_fail_retry() {
                         .await
                 );
 
+                let pid = tx
+                    .session()
+                    .outbound_publishes
+                    .iter()
+                    .next()
+                    .map(|(p, s)| (*p, *s));
+
                 let pid = match pid {
-                    Some(InFlightPublish {
-                        packet_identifier,
-                        state: _,
-                    }) => {
+                    Some((packet_identifier, _)) => {
                         assert_ok!(
                             tx.republish(
                                 packet_identifier,
@@ -495,6 +813,7 @@ async fn outgoing_qos1_write_fail_retry() {
 
                 match assert_ok!(tx.poll().await) {
                     Event::PublishAcknowledged(Puback {
+                        ack_mode: _,
                         packet_identifier,
                         reason_code: _,
                         reason_string: _,
@@ -514,8 +833,8 @@ async fn outgoing_qos1_write_fail_retry() {
 
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_qos1_read_fail_retry() {
-    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS1_READ_FAIL_CLIENT").unwrap();
+async fn outgoing_automatic_qos1_read_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS1_READ_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
     let (messages, rx_messages) = mpsc::channel(1);
@@ -567,6 +886,7 @@ async fn outgoing_qos1_read_fail_retry() {
 
                     match tx.poll().await {
                         Ok(Event::PublishAcknowledged(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -585,11 +905,7 @@ async fn outgoing_qos1_read_fail_retry() {
 
                 // Complete publish
 
-                let pid = session
-                    .pending_client_publishes
-                    .first()
-                    .unwrap()
-                    .packet_identifier;
+                let pid = session.outbound_publishes.first().unwrap().0;
 
                 let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
@@ -606,6 +922,7 @@ async fn outgoing_qos1_read_fail_retry() {
 
                 match assert_ok!(tx.poll().await) {
                     Event::PublishAcknowledged(Puback {
+                        ack_mode: _,
                         packet_identifier,
                         reason_code: _,
                         reason_string: _,
@@ -625,8 +942,8 @@ async fn outgoing_qos1_read_fail_retry() {
 
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_qos2_write_fail_retry() {
-    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS2_WRITE_FAIL_CLIENT").unwrap();
+async fn outgoing_automatic_qos2_write_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS2_WRITE_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
     let (messages, rx_messages) = mpsc::channel(1);
@@ -678,9 +995,10 @@ async fn outgoing_qos2_write_fail_retry() {
                     };
                     let pid = pid.unwrap();
 
-                    // Can fail because we have to responde with PUBREL
+                    // Can fail because we have to respond with PUBREL
                     match tx.poll().await {
                         Ok(Event::PublishReceived(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -696,6 +1014,7 @@ async fn outgoing_qos2_write_fail_retry() {
                     // Cannot fail because PUBCOMP is unanswered
                     match assert_ok!(tx.poll().await) {
                         Event::PublishComplete(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -710,8 +1029,6 @@ async fn outgoing_qos2_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let pid = session.pending_client_publishes.first().copied();
-
                 let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -720,11 +1037,22 @@ async fn outgoing_qos2_write_fail_retry() {
                         .await
                 );
 
+                let pid = tx
+                    .session()
+                    .outbound_publishes
+                    .iter()
+                    .next()
+                    .map(|(p, s)| (*p, *s));
+
                 let (pid, wait_for_pubrec) = match pid {
-                    Some(InFlightPublish {
+                    Some((
                         packet_identifier,
-                        state: CPublishFlightState::AwaitingPubrec,
-                    }) => {
+                        LocalPublishState::DuePublishExactlyOnce(AckMode::Automatic),
+                    )) => {
+                        assert_err!(
+                            tx.manual_release(packet_identifier, &AckOptions::new())
+                                .await,
+                        );
                         assert_ok!(
                             tx.republish(
                                 packet_identifier,
@@ -735,10 +1063,15 @@ async fn outgoing_qos2_write_fail_retry() {
                         );
                         (packet_identifier, true)
                     }
-                    Some(InFlightPublish {
-                        packet_identifier,
-                        state: CPublishFlightState::AwaitingPubcomp,
-                    }) => {
+                    Some((packet_identifier, LocalPublishState::DueRel(AckMode::Automatic))) => {
+                        assert_err!(
+                            tx.republish(
+                                packet_identifier,
+                                &pub_options,
+                                message.as_slice().into()
+                            )
+                            .await
+                        );
                         assert_ok!(tx.rerelease().await);
                         (packet_identifier, false)
                     }
@@ -753,6 +1086,7 @@ async fn outgoing_qos2_write_fail_retry() {
                 if wait_for_pubrec {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishReceived(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -764,6 +1098,7 @@ async fn outgoing_qos2_write_fail_retry() {
 
                 match assert_ok!(tx.poll().await) {
                     Event::PublishComplete(Puback {
+                        ack_mode: _,
                         packet_identifier,
                         reason_code: _,
                         reason_string: _,
@@ -783,8 +1118,194 @@ async fn outgoing_qos2_write_fail_retry() {
 
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_qos2_read_fail_retry() {
-    let tx_id = MqttString::from_str("RETRY_OUTGOING_QOS2_READ_FAIL_CLIENT").unwrap();
+async fn outgoing_manual_qos2_write_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_MANUAL_QOS2_WRITE_FAIL_CLIENT").unwrap();
+
+    let (rx_subscribed, subscribed) = oneshot::channel();
+    let (messages, rx_messages) = mpsc::channel(1);
+    let (rx_received, mut received) = mpsc::channel(1);
+
+    let (topic_name, topic_filter) = unique_topic();
+
+    let rx = receiver_task(topic_filter, rx_subscribed, rx_messages, rx_received);
+
+    let tx = async move {
+        assert_ok!(subscribed.await);
+
+        let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+
+        let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+        reconnect_options.clean_start = false;
+
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+            .exactly_once()
+            .ack_manually();
+
+        let mut i = 0;
+        let mut failed = true;
+
+        'outer: while failed {
+            let message = i.to_string().into_bytes();
+
+            i += 1;
+            failed = false;
+
+            'republish: {
+                let session = 'try_publish: {
+                    let Ok(mut tx) = connected_failing_client(
+                        BROKER_ADDRESS,
+                        &connect_options,
+                        Some(tx_id.as_borrowed()),
+                        ByteLimit::Unlimited,
+                        ByteLimit::FailAfter(i),
+                    )
+                    .await
+                    else {
+                        failed = true;
+                        continue 'outer;
+                    };
+
+                    let Ok(pid) = tx.publish(&pub_options, message.as_slice().into()).await else {
+                        failed = true;
+                        break 'try_publish tx.session().clone();
+                    };
+                    let pid = pid.unwrap();
+
+                    // Can't fail because we have to respond with PUBREL manually
+                    match assert_ok!(tx.poll().await) {
+                        Event::PublishReceived(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if pid == packet_identifier => {}
+                        _ => panic!("Should only receive a PUBREC"),
+                    }
+
+                    if tx.manual_release(pid, &AckOptions::new()).await.is_err() {
+                        failed = true;
+                        break 'try_publish tx.session().clone();
+                    }
+
+                    // Cannot fail because PUBCOMP is unanswered
+                    match assert_ok!(tx.poll().await) {
+                        Event::PublishComplete(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if pid == packet_identifier => {}
+                        _ => panic!("Should only receive a PUBCOMP"),
+                    }
+
+                    let _ = tx.disconnect(DEFAULT_DC_OPTIONS).await;
+                    break 'republish;
+                };
+
+                // Complete publish using infallible connection
+
+                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                    Client::with_session(session, ALLOC.get());
+                let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+                assert_ok!(
+                    tx.connect(tcp, &reconnect_options, Some(tx_id.as_borrowed()))
+                        .await
+                );
+
+                let pid = tx
+                    .session()
+                    .outbound_publishes
+                    .iter()
+                    .next()
+                    .map(|(p, s)| (*p, *s));
+
+                let (pid, wait_for_pubrec) = match pid {
+                    Some((
+                        packet_identifier,
+                        LocalPublishState::DuePublishExactlyOnce(AckMode::Manual),
+                    )) => {
+                        assert_err!(
+                            tx.manual_release(packet_identifier, &AckOptions::new())
+                                .await,
+                        );
+                        assert_ok!(
+                            tx.republish(
+                                packet_identifier,
+                                &pub_options,
+                                message.as_slice().into()
+                            )
+                            .await
+                        );
+                        (packet_identifier, true)
+                    }
+                    Some((packet_identifier, LocalPublishState::DueRel(AckMode::Manual))) => {
+                        assert_err!(
+                            tx.republish(
+                                packet_identifier,
+                                &pub_options,
+                                message.as_slice().into()
+                            )
+                            .await
+                        );
+                        assert_ok!(
+                            tx.manual_release(packet_identifier, &AckOptions::new())
+                                .await
+                        );
+                        (packet_identifier, false)
+                    }
+                    Some(_) => unreachable!("Should only have QoS 2 states"),
+                    None => (
+                        assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await)
+                            .unwrap(),
+                        true,
+                    ),
+                };
+
+                if wait_for_pubrec {
+                    match assert_ok!(tx.poll().await) {
+                        Event::PublishReceived(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if pid == packet_identifier => {
+                            assert_ok!(
+                                tx.manual_release(packet_identifier, &AckOptions::new())
+                                    .await
+                            );
+                        }
+                        _ => panic!("Should only receive a PUBREC"),
+                    }
+                }
+
+                match assert_ok!(tx.poll().await) {
+                    Event::PublishComplete(Puback {
+                        ack_mode: _,
+                        packet_identifier,
+                        reason_code: _,
+                        reason_string: _,
+                        user_properties: _,
+                    }) if pid == packet_identifier => {}
+                    _ => panic!("Should only receive a PUBCOMP"),
+                }
+            }
+
+            messages.send(message).await.unwrap();
+            assert!(assert_ok!(timeout(Duration::from_secs(5), received.recv()).await).is_some());
+        }
+    };
+
+    join!(rx, tx);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn outgoing_automatic_qos2_read_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS2_READ_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
     let (messages, rx_messages) = mpsc::channel(1);
@@ -835,6 +1356,7 @@ async fn outgoing_qos2_read_fail_retry() {
 
                     match tx.poll().await {
                         Ok(Event::PublishReceived(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -849,6 +1371,7 @@ async fn outgoing_qos2_read_fail_retry() {
 
                     match tx.poll().await {
                         Ok(Event::PublishComplete(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -867,8 +1390,6 @@ async fn outgoing_qos2_read_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let pid = session.pending_client_publishes.first().copied();
-
                 let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -877,11 +1398,22 @@ async fn outgoing_qos2_read_fail_retry() {
                         .await
                 );
 
+                let pid = tx
+                    .session()
+                    .outbound_publishes
+                    .iter()
+                    .next()
+                    .map(|(p, s)| (*p, *s));
+
                 let (pid, wait_for_pubrec) = match pid {
-                    Some(InFlightPublish {
+                    Some((
                         packet_identifier,
-                        state: CPublishFlightState::AwaitingPubrec,
-                    }) => {
+                        LocalPublishState::DuePublishExactlyOnce(AckMode::Automatic),
+                    )) => {
+                        assert_err!(
+                            tx.manual_release(packet_identifier, &AckOptions::new())
+                                .await
+                        );
                         assert_ok!(
                             tx.republish(
                                 packet_identifier,
@@ -892,10 +1424,15 @@ async fn outgoing_qos2_read_fail_retry() {
                         );
                         (packet_identifier, true)
                     }
-                    Some(InFlightPublish {
-                        packet_identifier,
-                        state: CPublishFlightState::AwaitingPubcomp,
-                    }) => {
+                    Some((packet_identifier, LocalPublishState::DueRel(AckMode::Automatic))) => {
+                        assert_err!(
+                            tx.republish(
+                                packet_identifier,
+                                &pub_options,
+                                message.as_slice().into()
+                            )
+                            .await
+                        );
                         assert_ok!(tx.rerelease().await);
                         (packet_identifier, false)
                     }
@@ -910,6 +1447,7 @@ async fn outgoing_qos2_read_fail_retry() {
                 if wait_for_pubrec {
                     match assert_ok!(tx.poll().await) {
                         Event::PublishReceived(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -921,6 +1459,196 @@ async fn outgoing_qos2_read_fail_retry() {
 
                 match assert_ok!(tx.poll().await) {
                     Event::PublishComplete(Puback {
+                        ack_mode: _,
+                        packet_identifier,
+                        reason_code: _,
+                        reason_string: _,
+                        user_properties: _,
+                    }) if pid == packet_identifier => {}
+                    _ => panic!("Should only receive a PUBCOMP"),
+                }
+            }
+
+            messages.send(message).await.unwrap();
+            assert!(assert_ok!(timeout(Duration::from_secs(5), received.recv()).await).is_some());
+        }
+    };
+
+    join!(rx, tx);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn outgoing_manual_qos2_read_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_OUTGOING_MANUAL_QOS2_READ_FAIL_CLIENT").unwrap();
+
+    let (rx_subscribed, subscribed) = oneshot::channel();
+    let (messages, rx_messages) = mpsc::channel(1);
+    let (rx_received, mut received) = mpsc::channel(1);
+
+    let (topic_name, topic_filter) = unique_topic();
+
+    let rx = receiver_task(topic_filter, rx_subscribed, rx_messages, rx_received);
+
+    let tx = async move {
+        assert_ok!(subscribed.await);
+
+        let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+
+        let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+        reconnect_options.clean_start = false;
+
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+            .exactly_once()
+            .ack_manually();
+
+        let mut i = 0;
+        let mut failed = true;
+
+        'outer: while failed {
+            let message = i.to_string().into_bytes();
+
+            i += 1;
+            failed = false;
+
+            'republish: {
+                let session = 'try_publish: {
+                    let Ok(mut tx) = connected_failing_client(
+                        BROKER_ADDRESS,
+                        &connect_options,
+                        Some(tx_id.as_borrowed()),
+                        ByteLimit::FailAfter(i),
+                        ByteLimit::Unlimited,
+                    )
+                    .await
+                    else {
+                        failed = true;
+                        continue 'outer;
+                    };
+
+                    let pid = assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await)
+                        .unwrap();
+
+                    match tx.poll().await {
+                        Ok(Event::PublishReceived(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        })) if pid == packet_identifier => {
+                            assert_ok!(
+                                tx.manual_release(packet_identifier, &AckOptions::new())
+                                    .await
+                            );
+                        }
+                        Ok(_) => panic!("Should only receive a PUBREC"),
+                        Err(_) => {
+                            failed = true;
+                            break 'try_publish tx.session().clone();
+                        }
+                    }
+
+                    match tx.poll().await {
+                        Ok(Event::PublishComplete(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        })) if pid == packet_identifier => {}
+                        Ok(_) => panic!("Should only receive a PUBCOMP"),
+                        Err(_) => {
+                            failed = true;
+                            break 'try_publish tx.session().clone();
+                        }
+                    }
+
+                    let _ = tx.disconnect(DEFAULT_DC_OPTIONS).await;
+                    break 'republish;
+                };
+
+                // Complete publish using infallible connection
+
+                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                    Client::with_session(session, ALLOC.get());
+                let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+                assert_ok!(
+                    tx.connect(tcp, &reconnect_options, Some(tx_id.as_borrowed()))
+                        .await
+                );
+
+                let pid = tx
+                    .session()
+                    .outbound_publishes
+                    .iter()
+                    .next()
+                    .map(|(p, s)| (*p, *s));
+
+                let (pid, wait_for_pubrec) = match pid {
+                    Some((
+                        packet_identifier,
+                        LocalPublishState::DuePublishExactlyOnce(AckMode::Manual),
+                    )) => {
+                        assert_err!(
+                            tx.manual_release(packet_identifier, &AckOptions::new())
+                                .await
+                        );
+                        assert_ok!(
+                            tx.republish(
+                                packet_identifier,
+                                &pub_options,
+                                message.as_slice().into()
+                            )
+                            .await
+                        );
+                        (packet_identifier, true)
+                    }
+                    Some((packet_identifier, LocalPublishState::DueRel(AckMode::Manual))) => {
+                        assert_err!(
+                            tx.republish(
+                                packet_identifier,
+                                &pub_options,
+                                message.as_slice().into()
+                            )
+                            .await
+                        );
+                        assert_ok!(
+                            tx.manual_release(packet_identifier, &AckOptions::new())
+                                .await
+                        );
+                        (packet_identifier, false)
+                    }
+                    Some(_) => unreachable!("Should only have QoS 2 states"),
+                    None => (
+                        assert_ok!(tx.publish(&pub_options, message.as_slice().into()).await)
+                            .unwrap(),
+                        true,
+                    ),
+                };
+
+                if wait_for_pubrec {
+                    match assert_ok!(tx.poll().await) {
+                        Event::PublishReceived(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if pid == packet_identifier => {
+                            assert_ok!(
+                                tx.manual_release(packet_identifier, &AckOptions::new())
+                                    .await
+                            );
+                        }
+                        _ => panic!("Should only receive a PUBREC"),
+                    }
+                }
+
+                match assert_ok!(tx.poll().await) {
+                    Event::PublishComplete(Puback {
+                        ack_mode: _,
                         packet_identifier,
                         reason_code: _,
                         reason_string: _,
@@ -967,8 +1695,8 @@ async fn receiver_task(
 
 #[tokio::test]
 #[test_log::test]
-async fn incoming_qos1_write_fail_retry() {
-    let tx_id = MqttString::from_str("RETRY_INCOMING_QOS1_WRITE_FAIL_CLIENT").unwrap();
+async fn incoming_automatic_qos1_write_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_INCOMING_AUTOMATIC_QOS1_WRITE_FAIL_CLIENT").unwrap();
 
     let (messages, tx_messages) = mpsc::channel(1);
     let (received, tx_received) = mpsc::channel(1);
@@ -1081,8 +1809,135 @@ async fn incoming_qos1_write_fail_retry() {
 
 #[tokio::test]
 #[test_log::test]
-async fn incoming_qos1_read_fail_retry() {
-    let tx_id = MqttString::from_str("RETRY_INCOMING_QOS1_READ_FAIL_CLIENT").unwrap();
+async fn incoming_manual_qos1_write_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_INCOMING_MANUAL_QOS1_WRITE_FAIL_CLIENT").unwrap();
+
+    let (messages, tx_messages) = mpsc::channel(1);
+    let (received, tx_received) = mpsc::channel(1);
+
+    let (topic_name, topic_filter) = unique_topic();
+
+    let tx = publisher_task(topic_name, QoS::AtLeastOnce, tx_messages, tx_received);
+
+    let rx = async move {
+        let connect_options = NO_SESSION_CONNECT_OPTIONS
+            .clone()
+            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+
+        let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+        reconnect_options.clean_start = false;
+
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+
+        let mut i = 0;
+        let mut failed = true;
+
+        'outer: while failed {
+            let message = i.to_string().into_bytes();
+
+            i += 1;
+            failed = false;
+
+            'rereceive: {
+                let msg = message.clone();
+
+                let session = 'try_receive: {
+                    let Ok(mut rx) = connected_failing_client(
+                        BROKER_ADDRESS,
+                        &connect_options,
+                        Some(tx_id.as_borrowed()),
+                        ByteLimit::Unlimited,
+                        ByteLimit::FailAfter(i),
+                    )
+                    .await
+                    else {
+                        failed = true;
+                        continue 'outer;
+                    };
+
+                    rx.ack_manually_when(&|_| true);
+
+                    let Ok(pid) = rx.subscribe(topic_filter.as_borrowed(), &sub_options).await
+                    else {
+                        failed = true;
+                        continue 'outer;
+                    };
+
+                    // Cannot fail because SUBACK is unanswered
+                    match assert_ok!(rx.poll().await) {
+                        Event::Suback(Suback {
+                            packet_identifier,
+                            reason_string: _,
+                            user_properties: _,
+                            reason_code: _,
+                        }) if pid == packet_identifier => {}
+                        _ => panic!("Should only receive a SUBACK"),
+                    }
+
+                    messages.send(message).await.unwrap();
+
+                    match assert_ok!(rx.poll().await) {
+                        Event::Publish(Publish {
+                            dup: false,
+                            identified_qos: IdentifiedQoS::AtLeastOnce(_),
+                            message,
+                            ..
+                        }) if &*message == msg.as_slice() => {}
+                        Event::Publish(_) => panic!("Received non-matching PUBLISH"),
+                        _ => panic!("Should only receive a PUBLISH"),
+                    };
+
+                    if rx
+                        .manual_acknowledge(pid, ReasonCode::Success, &AckOptions::new())
+                        .await
+                        .is_err()
+                    {
+                        failed = true;
+                        break 'try_receive rx.session().clone();
+                    }
+
+                    break 'rereceive;
+                };
+
+                // Complete publish using infallible connection
+
+                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                    Client::with_session(session, ALLOC.get());
+                let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+                assert_ok!(
+                    rx.connect(tcp, &reconnect_options, Some(tx_id.as_borrowed()))
+                        .await
+                );
+                rx.ack_manually_when(&|_| true);
+
+                match assert_ok!(rx.poll().await) {
+                    Event::Publish(Publish {
+                        dup: true,
+                        identified_qos: IdentifiedQoS::AtLeastOnce(pid),
+                        message,
+                        ..
+                    }) if &*message == msg.as_slice() => {
+                        assert_ok!(
+                            rx.manual_acknowledge(pid, ReasonCode::Success, &AckOptions::new())
+                                .await
+                        );
+                    }
+                    Event::Publish(p) => panic!("Received non-matching PUBLISH: {:?}", p),
+                    _ => panic!("Should only receive a PUBLISH"),
+                };
+            };
+
+            received.send(()).await.unwrap();
+        }
+    };
+
+    join!(rx, tx);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn incoming_automatic_qos1_read_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_INCOMING_AUTOMATIC_QOS1_READ_FAIL_CLIENT").unwrap();
 
     let (messages, tx_messages) = mpsc::channel(1);
     let (received, tx_received) = mpsc::channel(1);
@@ -1195,8 +2050,134 @@ async fn incoming_qos1_read_fail_retry() {
 
 #[tokio::test]
 #[test_log::test]
-async fn incoming_qos2_write_fail_retry() {
-    let tx_id = MqttString::from_str("RETRY_INCOMING_QOS2_WRITE_FAIL_CLIENT").unwrap();
+async fn incoming_manual_qos1_read_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_INCOMING_MANUAL_QOS1_READ_FAIL_CLIENT").unwrap();
+
+    let (messages, tx_messages) = mpsc::channel(1);
+    let (received, tx_received) = mpsc::channel(1);
+
+    let (topic_name, topic_filter) = unique_topic();
+
+    let tx = publisher_task(topic_name, QoS::AtLeastOnce, tx_messages, tx_received);
+
+    let rx = async move {
+        let connect_options = NO_SESSION_CONNECT_OPTIONS
+            .clone()
+            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+
+        let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+        reconnect_options.clean_start = false;
+
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+
+        let mut i = 0;
+        let mut failed = true;
+
+        'outer: while failed {
+            let message = i.to_string().into_bytes();
+
+            i += 1;
+            failed = false;
+
+            'rereceive: {
+                let msg = message.clone();
+
+                let session = 'try_receive: {
+                    let Ok(mut rx) = connected_failing_client(
+                        BROKER_ADDRESS,
+                        &connect_options,
+                        Some(tx_id.as_borrowed()),
+                        ByteLimit::FailAfter(i),
+                        ByteLimit::Unlimited,
+                    )
+                    .await
+                    else {
+                        failed = true;
+                        continue 'outer;
+                    };
+                    rx.ack_manually_when(&|_| true);
+
+                    // Cannot fail because subscribing only sends
+                    let pid =
+                        assert_ok!(rx.subscribe(topic_filter.as_borrowed(), &sub_options).await);
+
+                    match rx.poll().await {
+                        Ok(Event::Suback(Suback {
+                            packet_identifier,
+                            reason_string: _,
+                            user_properties: _,
+                            reason_code: _,
+                        })) if pid == packet_identifier => {}
+                        Ok(_) => panic!("Should only receive a SUBACK"),
+                        Err(_) => {
+                            failed = true;
+                            continue 'outer;
+                        }
+                    }
+
+                    messages.send(message).await.unwrap();
+
+                    match rx.poll().await {
+                        Ok(Event::Publish(Publish {
+                            dup: false,
+                            identified_qos: IdentifiedQoS::AtLeastOnce(_),
+                            message,
+                            ..
+                        })) if &*message == msg.as_slice() => {
+                            assert_ok!(
+                                rx.manual_acknowledge(pid, ReasonCode::Success, &AckOptions::new())
+                                    .await
+                            );
+                        }
+                        Ok(Event::Publish(_)) => panic!("Received non-matching PUBLISH"),
+                        Ok(_) => panic!("Should only receive a PUBLISH"),
+                        Err(_) => {
+                            failed = true;
+                            break 'try_receive rx.session().clone();
+                        }
+                    };
+
+                    break 'rereceive;
+                };
+
+                // Complete publish using infallible connection
+
+                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                    Client::with_session(session, ALLOC.get());
+                let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+                assert_ok!(
+                    rx.connect(tcp, &reconnect_options, Some(tx_id.as_borrowed()))
+                        .await
+                );
+                rx.ack_manually_when(&|_| true);
+
+                match assert_ok!(rx.poll().await) {
+                    Event::Publish(Publish {
+                        identified_qos: IdentifiedQoS::AtLeastOnce(pid),
+                        message,
+                        ..
+                    }) if &*message == msg.as_slice() => {
+                        assert_ok!(
+                            rx.manual_acknowledge(pid, ReasonCode::Success, &AckOptions::new())
+                                .await
+                        );
+                    }
+                    Event::Publish(p) => panic!("Received non-matching PUBLISH: {:?}", p),
+                    _ => panic!("Should only receive a PUBLISH"),
+                };
+            }
+
+            received.send(()).await.unwrap();
+        }
+    };
+
+    join!(rx, tx);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn incoming_automatic_qos2_write_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_INCOMING_AUTOMATIC_QOS2_WRITE_FAIL_CLIENT").unwrap();
 
     let (messages, tx_messages) = mpsc::channel(1);
     let (received, tx_received) = mpsc::channel(1);
@@ -1277,6 +2258,7 @@ async fn incoming_qos2_write_fail_retry() {
 
                     match rx.poll().await {
                         Ok(Event::PublishReleased(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -1294,11 +2276,6 @@ async fn incoming_qos2_write_fail_retry() {
                 };
 
                 // Complete publish using infallible connection
-                // This is only Some(pid) when we haven't received PUBREL yet.
-                let pid = session
-                    .pending_server_publishes
-                    .first()
-                    .map(|c| c.packet_identifier);
 
                 let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
@@ -1308,11 +2285,15 @@ async fn incoming_qos2_write_fail_retry() {
                         .await
                 );
 
+                // This is only Some(pid) when we haven't received PUBREL yet.
+                let pid = rx.session().inbound_publishes.first().copied();
+
                 loop {
                     match pid {
-                        Some(pid) => match assert_ok!(rx.poll().await) {
-                            Event::Duplicate => {}
+                        Some((pid, _)) => match assert_ok!(rx.poll().await) {
+                            Event::Duplicate(_) => {}
                             Event::PublishReleased(Puback {
+                                ack_mode: _,
                                 packet_identifier,
                                 reason_code: _,
                                 reason_string: _,
@@ -1323,7 +2304,7 @@ async fn incoming_qos2_write_fail_retry() {
                         },
                         None => match assert_ok!(rx.poll().await) {
                             Event::Ignored => break,
-                            e => panic!("Should only receive unknown PUBCOMP: {:?}", e),
+                            e => panic!("Should only receive unknown PUBREL: {:?}", e),
                         },
                     }
                 }
@@ -1338,8 +2319,177 @@ async fn incoming_qos2_write_fail_retry() {
 
 #[tokio::test]
 #[test_log::test]
-async fn incoming_qos2_read_fail_retry() {
-    let tx_id = MqttString::from_str("RETRY_INCOMING_QOS2_READ_FAIL_CLIENT").unwrap();
+async fn incoming_manual_qos2_write_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_INCOMING_MANUAL_QOS2_WRITE_FAIL_CLIENT").unwrap();
+
+    let (messages, tx_messages) = mpsc::channel(1);
+    let (received, tx_received) = mpsc::channel(1);
+
+    let (topic_name, topic_filter) = unique_topic();
+
+    let tx = publisher_task(topic_name, QoS::ExactlyOnce, tx_messages, tx_received);
+
+    let rx = async move {
+        let connect_options = NO_SESSION_CONNECT_OPTIONS
+            .clone()
+            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+
+        let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+        reconnect_options.clean_start = false;
+
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
+
+        let mut i = 0;
+        let mut failed = true;
+
+        'outer: while failed {
+            let message = i.to_string().into_bytes();
+
+            i += 1;
+            failed = false;
+
+            'rereceive: {
+                let msg = message.clone();
+
+                let session = 'try_receive: {
+                    let Ok(mut rx) = connected_failing_client(
+                        BROKER_ADDRESS,
+                        &connect_options,
+                        Some(tx_id.as_borrowed()),
+                        ByteLimit::Unlimited,
+                        ByteLimit::FailAfter(i),
+                    )
+                    .await
+                    else {
+                        failed = true;
+                        continue 'outer;
+                    };
+                    rx.ack_manually_when(&|_| true);
+
+                    let Ok(pid) = rx.subscribe(topic_filter.as_borrowed(), &sub_options).await
+                    else {
+                        failed = true;
+                        continue 'outer;
+                    };
+
+                    // Cannot fail because SUBACK is unanswered
+                    match assert_ok!(rx.poll().await) {
+                        Event::Suback(Suback {
+                            packet_identifier,
+                            reason_string: _,
+                            user_properties: _,
+                            reason_code: _,
+                        }) if pid == packet_identifier => {}
+                        _ => panic!("Should only receive a SUBACK"),
+                    }
+
+                    messages.send(message).await.unwrap();
+
+                    let pid = match assert_ok!(rx.poll().await) {
+                        Event::Publish(Publish {
+                            dup: false,
+                            identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
+                            message,
+                            ..
+                        }) if &*message == msg.as_slice() => packet_identifier,
+                        Event::Publish(_) => panic!("Received non-matching PUBLISH"),
+                        _ => panic!("Should only receive a PUBLISH"),
+                    };
+
+                    if rx
+                        .manual_receive(pid, ReasonCode::Success, &AckOptions::new())
+                        .await
+                        .is_err()
+                    {
+                        failed = true;
+                        break 'try_receive rx.session().clone();
+                    }
+
+                    match assert_ok!(rx.poll().await) {
+                        Event::PublishReleased(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if packet_identifier == pid => {}
+                        Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
+                        _ => panic!("Should only receive a PUBREL"),
+                    }
+
+                    if rx.manual_complete(pid, &AckOptions::new()).await.is_err() {
+                        failed = true;
+                        break 'try_receive rx.session().clone();
+                    }
+
+                    break 'rereceive;
+                };
+
+                // Complete publish using infallible connection
+
+                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                    Client::with_session(session, ALLOC.get());
+                let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+                assert_ok!(
+                    rx.connect(tcp, &reconnect_options, Some(tx_id.as_borrowed()))
+                        .await
+                );
+                rx.ack_manually_when(&|_| true);
+
+                // This is only Some(pid) when we haven't received PUBREL yet.
+                let pid = rx.session().inbound_publishes.first().copied();
+
+                loop {
+                    match pid {
+                        Some((pid, _)) => match assert_ok!(rx.poll().await) {
+                            Event::Duplicate(Publish {
+                                identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
+                                ..
+                            }) if pid == packet_identifier => {
+                                assert_ok!(
+                                    rx.manual_receive(
+                                        packet_identifier,
+                                        ReasonCode::Success,
+                                        &AckOptions::new(),
+                                    )
+                                    .await
+                                );
+                            }
+                            Event::PublishReleased(Puback {
+                                ack_mode: _,
+                                packet_identifier,
+                                reason_code: _,
+                                reason_string: _,
+                                user_properties: _,
+                            }) if packet_identifier == pid => {
+                                assert_ok!(
+                                    rx.manual_complete(packet_identifier, &AckOptions::new(),)
+                                        .await
+                                );
+                                break;
+                            }
+                            Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
+                            e => panic!("Should only receive PUBLISH or PUBREL: {:?}", e),
+                        },
+                        None => match assert_ok!(rx.poll().await) {
+                            Event::Ignored => break,
+                            e => panic!("Should only receive unknown PUBREL: {:?}", e),
+                        },
+                    }
+                }
+            }
+
+            received.send(()).await.unwrap();
+        }
+    };
+
+    join!(rx, tx);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn incoming_automatic_qos2_read_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_INCOMING_AUTOMATIC_QOS2_READ_FAIL_CLIENT").unwrap();
 
     let (messages, tx_messages) = mpsc::channel(1);
     let (received, tx_received) = mpsc::channel(1);
@@ -1421,6 +2571,7 @@ async fn incoming_qos2_read_fail_retry() {
 
                     match rx.poll().await {
                         Ok(Event::PublishReleased(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
@@ -1438,11 +2589,6 @@ async fn incoming_qos2_read_fail_retry() {
                 };
 
                 // Complete publish using infallible connection
-                // This is only Some(pid) when we haven't received PUBREL yet.
-                let pid = session
-                    .pending_server_publishes
-                    .first()
-                    .map(|c| c.packet_identifier);
 
                 let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
@@ -1452,16 +2598,20 @@ async fn incoming_qos2_read_fail_retry() {
                         .await
                 );
 
+                // This is only Some(pid) when we haven't received PUBREL yet.
+                let pid = rx.session().inbound_publishes.first().copied();
+
                 'complete: {
                     let pid = match assert_ok!(rx.poll().await) {
                         // We received the missing PUBCOMP
                         Event::Ignored => break 'complete,
                         Event::PublishReleased(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
                             user_properties: _,
-                        }) if packet_identifier == pid.unwrap() => break 'complete,
+                        }) if packet_identifier == pid.unwrap().0 => break 'complete,
                         Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
                         Event::Publish(Publish {
                             identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
@@ -1474,11 +2624,212 @@ async fn incoming_qos2_read_fail_retry() {
 
                     match assert_ok!(rx.poll().await) {
                         Event::PublishReleased(Puback {
+                            ack_mode: _,
                             packet_identifier,
                             reason_code: _,
                             reason_string: _,
                             user_properties: _,
                         }) if packet_identifier == pid => break 'complete,
+                        Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
+                        e => panic!("Should only receive PUBREL: {:?}", e),
+                    }
+                }
+            }
+
+            received.send(()).await.unwrap();
+        }
+    };
+
+    join!(rx, tx);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn incoming_manual_qos2_read_fail_retry() {
+    let tx_id = MqttString::from_str("RETRY_INCOMING_MANUAL_QOS2_READ_FAIL_CLIENT").unwrap();
+
+    let (messages, tx_messages) = mpsc::channel(1);
+    let (received, tx_received) = mpsc::channel(1);
+
+    let (topic_name, topic_filter) = unique_topic();
+
+    let tx = publisher_task(topic_name, QoS::ExactlyOnce, tx_messages, tx_received);
+
+    let rx = async move {
+        let connect_options = NO_SESSION_CONNECT_OPTIONS
+            .clone()
+            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+
+        let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
+        reconnect_options.clean_start = false;
+
+        let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
+
+        let mut i = 0;
+        let mut failed = true;
+
+        'outer: while failed {
+            let message = i.to_string().into_bytes();
+
+            i += 1;
+            failed = false;
+
+            'rereceive: {
+                let msg = message.clone();
+
+                let session = 'try_receive: {
+                    let Ok(mut rx) = connected_failing_client(
+                        BROKER_ADDRESS,
+                        &connect_options,
+                        Some(tx_id.as_borrowed()),
+                        ByteLimit::FailAfter(i),
+                        ByteLimit::Unlimited,
+                    )
+                    .await
+                    else {
+                        failed = true;
+                        continue 'outer;
+                    };
+                    rx.ack_manually_when(&|_| true);
+
+                    // Cannot fail because subscribing only sends
+                    let pid =
+                        assert_ok!(rx.subscribe(topic_filter.as_borrowed(), &sub_options).await);
+
+                    match rx.poll().await {
+                        Ok(Event::Suback(Suback {
+                            packet_identifier,
+                            reason_string: _,
+                            user_properties: _,
+                            reason_code: _,
+                        })) if pid == packet_identifier => {}
+                        Ok(_) => panic!("Should only receive a SUBACK"),
+                        Err(_) => {
+                            failed = true;
+                            continue 'outer;
+                        }
+                    }
+
+                    messages.send(message).await.unwrap();
+
+                    let pid = match rx.poll().await {
+                        Ok(Event::Publish(Publish {
+                            dup: false,
+                            identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
+                            message,
+                            ..
+                        })) if &*message == msg.as_slice() => {
+                            assert_ok!(
+                                rx.manual_receive(
+                                    packet_identifier,
+                                    ReasonCode::Success,
+                                    &AckOptions::new()
+                                )
+                                .await
+                            );
+
+                            packet_identifier
+                        }
+                        Ok(Event::Publish(_)) => panic!("Received non-matching PUBLISH"),
+                        Ok(_) => panic!("Should only receive a PUBLISH"),
+                        Err(_) => {
+                            failed = true;
+                            break 'try_receive rx.session().clone();
+                        }
+                    };
+
+                    match rx.poll().await {
+                        Ok(Event::PublishReleased(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        })) if packet_identifier == pid => {
+                            assert_ok!(
+                                rx.manual_complete(packet_identifier, &AckOptions::new())
+                                    .await
+                            );
+                        }
+                        Ok(Event::PublishReleased(_)) => panic!("Received non-matching PUBREL"),
+                        Ok(_) => panic!("Should only receive a PUBREL"),
+                        Err(_) => {
+                            failed = true;
+                            break 'try_receive rx.session().clone();
+                        }
+                    }
+
+                    break 'rereceive;
+                };
+
+                // Complete publish using infallible connection
+
+                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                    Client::with_session(session, ALLOC.get());
+                let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+                assert_ok!(
+                    rx.connect(tcp, &reconnect_options, Some(tx_id.as_borrowed()))
+                        .await
+                );
+                rx.ack_manually_when(&|_| true);
+
+                // This is only Some(pid) when we haven't received PUBREL yet.
+                let pid = rx.session().inbound_publishes.first().copied();
+
+                'complete: {
+                    let pid = match assert_ok!(rx.poll().await) {
+                        // We received the missing PUBCOMP
+                        Event::Ignored => break 'complete,
+                        Event::PublishReleased(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if packet_identifier == pid.unwrap().0 => {
+                            assert_ok!(
+                                rx.manual_complete(packet_identifier, &AckOptions::new())
+                                    .await
+                            );
+
+                            break 'complete;
+                        }
+                        Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
+                        Event::Publish(Publish {
+                            identified_qos: IdentifiedQoS::ExactlyOnce(packet_identifier),
+                            message,
+                            ..
+                        }) if &*message == msg.as_slice() => {
+                            assert_ok!(
+                                rx.manual_receive(
+                                    packet_identifier,
+                                    ReasonCode::Success,
+                                    &AckOptions::new()
+                                )
+                                .await
+                            );
+
+                            packet_identifier
+                        }
+                        Event::Publish(_) => panic!("Received non-matching PUBLISH"),
+                        e => panic!("Should only receive PUBLISH or PUBREL: {:?}", e),
+                    };
+
+                    match assert_ok!(rx.poll().await) {
+                        Event::PublishReleased(Puback {
+                            ack_mode: _,
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if packet_identifier == pid => {
+                            assert_ok!(
+                                rx.manual_complete(packet_identifier, &AckOptions::new())
+                                    .await
+                            );
+
+                            break 'complete;
+                        }
                         Event::PublishReleased(_) => panic!("Received non-matching PUBREL"),
                         e => panic!("Should only receive PUBREL: {:?}", e),
                     }

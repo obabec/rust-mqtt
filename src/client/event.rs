@@ -4,6 +4,7 @@ use heapless::Vec;
 
 use crate::{
     bytes::Bytes,
+    client::AckMode,
     types::{
         IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, PacketIdentifier, ReasonCode,
         TopicName, VarByteInt,
@@ -45,17 +46,27 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PRO
     /// The server sent a PINGRESP packet.
     Pingresp,
 
-    /// The server sent a PUBLISH packet.
+    /// The server sent a PUBLISH packet. In the case of [`QoS::AtLeastOnce`], this can be
+    /// a duplicate packet as indicated by the `DUP` flag, however, this flag being set
+    /// does not rule out the possibility of this packet being the first one to deliver
+    /// the application message. In the case of [`QoS::ExactlyOnce`], this packet and event
+    /// is definitely the first one to deliver the application message despite the setting
+    /// of the `DUP` flag, any other instances of the same application message will surface
+    /// as [`Event::Duplicate`].
     ///
-    /// The client has acted as follows:
+    /// The client has responded as follows:
     /// - [`QoS::AtMostOnce`]: No action
-    /// - [`QoS::AtLeastOnce`]: A PUBACK packet has been sent to the server.
-    /// - [`QoS::ExactlyOnce`]: A PUBREC packet has been sent to the server and the packet
-    ///   identifier is tracked as in flight
+    /// - [`QoS::AtLeastOnce`] and [`Publish::ack_mode`] is [`AckMode::Automatic`]: A PUBACK packet has been sent to the server.
+    /// - [`QoS::AtLeastOnce`] and [`Publish::ack_mode`] is [`AckMode::Manual`]: No action, the PUBACK must be sent manually by the user with [`Client::manual_acknowledge`].
+    /// - [`QoS::ExactlyOnce`]: A PUBREC packet has been sent to the server.
+    /// - [`QoS::ExactlyOnce`] and [`Publish::ack_mode`] is [`AckMode::Automatic`]: A PUBREC packet has been sent to the server.
+    /// - [`QoS::ExactlyOnce`] and [`Publish::ack_mode`] is [`AckMode::Manual`]: No action, the PUBREC must be sent manually by the user with [`Client::manual_receive`].
     ///
     /// [`QoS::AtMostOnce`]: crate::types::QoS::AtMostOnce
     /// [`QoS::AtLeastOnce`]: crate::types::QoS::AtLeastOnce
     /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
+    /// [`Client::manual_acknowledge`]: crate::client::Client::manual_acknowledge
+    /// [`Client::manual_receive`]: crate::client::Client::manual_receive
     Publish(Publish<'e, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>),
 
     /// The server sent a SUBACK packet matching a SUBSCRIBE packet.
@@ -70,20 +81,42 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PRO
     /// indicates success. The UNSUBSCRIBE packet won't have to be resent.
     Unsuback(Suback<'e, MAX_USER_PROPERTIES>),
 
-    /// The server sent a PUBACK or PUBREC with an erroneous [`ReasonCode`], therefore
-    /// rejecting the publication. The publication process is aborted, the client has
-    /// removed this publication's flight state from its session and has not responded
-    /// with another packet. The publication can be retried with [`Client::publish`].
+    /// The server sent a PUBACK, PUBREC or PUBCOMP with an erroneous [`ReasonCode`],
+    /// therefore rejecting the publication. The publication process is aborted, the client
+    /// has removed this publication's flight state from its session and has not responded
+    /// with another packet. The publication can be retried with [`Client::publish`], note
+    /// however that this retry is a new application message.
     ///
     /// The included [`ReasonCode`] is always erroneous.
     ///
+    /// In the case of an erroneous PUBCOMP, the spec states:
+    /// This is not an error during recovery, but at other times indicates a mismatch
+    /// between the session state on the client and server.
+    ///
     /// [`Client::publish`]: crate::client::Client::publish
     PublishRejected(Pubrej<'e, MAX_USER_PROPERTIES>),
+
+    /// The server sent a PUBREL with an erroneous [`ReasonCode`], therefore aborting its own
+    /// publication. The reason code can only be [`ReasonCode::PacketIdentifierNotFound`].
+    /// Note that the client has already delivered the associated publication previously with
+    /// an [`Event::Publish`]. The client has automatically responded with a PUBCOMP packet as
+    /// dictated by the specification.
+    ///
+    /// The spec states:
+    /// This is not an error during recovery, but at other times indicates a mismatch
+    /// between the session state on the client and server.
+    ///
+    /// [`QoS`]: crate::types::QoS
+    /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
+    /// [`QoS::AtLeastOnce`]: crate::types::QoS::AtLeastOnce
+    PublishAborted(Pubrej<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a PUBACK packet matching a [`QoS::AtLeastOnce`] PUBLISH packet
     /// confirming that the PUBLISH has been received. The [`QoS::AtLeastOnce`]
     /// publication process is complete, the PUBLISH packet won't have to be resent.
     ///
+    /// The included [`AckMode`] has no significance because for outgoing publications
+    /// at [`QoS::AtLeastOnce`], there are no acknowledgements to be sent by the client.
     /// The included [`ReasonCode`] is always successful.
     ///
     /// [`QoS::AtLeastOnce`]: crate::types::QoS::AtLeastOnce
@@ -92,44 +125,72 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PRO
     /// The server sent a PUBREC packet matching a [`QoS::ExactlyOnce`] PUBLISH packet
     /// confirming that the PUBLISH has been received. The first handshake of the
     /// [`QoS::ExactlyOnce`] publication process is complete, the PUBLISH packet won't
-    /// have to be resent. The client has responded with a PUBREL packet.
+    /// have to be resent. In case of [`AckMode::Automatic`], the client has responded
+    /// with a PUBREL packet, for [`AckMode::Manual`], this PUBREL has to be sent
+    /// manually via [`Client::manual_release`].
     ///
     /// The included [`ReasonCode`] is always successful.
     ///
     /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
+    /// [`Client::manual_release`]: crate::client::Client::manual_release
     PublishReceived(Puback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a PUBREL packet matching a [`QoS::ExactlyOnce`] PUBREC packet
     /// confirming that the PUBREC has been received. The [`QoS::ExactlyOnce`]
     /// publication process is complete, the PUBREC packet won't have to be resent.
-    /// The client has responded with a PUBCOMP packet.
+    /// In case of [`AckMode::Automatic`], the client has responded with a PUBCOMP
+    /// packet, for [`AckMode::Manual`], this PUBCOMP has to be sent manually via
+    /// [`Client::manual_complete`].
     ///
     /// The included [`ReasonCode`] is always successful.
     ///
     /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
+    /// [`Client::manual_complete`]: crate::client::Client::manual_complete
     PublishReleased(Puback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a PUBCOMP packet matching a [`QoS::ExactlyOnce`] PUBREL packet
     /// confirming that the PUBREL has been received. The [`QoS::ExactlyOnce`]
     /// publication process is complete, the PUBREL packet won't have to be resent.
     ///
+    /// The included [`AckMode`] has no significance because the PUBCOMP packet
+    /// completes the handshake removing the packet identifier from the session state
+    /// completely, there are no more acknowledgements to be sent by the client.
     /// The included [`ReasonCode`] is always successful.
     ///
     /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
     PublishComplete(Puback<'e, MAX_USER_PROPERTIES>),
 
     /// The server sent a SUBACK, UNSUBACK, PUBACK, PUBREC, PUBREL or PUBCOMP
-    /// packet with a packet identifier that is not in flight (anymore).
+    /// packet with a packet identifier that is not in flight (anymore) or the
+    /// server sent a PUBREC, PUBREL or PUBCOMP packet that did not drive the
+    /// the session entry of its packet identifier forward.
     ///
-    /// The client has not responded to the server or has responded appropriately
-    /// to prevent a potential protocol deadlock.
+    /// The client has not responded to the server or has responded
+    /// automatically according to MQTT's rules to prevent a potential protocol
+    /// deadlock. In both cases, no manual acknowledgements are required or
+    /// allowed.
     Ignored,
 
     /// The server sent a [`QoS::ExactlyOnce`] PUBLISH packet which would cause a duplicate.
-    /// The client has responded with a PUBREC packet.
+    /// The [`AckMode`] of the original PUBLISH packet for this packet identifier is unchanged,
+    /// which is also the value set for the included [`Publish::ack_mode`] instead of the value
+    /// produced by the predicate optionally set with [`Client::ack_manually_when`]. The client
+    /// response behaviour depends on the original [`AckMode`] value (the one in this
+    /// [`Publish::ack_mode`]):
+    /// - [`AckMode::Automatic`]: The client has responded automatically.
+    /// - [`AckMode::Manual`]:
+    ///   - The client has responded automatically in all cases where a PUBREC was previously
+    ///     sent within the same network connection.
+    ///   - If a reconnection occured and this duplicate is the first republish, the PUBREC
+    ///     packet must still be sent manually.
+    ///
+    /// Because the message was deserialized already anyway, it is included here, however, it
+    /// is **NOT** a valid application message and **MUST** be treated like it wasn't ever
+    /// delivered by the client.
     ///
     /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
-    Duplicate,
+    /// [`Client::ack_manually_when`]: crate::client::Client::ack_manually_when
+    Duplicate(Publish<'e, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>),
 }
 
 /// Content of [`Event::Suback`].
@@ -149,11 +210,18 @@ pub struct Suback<'s, const MAX_USER_PROPERTIES: usize> {
     pub reason_code: ReasonCode,
 }
 
-/// Content of [`Event::Publish`].
+/// Content of [`Event::Publish`] or [`Event::Duplicate`]. In the latter case, it is **NOT** a valid
+/// application message and **MUST** be treated like it wasn't ever delivered by the client.
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PROPERTIES: usize>
 {
+    /// The acknowledgement mode the client has determined with its given predicate to use for this
+    /// publication flow. If this is the content of an [`Event::Duplicate`], this value is not the
+    /// one determined for this PUBLISH packet through the predicate but the value of the original
+    /// [`Event::Publish`] event.
+    pub ack_mode: AckMode,
+
     /// The DUP flag in the PUBLISH packet. If set to false, it indicates that this is the first occasion
     /// the server has attempted to send this publication.
     pub dup: bool,
@@ -215,6 +283,12 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER
 #[derive(Debug)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Puback<'p, const MAX_USER_PROPERTIES: usize> {
+    /// The acknowledgement mode that was configured at the time of
+    /// publication (for outgoing publications) or the mode the client has
+    /// determined with its given function (for incoming publications).
+    /// This value is unchanged from the same field in the associated,
+    /// previous [`Publish`] or [`Puback`] event.
+    pub ack_mode: AckMode,
     /// Packet identifier of the acknowledged PUBLISH packet.
     pub packet_identifier: PacketIdentifier,
     /// Reason code of this state in the publication process
@@ -226,13 +300,15 @@ pub struct Puback<'p, const MAX_USER_PROPERTIES: usize> {
     pub user_properties: Vec<MqttStringPair<'p>, MAX_USER_PROPERTIES>,
 }
 
-impl<'p, T, const MAX_USER_PROPERTIES: usize> From<GenericPubackPacket<'p, T, MAX_USER_PROPERTIES>>
-    for Puback<'p, MAX_USER_PROPERTIES>
-{
-    fn from(packet: GenericPubackPacket<'p, T, MAX_USER_PROPERTIES>) -> Self {
+impl<'p, const MAX_USER_PROPERTIES: usize> Puback<'p, MAX_USER_PROPERTIES> {
+    pub(crate) fn new<T>(
+        packet: GenericPubackPacket<'p, T, MAX_USER_PROPERTIES>,
+        ack_mode: AckMode,
+    ) -> Self {
         debug_assert!(packet.reason_code.is_success());
 
         Self {
+            ack_mode,
             packet_identifier: packet.packet_identifier,
             reason_code: packet.reason_code,
             reason_string: packet.reason_string.map(Property::into_inner),

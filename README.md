@@ -15,7 +15,7 @@
 
 The design goal is a strict yet flexible and explicit API that leverages Rust's type system to enforce the MQTT specification while exposing all protocol features transparently. Session state, configuration, and Quality of Service message delivery and retry behaviour remain fully under user control, giving complete freedom over protocol usage. Protocol-related errors are prevented by the client API and are modeled in a way that enables maximum recoverability. By avoiding opinionated design choices and making no assumptions about the runtime environment, `rust-mqtt` remains lightweight while providing a powerful MQTT client foundation.
 
-`rust-mqtt` does not implement opinionated connection management — automatic reconnects, keepalive loops, retry policies, or background tasks are intentionally left to the user. Instead, the crate provides cancel-safe protocol primitives, suitable for higher-level clients, tooling, and resource-constrained embedded applications. In the future, the client will be extended with additional I/O traits such as `ReadReady` to further composability.
+`rust-mqtt` does not implement opinionated connection management — automatic reconnects, keepalive loops, retry policies, or background tasks are intentionally left to the user. Instead, the crate provides cancel-safe protocol primitives and optional manual acknowledgements, suitable for higher-level clients, tooling, and resource-constrained embedded applications. In the future, the client will be extended with additional I/O traits such as `ReadReady` to further composability.
 
 ## Library state
 
@@ -23,6 +23,7 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 
 - Will
 - Bidirectional publications with Quality of Service 0, 1 and 2
+- Automatic and manual/deferred acknowledgements
 - Flow control
 - Configuration & session tracking
 - Session recovery
@@ -32,13 +33,14 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 - Message expiry interval
 - Topic alias in outgoing publications
 - Request/Response
-- Reason String in CONNACK, SUBACK, UNSUBACK and DISCONNECT packet as well as incoming PUBACK, PUBREC, PUBREL and PUBCOMP packets
-- User Property in CONNECT, CONNACK, PUBLISH, SUBSCRIBE, SUBACK, UNSUBSCRIBE, UNSUBACK and DISCONNECT packets as well as incoming PUBACK, PUBREC, PUBREL and PUBCOMP packets
+- Request Problem Information
+- Reason String
+- User Property
 
 ### Currently unsupported MQTT features & limitations
 
 - AUTH packet
-- Properties: Authentication Method, Authentication Data, Request Problem Information, Reason String (outgoing PUBACK, PUBREC, PUBREL, PUBCOMP), User Property (outgoing PUBACK, PUBREC, PUBREL and PUBCOMP)
+- Properties: Authentication Method, Authentication Data
 - Subscribing to multiple topics in a single packet
 - Topic alias in incoming publications
 
@@ -57,7 +59,7 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 - Logging-related:
   - `log`: Enables logging via the `log` crate
   - `defmt`: Implements `defmt::Format` for crate items & enables logging via the `defmt` crate (version 1)
-  - `log-level-*`: Enables logs at the selected level and more severe levels (error, warn, info, debug, trace)
+  - `log-level-*`: Enables logs at the selected level and more severe levels (error, warn, info, debug, trace). The trace log level also features detailed MQTT state machine logs.
   - `log-verbose`: Enables high-overhead IO traces at the trace log level and enables `log-level-trace`
 
 ## Usage
@@ -123,17 +125,22 @@ async fn main() {
 
     // Recover the in-flight Quality of Service 2 publish.
 
-    match client.session().cpublish_flight_state(packet_identifier) {
-        // - Republish if PUBLISH / PUBREC may have been lost
-        Some(CPublishFlightState::AwaitingPubrec) => client.republish(
+    // Republish if PUBLISH / PUBREC may have been lost
+    match client
+        .republish(
             packet_identifier,
             &PublicationOptions::new(topic_reference).exactly_once(),
             "Hello World!".into(),
-        ).await.unwrap(),
-        // - Re-release if PUBREL / PUBCOMP may have been lost
-        Some(CPublishFlightState::AwaitingPubcomp) => client.rerelease().await.unwrap(),
-        // - Flight state already completed
-        _ => {}
+        )
+        .await
+    {
+        // All done / Flight state is already completed
+        Ok(_) | Err(MqttError::PacketIdentifierNotInFlight) => {}
+
+        // Re-release if PUBREL / PUBCOMP may have been lost
+        Err(MqttError::HandshakeStateMismatched) => client.rerelease().await.unwrap(),
+
+        Err(_) => panic!("Other error :("),
     }
 }
 ```
@@ -142,8 +149,9 @@ async fn main() {
 
 - 'demo' is a showcase of rust-mqtt's features over TCP. Note that the example usage is very strict and not really a good way of using the client.
 - 'tls' connects the client to a broker over TLS with client certificate authentication and server certificate verification using [embedded-tls](https://github.com/drogue-iot/embedded-tls).
+- 'manual_ack' shows the client's capabilities of manual acknowledgements by rudimentarily implementing the optional payload format check (see [MQTTv5, 3.3.2.3.2 Payload Format Indicator](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901111))
 
-Set up the broker for 'demo' by installing, configuring and running Mosquitto using the CI configuration:
+Set up the broker for 'demo' and 'manual_ack' by installing, configuring and running Mosquitto using the CI configuration:
 
 ```bash
 cp .ci/mqtt_pass_plain.txt .ci/mqtt_pass_hashed.txt
@@ -163,7 +171,7 @@ Then you can run the examples with different logging configs and the bump/alloc 
 ```bash
 RUST_LOG=info cargo run --example demo
 RUST_LOG=info cargo run --example tls
-RUST_LOG=trace cargo run --example demo --no-default-features --features "v5 log bump log-level-trace"
+RUST_LOG=trace cargo run --example manual_ack --no-default-features --features "v5 log bump log-level-trace"
 ```
 
 ### Tests

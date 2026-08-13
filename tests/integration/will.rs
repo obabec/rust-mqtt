@@ -4,7 +4,7 @@ use rust_mqtt::{
     client::{
         MqttError,
         event::Publish,
-        options::{DisconnectOptions, WillOptions},
+        options::{AckMode, DisconnectOptions, WillOptions},
     },
     config::SessionExpiryInterval,
     types::{IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, ReasonCode},
@@ -48,6 +48,7 @@ async fn network_failure() {
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, will_topic_filter);
 
         let Publish {
+            ack_mode,
             dup,
             identified_qos,
             retain,
@@ -62,6 +63,7 @@ async fn network_failure() {
             message,
         } = assert_recv_excl!(rx, will_topic_name);
 
+        assert_eq!(ack_mode, AckMode::Automatic);
         assert!(!dup);
         assert_eq!(identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!retain);
@@ -106,6 +108,7 @@ async fn disconnect_with_will_message() {
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, will_topic_filter);
 
         let Publish {
+            ack_mode,
             dup,
             identified_qos,
             retain,
@@ -120,6 +123,7 @@ async fn disconnect_with_will_message() {
             message,
         } = assert_recv_excl!(rx, will_topic_name);
 
+        assert_eq!(ack_mode, AckMode::Automatic);
         assert!(!dup);
         assert_eq!(identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!retain);
@@ -295,6 +299,7 @@ async fn properties() {
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, will_topic_filter);
 
         let Publish {
+            ack_mode,
             dup,
             identified_qos,
             retain,
@@ -309,6 +314,7 @@ async fn properties() {
             message,
         } = assert_recv_excl!(rx, will_topic_name);
 
+        assert_eq!(ack_mode, AckMode::Automatic);
         assert!(!dup);
         assert_eq!(identified_qos, IdentifiedQoS::AtMostOnce);
         assert!(!retain);

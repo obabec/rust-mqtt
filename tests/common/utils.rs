@@ -221,7 +221,7 @@ pub async fn receive_and_complete<'c>(
                     "Expected PUBREL with packet identifier {:?}, but received PUBREL with packet identifier {:?}",
                     pid, p.packet_identifier
                 ),
-                e => warn!("Expected PUBLISH, but received {:?}", e),
+                e => warn!("Expected PUBREL, but received {:?}", e),
             }
         },
     }

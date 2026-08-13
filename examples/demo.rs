@@ -112,7 +112,7 @@ async fn main() {
             user_properties: _,
             reason_code,
         })) => {
-            info!("Subscribed with reason code {reason_code:?}")
+            info!("Subscribed with reason code {reason_code:?}");
         }
         Ok(e) => {
             error!("Expected Suback but received event {e:?}");
@@ -220,7 +220,7 @@ async fn main() {
             user_properties: _,
             reason_code,
         })) => {
-            info!("Unsubscribed with reason code {reason_code:?}")
+            info!("Unsubscribed with reason code {reason_code:?}");
         }
         Ok(e) => {
             info!("Expected Unsuback but received event {e:?}");
@@ -319,6 +319,7 @@ async fn main() {
     loop {
         match client.poll().await {
             Ok(Event::PublishComplete(Puback {
+                ack_mode: _,
                 packet_identifier,
                 reason_code: _,
                 reason_string: _,

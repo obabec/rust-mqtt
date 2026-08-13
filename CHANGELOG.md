@@ -29,6 +29,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Replace usage of `MqttError::InvalidTopicAlias` with `MqttError::UnsupportedByServer`
 - Move `ConnectInfo` into `crate::client::event` and rename to `Connected`
 - Replace `ReceiveMaximum` newtype with inlined `NonZero<u16>`
+- Implement `Debug` and `defmt::Format` for `Client` without trait bounds
+- Remove `InFlightPublish`
+- Remove `CPublishFlightState` and `SPublishFlightState` and replace with `LocalPublishState` and `PeerPublishState` respectively with manual acknowledgement capabilites
+- Fix edge cases of session state machine to be specification compliant
+- Move subscription and unsubscription tracking into session
+- Implement session as handle-based state machine with detailed logging
+- Include the `Publish` event in `Event::Duplicate`
+- Add `Event::PublishAborted`
+- Add an `AckMode` field to to `Puback` events (`Event::PublishAcknowledged`, `Event::PublishReceived`, `Event::PublishReleased` and `Event::PublishComplete`)
+- Add `AckMode` for specifying manual or automatic acknowledgement mode for publication flows
+- Add manual acknowledgements for incoming publications with a predicate on `Publish` events deciding the `AckMode`
+- Add manual acknowledgements for outgoing publications with a field in `PublicationOptions`
+- Add manual_ack example
 
 ## 0.5.1 - 2026-04-10
 

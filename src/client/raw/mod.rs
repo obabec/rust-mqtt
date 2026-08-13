@@ -23,11 +23,25 @@ use crate::{
 };
 
 /// An MQTT Client offering a low level api for sending and receiving packets
-#[derive(Debug)]
 pub(crate) struct Raw<'b, N: Transport, B: BufferProvider<'b>> {
     n: NetState<N>,
     buf: &'b mut B,
     header: HeaderState,
+}
+
+impl<'b, N: Transport, B: BufferProvider<'b>> core::fmt::Debug for Raw<'b, N, B> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Raw")
+            .field("header", &self.header)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<'b, N: Transport, B: BufferProvider<'b>> defmt::Format for Raw<'b, N, B> {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "Raw {{ header: {:?}, .. }}", self.header);
+    }
 }
 
 impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
@@ -42,7 +56,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
     pub fn set_net(&mut self, net: N) {
         debug_assert!(
             !self.n.is_ok(),
-            "Network must not be in Ok() state to replace it."
+            "network must not be in Ok() state to replace it."
         );
         self.n.replace(net);
     }
@@ -71,7 +85,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
     pub async fn abort(&mut self) -> Result<(), RawError<B::ProvisionError>> {
         debug_assert!(
             !self.n.is_ok(),
-            "Network must not be in Ok() state to disconnect due to an error."
+            "network must not be in Ok() state to disconnect due to an error."
         );
 
         match &mut self.n {
@@ -81,7 +95,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
                 debug!("sending DISCONNECT packet with reason code: {:?}", r);
 
                 // Don't check whether length exceeds servers maximum packet size because we don't
-                // add a reason string to the DISCONNECT packet -> length is always in the 4..=6 range in bytes.
+                // add properties to the DISCONNECT packet -> length is always in the 4..=6 range in bytes.
                 // The server really shouldn't reject this.
                 let r = packet
                     .send(n)

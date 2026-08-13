@@ -6,8 +6,6 @@ use core::marker::PhantomData;
 
 use heapless::Vec;
 
-#[cfg(test)]
-use crate::types::{MqttString, MqttStringPair};
 use crate::{
     buffer::BufferProvider,
     eio::{Read, Write},
@@ -192,25 +190,23 @@ impl<T: PubackPacketType, const MAX_USER_PROPERTIES: usize> TxPacket
 impl<'p, T: PubackPacketType, const MAX_USER_PROPERTIES: usize>
     GenericPubackPacket<'p, T, MAX_USER_PROPERTIES>
 {
-    pub const fn new(packet_identifier: PacketIdentifier, reason_code: ReasonCode) -> Self {
+    pub const fn new(
+        packet_identifier: PacketIdentifier,
+        reason_code: ReasonCode,
+        reason_string: Option<ReasonString<'p>>,
+        user_properties: Vec<UserProperty<'p>, MAX_USER_PROPERTIES>,
+    ) -> Self {
         Self {
             packet_identifier,
             reason_code,
-            reason_string: None,
-            user_properties: Vec::new(),
+            reason_string,
+            user_properties,
             _phantom_data: PhantomData,
         }
     }
 
-    #[cfg(test)]
-    pub fn add_reason_string(&mut self, reason_string: MqttString<'p>) {
-        self.reason_string = Some(reason_string.into());
-    }
-    #[cfg(test)]
-    pub fn add_user_property(&mut self, user_property: MqttStringPair<'p>) {
-        self.user_properties
-            .push(UserProperty(user_property))
-            .unwrap();
+    pub const fn minimal(packet_identifier: PacketIdentifier, reason_code: ReasonCode) -> Self {
+        Self::new(packet_identifier, reason_code, None, Vec::new())
     }
 
     fn properties_length(&self) -> VarByteInt {
@@ -249,7 +245,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubackPacket::<0>::new(PacketIdentifier::new(NonZero::new(7439).unwrap()), ReasonCode::NotAuthorized),
+                PubackPacket::<0>::minimal(PacketIdentifier::new(NonZero::new(7439).unwrap()), ReasonCode::NotAuthorized),
                 [
                     0x40,
                     0x04,
@@ -264,19 +260,24 @@ mod unit {
         #[tokio::test]
         #[test_log::test]
         async fn encode_properties() {
-            let mut packet = PubackPacket::<16>::new(
+            let packet = PubackPacket::<16>::new(
                 PacketIdentifier::new(NonZero::new(23485).unwrap()),
                 ReasonCode::TopicNameInvalid,
+                Some(ReasonString(
+                    MqttString::from_str("invalid topic name!").unwrap(),
+                )),
+                [
+                    UserProperty(MqttStringPair::new(
+                        MqttString::from_str("topic name").unwrap(),
+                        MqttString::from_str("invalid").unwrap(),
+                    )),
+                    UserProperty(MqttStringPair::new(
+                        MqttString::from_str("accepted").unwrap(),
+                        MqttString::from_str("negative").unwrap(),
+                    )),
+                ]
+                .into(),
             );
-            packet.add_reason_string(MqttString::from_str("invalid topic name!").unwrap());
-            packet.add_user_property(MqttStringPair::new(
-                MqttString::from_str("topic name").unwrap(),
-                MqttString::from_str("invalid").unwrap(),
-            ));
-            packet.add_user_property(MqttStringPair::new(
-                MqttString::from_str("accepted").unwrap(),
-                MqttString::from_str("negative").unwrap(),
-            ));
 
             #[rustfmt::skip]
             encode!(
@@ -434,7 +435,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubrecPacket::<0>::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::QuotaExceeded),
+                PubrecPacket::<0>::minimal(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::QuotaExceeded),
                 [
                     0x50,
                     0x04,
@@ -449,19 +450,22 @@ mod unit {
         #[tokio::test]
         #[test_log::test]
         async fn encode_properties() {
-            let mut packet = PubrecPacket::<16>::new(
+            let packet = PubrecPacket::<16>::new(
                 PacketIdentifier::new(NonZero::new(23895).unwrap()),
                 ReasonCode::ImplementationSpecificError,
+                Some(ReasonString(MqttString::from_str("I crashed :(").unwrap())),
+                [
+                    UserProperty(MqttStringPair::new(
+                        MqttString::from_str("me").unwrap(),
+                        MqttString::from_str("somewhere over the rainbow").unwrap(),
+                    )),
+                    UserProperty(MqttStringPair::new(
+                        MqttString::from_str("problem").unwrap(),
+                        MqttString::from_str("yours").unwrap(),
+                    )),
+                ]
+                .into(),
             );
-            packet.add_reason_string(MqttString::from_str("I crashed :(").unwrap());
-            packet.add_user_property(MqttStringPair::new(
-                MqttString::from_str("me").unwrap(),
-                MqttString::from_str("somewhere over the rainbow").unwrap(),
-            ));
-            packet.add_user_property(MqttStringPair::new(
-                MqttString::from_str("problem").unwrap(),
-                MqttString::from_str("yours").unwrap(),
-            ));
 
             #[rustfmt::skip]
             encode!(
@@ -616,7 +620,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubrelPacket::<0>::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::PacketIdentifierNotFound),
+                PubrelPacket::<0>::minimal(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::PacketIdentifierNotFound),
                 [
                     0x62,
                     0x04,
@@ -631,15 +635,16 @@ mod unit {
         #[tokio::test]
         #[test_log::test]
         async fn encode_properties() {
-            let mut packet = PubrelPacket::<16>::new(
+            let packet = PubrelPacket::<16>::new(
                 PacketIdentifier::new(NonZero::new(9786).unwrap()),
                 ReasonCode::PacketIdentifierNotFound,
+                Some(ReasonString(MqttString::try_from("test reason").unwrap())),
+                [UserProperty(MqttStringPair::new(
+                    MqttString::try_from("test-name").unwrap(),
+                    MqttString::try_from("test-value").unwrap(),
+                ))]
+                .into(),
             );
-            packet.add_reason_string(MqttString::try_from("test reason").unwrap());
-            packet.add_user_property(MqttStringPair::new(
-                MqttString::try_from("test-name").unwrap(),
-                MqttString::try_from("test-value").unwrap(),
-            ));
 
             #[rustfmt::skip]
             encode!(
@@ -711,7 +716,7 @@ mod unit {
                 42,
                 [
                     0x62,
-                    0x2A, 
+                    0x2A,
 
                     0x26, 0x3A, // Packet Identifier
                     0x92,       // Reason Code
@@ -720,10 +725,10 @@ mod unit {
 
                     // Reason String
                     0x1F, 0x00, 0x0B,
-                          b't', b'e', b's', b't', b' ', b'r', b'e', b'a', b's', b'o', b'n', 
+                          b't', b'e', b's', b't', b' ', b'r', b'e', b'a', b's', b'o', b'n',
 
                     // User Property
-                    0x26, 0x00, 0x09, b't', b'e', b's', b't', b'-', b'n', b'a', b'm', b'e', 
+                    0x26, 0x00, 0x09, b't', b'e', b's', b't', b'-', b'n', b'a', b'm', b'e',
                           0x00, 0x0A, b't', b'e', b's', b't', b'-', b'v', b'a', b'l', b'u', b'e',
                 ]
             );
@@ -798,7 +803,7 @@ mod unit {
         async fn encode_simple() {
             #[rustfmt::skip]
             encode!(
-                PubcompPacket::<0>::new(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::PacketIdentifierNotFound),
+                PubcompPacket::<0>::minimal(PacketIdentifier::new(NonZero::new(876).unwrap()), ReasonCode::PacketIdentifierNotFound),
                 [
                     0x70,
                     0x04,
@@ -813,15 +818,16 @@ mod unit {
         #[tokio::test]
         #[test_log::test]
         async fn encode_properties() {
-            let mut packet = PubcompPacket::<16>::new(
+            let packet = PubcompPacket::<16>::new(
                 PacketIdentifier::new(NonZero::new(9786).unwrap()),
                 ReasonCode::PacketIdentifierNotFound,
+                Some(ReasonString(MqttString::try_from("test reason").unwrap())),
+                [UserProperty(MqttStringPair::new(
+                    MqttString::try_from("test-name").unwrap(),
+                    MqttString::try_from("test-value").unwrap(),
+                ))]
+                .into(),
             );
-            packet.add_reason_string(MqttString::try_from("test reason").unwrap());
-            packet.add_user_property(MqttStringPair::new(
-                MqttString::try_from("test-name").unwrap(),
-                MqttString::try_from("test-value").unwrap(),
-            ));
 
             #[rustfmt::skip]
             encode!(
@@ -937,15 +943,15 @@ mod unit {
                 0x1B,       // Property length
 
                 // User Property
-                0x26, 0x00, 0x02, b'k', b'1', 
+                0x26, 0x00, 0x02, b'k', b'1',
                       0x00, 0x02, b'v', b'1',
 
                 // User Property
-                0x26, 0x00, 0x02, b'k', b'2', 
+                0x26, 0x00, 0x02, b'k', b'2',
                       0x00, 0x02, b'v', b'2',
 
                 // User Property
-                0x26, 0x00, 0x02, b'k', b'3', 
+                0x26, 0x00, 0x02, b'k', b'3',
                       0x00, 0x02, b'v', b'3',
             ]);
 

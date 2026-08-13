@@ -1,8 +1,6 @@
 //! Implements full client functionality with session and configuration handling and Quality of Service flows.
 
-use core::num::NonZero;
-
-use heapless::Vec;
+use core::{matches, num::NonZero};
 
 use crate::{
     buffer::BufferProvider,
@@ -10,8 +8,8 @@ use crate::{
     client::{
         event::{Connected, Event, Puback, Publish, Pubrej, Suback},
         options::{
-            ConnectOptions, DisconnectOptions, PublicationOptions, SubscriptionOptions,
-            TopicReference, UnsubscriptionOptions,
+            AckMode, AckOptions, ConnectOptions, DisconnectOptions, PublicationOptions,
+            SubscriptionOptions, TopicReference, UnsubscriptionOptions,
         },
         raw::Raw,
     },
@@ -20,7 +18,7 @@ use crate::{
     header::{FixedHeader, PacketType},
     io::Transport,
     packet::{Packet, TxPacket},
-    session::{CPublishFlightState, SPublishFlightState, Session},
+    session::{Error as SmError, Event as SmEvent, LocalPublishState, Response, Session},
     types::{
         IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, PacketIdentifier, QoS, ReasonCode,
         SubscriptionFilter, TopicFilter, TopicName, VarByteInt,
@@ -46,7 +44,9 @@ pub use err::Error as MqttError;
 /// An MQTT client.
 ///
 /// Configuration via const parameters:
-/// - `MAX_SUBSCRIBES`: The maximum amount of in-flight/unacknowledged SUBSCRIBE packets (one per call to [`Self::subscribe`]).
+///
+/// - `SUBSCRIBE_MAXIMUM`: The maximum amount of in-flight/unacknowledged packets allowed for SUBSCRIBE and UNSUBSCRIBE packets
+///   each (one slot per call to [`Client::subscribe`] or [`Client::unsubscribe`]). Must not be greater than 65535.
 /// - `RECEIVE_MAXIMUM`: MQTT's control flow mechanism. The maximum amount of incoming [`QoS::AtLeastOnce`] and
 ///   [`QoS::ExactlyOnce`] publications (accumulated). Must not be 0 and must not be greater than 65535.
 /// - `SEND_MAXIMUM`: The maximum amount of outgoing [`QoS::AtLeastOnce`] and [`QoS::ExactlyOnce`] publications. The server
@@ -58,13 +58,98 @@ pub use err::Error as MqttError;
 ///   - It is recommended (but not strictly required) to use a value >= 1, because if the value is 0, the client does not
 ///     guarantee to detect the protocol error and disconnect from the server when the request problem information property in
 ///     CONNECT is 0 and the server sends user properties in a packet other than CONNACK, DISCONNECT or PUBLISH.
-#[derive(Debug)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+///
+/// The client has two modes of how the acknowledgements within handshakes of [`QoS::AtLeastOnce`] and [`QoS::ExactlyOnce`]
+/// publications are handled. These modes are the default [`AckMode::Automatic`] and the proactively configurable
+/// [`AckMode::Manual`]. The modes are applied separately and independently for each tuple of packet identifier and publication
+/// direction (incoming or outgoing publication). For outgoing publications, the [`AckMode`] is selected once at the time of
+/// sending the first PUBLISH packet with [`Client::publish`] and stays unchanged for this tuple (packet identifier/outgoing)
+/// for the entire duration of the handshake until its completion and deletion from the session state after receiving a PUBCOMP
+/// (Note that for outgoing publications, [`AckMode::Manual`] is only an option for [`QoS::ExactlyOnce`] and not for
+/// [`QoS::AtLeastOnce`] publications because no acknowledgements are required by the client, and in case of a reconnection the
+/// PUBLISH packet has to be retransmitted manually anyway).
+/// For incoming publications, a predicate can be set which will be called for every applicable incoming PUBLISH packet and
+/// determine the [`AckMode`] for this tuple (packet identifier/incoming). As with outgoing publications, this [`AckMode`] also
+/// remains unchangd for the duration of the handshake until it's completed with an outgoing PUBACK, PUBCOMP or erroneous reason-
+/// coded PUBREC packet or an incoming erroneous PUBREL packet.
+/// Hard disconnections after which the session is not continued of course also clear any session entries and as such the
+/// associations of packet identifiers and publication direction with an [`AckMode`] are also removed.
+///
+/// The state machine behind the publication mechanism is robust and prevents illegal acknowledgements or retransmissions and
+/// therefore protocol errors triggered by incorrect calls to [`Client::republish`], [`Client::rerelease`],
+/// [`Client::manual_acknowledge`], [`Client::manual_receive`], [`Client::manual_release`] and [`Client::manual_complete`].
+/// By interpreting the specification liberally, the state machine accommodates unexpected server packets that a stricter
+/// implementation might reject, raising errors only when there is no appropriate way to react.
+///
+/// What follows is an overview of over the automatic and manual acknowledgement modes, what work the client does automatically
+/// vs what has to be done by the user and which acknowledgement packets are sent how.
+///
+/// - Outgoing [`QoS::AtMostOnce`] publication: No acknowledgement packets and retransmissions, only [`AckMode::Automatic`] is
+///   available. After sending the fire-and-forget PUBLISH packet, no further action is required.
+/// - Outgoing [`QoS::AtLeastOnce`] publication: No acknowledgement packets sent by the client, only [`AckMode::Automatic`] is
+///   available.
+///   - If a PUBACK packet has not been received yet when a reconnection happens, the PUBLISH packet must be resent with
+///     [`Client::republish`].
+/// - Outgoing [`QoS::ExactlyOnce`] publication:
+///   - [`AckMode::Automatic`]:
+///     - Upon reconnection, if a PUBREC packet has not been received yet, the PUBLISH packet must be resent with
+///       [`Client::republish`].
+///     - Upon reconnection, if a PUBREC packet has been received, the PUBREL packet must be retransmitted. This is done
+///       with a single call to [`Client::rerelease`] which handles this case for all matching outgoing publications at once.
+///     - All other acknowledgement packets not matching the criteria above are sent automatically.
+///   - [`AckMode::Manual`]:
+///     - When the first PUBREC packet is received (emitted as [`Event::PublishReceived`]), the user must manually send the
+///       subsequent PUBREL with [`Client::manual_release`].
+///     - Other received PUBREC packets (emitted as [`Event::Ignored`]) are acknowledged automatically.
+///     - Upon reconnection, if a PUBREC packet has not been received yet, the PUBLISH packet must be resent with
+///       [`Client::republish`].
+///     - Upon reconnection, if a PUBREC packet has been received, the PUBREL packet must be (re-)transmitted with
+///       [`Client::manual_release`]. Note that [`Client::rerelease`] will **NOT** match this criterion and won't send a PUBREL
+///       for this packet identifier.
+///
+/// - Incoming [`QoS::AtMostOnce`] publication: No acknowledgement or retransmission, the [`AckMode`] deduced from the
+///   predicate, if called, has no effect. After receiving the PUBLISH packet, no further action is required.
+/// - Incoming [`QoS::AtLeastOnce`] publication:
+///   - [`AckMode::Automatic`]: The client responds automatically with a PUBACK packet and removes the session state. In case of
+///     a network failure during the transmission of the PUBACK, this behaviour is unchanged as the server must retransmit the
+///     PUBLISH. No further action is required.
+///   - [`AckMode::Manual`]:
+///     - When a PUBLISH packet is received for a packet identifier for the first time in a network connection, the PUBACK packet
+///       must be sent manually with [`Client::manual_acknowledge`]. This completes the handshake, subsequent PUBLISH packets are
+///       treated as new application messages.
+///     - When a PUBLISH packet has not been responded to with a PUBACK yet and a PUBLISH packet with the same packet identifier
+///       is received (on the same or a different network connection, emitted as [`Event::Publish`]), a single call to
+///       [`Client::manual_acknowledge`] completes the handshake.
+/// - Incoming [`QoS::ExactlyOnce`] publication:
+///   - [`AckMode::Automatic`]:
+///     - When a PUBLISH packet is received, it is automatically acknowledged with a PUBREC packet.
+///     - When a PUBREL packet is received, it is automatically acknowleged with a PUBCOMP packet.
+///   - [`AckMode::Manual`]:
+///     - When a PUBLISH packet is received for a packet identifier for the first time in a network connection, the PUBREC packet
+///       must be sent manually with [`Client::manual_receive`].
+///     - If a duplicate PUBLISH packet is received ([`Event::Duplicate`]) on the same network connection as the previous PUBLISH
+///       and no PUBREC has been sent yet, the required call to [`Client::manual_receive`] acknowledges all PUBLISH packets
+///       received up to this point.
+///     - If a duplicate PUBLISH packet is received ([`Event::Duplicate`]) on the same network connection as the previous PUBLISH
+///       packet and this previous PUBLISH packet has already been acknowledged with a PUBREC, the client acknowledges this
+///       duplicate PUBLISH automatically.
+///     - Upon reconnection, if a duplicate PUBLISH packet is received ([`Event::Duplicate`]), but a PUBREL has also been received
+///       before, a protocol error is caused by the server. No manual acknowledgement is necessary immediately. After a
+///       reconnection, the next steps are treated exactly as without a protocol error (but with a reconnection in mind).
+///     - Upon reconnection, if a duplicate PUBLISH packet is received ([`Event::Duplicate`]) and no PUBREL has been received
+///       before, a manual acknowledgement via [`Client::manual_receive`] is required independent of a PUBREC having been sent
+///       before or not.
+///     - When a PUBREL packet is received and it matches an entry, the PUBCOMP packet must be sent manually with
+///       [`Client::manual_complete`]. This completes the handshake
+///
+/// - Only PUBLISH packets can instantiate a session entry with an associated [`AckMode`]. For this reason, when acknowledgement
+///   packets with unused packet identifiers that require a responding packet are received (PUBREC and PUBREL), no session entry
+///   is created and the responding packet (PUBREL and PUBCOMP) is sent automatically by the client.
 pub struct Client<
     'c,
     N: Transport,
     B: BufferProvider<'c>,
-    const MAX_SUBSCRIBES: usize,
+    const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
@@ -73,23 +158,86 @@ pub struct Client<
     client_config: ClientConfig,
     shared_config: SharedConfig,
     server_config: ServerConfig,
-    session: Session<RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    session: Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
 
     raw: Raw<'c, N, B>,
 
-    packet_identifier_counter: PacketIdentifier,
-
-    /// sent SUBSCRIBE packets
-    pending_suback: Vec<PacketIdentifier, MAX_SUBSCRIBES>,
-    /// sent UNSUBSCRIBE packets
-    pending_unsuback: Vec<PacketIdentifier, MAX_SUBSCRIBES>,
+    manual_ack_when:
+        &'c dyn Fn(&Publish<'_, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>) -> bool,
 }
 
 impl<
     'c,
     N: Transport,
     B: BufferProvider<'c>,
-    const MAX_SUBSCRIBES: usize,
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
+    const MAX_USER_PROPERTIES: usize,
+> core::fmt::Debug
+    for Client<
+        'c,
+        N,
+        B,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_SUBSCRIPTION_IDENTIFIERS,
+        MAX_USER_PROPERTIES,
+    >
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Client")
+            .field("client_config", &self.client_config)
+            .field("shared_config", &self.shared_config)
+            .field("server_config", &self.server_config)
+            .field("session", &self.session)
+            .field("raw", &self.raw)
+            .finish_non_exhaustive()
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl<
+    'c,
+    N: Transport,
+    B: BufferProvider<'c>,
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
+    const MAX_USER_PROPERTIES: usize,
+> defmt::Format
+    for Client<
+        'c,
+        N,
+        B,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_SUBSCRIPTION_IDENTIFIERS,
+        MAX_USER_PROPERTIES,
+    >
+{
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(
+            fmt,
+            "Client {{ client_config: {:?}, shared_config: {:?}, server_config: {:?}, session: {:?}, raw: {:?}, .. }}",
+            self.client_config,
+            self.shared_config,
+            self.server_config,
+            self.session,
+            self.raw,
+        );
+    }
+}
+
+impl<
+    'c,
+    N: Transport,
+    B: BufferProvider<'c>,
+    const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
@@ -99,7 +247,7 @@ impl<
         'c,
         N,
         B,
-        MAX_SUBSCRIBES,
+        SUBSCRIBE_MAXIMUM,
         RECEIVE_MAXIMUM,
         SEND_MAXIMUM,
         MAX_SUBSCRIPTION_IDENTIFIERS,
@@ -110,8 +258,13 @@ impl<
     /// dynamically sized fields of received packets.
     /// The session state is initialised as a new session. If you want to start the
     /// client with an existing session, use [`Self::with_session`].
+    /// All publications and acknowledgements will be acknowledged automatically.
     pub fn new(buffer: &'c mut B) -> Self {
         const {
+            const_assert!(
+                SUBSCRIBE_MAXIMUM <= 65535,
+                "SUBSCRIBE_MAXIMUM must be less than or equal to 65535"
+            );
             const_assert!(
                 RECEIVE_MAXIMUM <= 65535,
                 "RECEIVE_MAXIMUM must be less than or equal to 65535"
@@ -131,20 +284,16 @@ impl<
             shared_config: SharedConfig::default(),
             server_config: ServerConfig::default(),
             session: Session::default(),
-
             raw: Raw::new_disconnected(buffer),
 
-            packet_identifier_counter: PacketIdentifier::ONE,
-
-            pending_suback: Vec::new(),
-            pending_unsuback: Vec::new(),
+            manual_ack_when: &|_| false,
         }
     }
 
     /// Creates a new, disconnected MQTT client using a buffer provider to store
     /// dynamically sized fields of received packets.
     pub fn with_session(
-        session: Session<RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+        session: Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
         buffer: &'c mut B,
     ) -> Self {
         let mut s = Self::new(buffer);
@@ -152,17 +301,25 @@ impl<
         s
     }
 
+    /// Sets the predicate which selects whether the quality of service handshakes of an incoming
+    /// publication are executed automatically by the client or manually by the user. If the
+    /// predicate returns [`false`] for an incoming [`QoS::AtLeastOnce`] or [`QoS::ExactlyOnce`]
+    /// PUBLISH packet, its handshake flow will be acknowledged automatically. If the predicate
+    /// returns [`true`], the acknowledgement packets of its handshake must be sent manually mostly.
+    /// Refer to the documentation of [`Client`] for a detailed description of these cases.
+    pub fn ack_manually_when(
+        &mut self,
+        predicate: &'c dyn Fn(
+            &Publish<'_, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>,
+        ) -> bool,
+    ) {
+        self.manual_ack_when = predicate;
+    }
+
     /// Returns the amount of publications the client is allowed to make according to the server's
     /// receive maximum. Does not account local space for storing publication state.
     fn remaining_send_quota(&self) -> u16 {
-        self.server_config.receive_maximum.get() - self.session.in_flight_cpublishes()
-    }
-
-    fn is_packet_identifier_used(&self, packet_identifier: PacketIdentifier) -> bool {
-        self.session
-            .is_used_cpublish_packet_identifier(packet_identifier)
-            || self.pending_suback.contains(&packet_identifier)
-            || self.pending_unsuback.contains(&packet_identifier)
+        self.server_config.receive_maximum.get() - self.session.active_outbound_publishes()
     }
 
     /// Returns configuration for this client.
@@ -185,7 +342,7 @@ impl<
 
     /// Returns session related configuration and tracking information.
     #[inline]
-    pub fn session(&self) -> &Session<RECEIVE_MAXIMUM, SEND_MAXIMUM> {
+    pub fn session(&self) -> &Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM> {
         &self.session
     }
 
@@ -201,33 +358,6 @@ impl<
     #[inline]
     pub fn buffer_mut(&mut self) -> &mut B {
         self.raw.buffer_mut()
-    }
-
-    /// Generates a new packet identifier.
-    fn packet_identifier(&mut self) -> PacketIdentifier {
-        loop {
-            let packet_identifier = self.packet_identifier_counter;
-
-            self.packet_identifier_counter = packet_identifier.next();
-
-            if !self.is_packet_identifier_used(packet_identifier) {
-                break packet_identifier;
-            }
-        }
-    }
-
-    /// Returns true if the packet identifier exists.
-    fn remove_packet_identifier_if_exists<const M: usize>(
-        vec: &mut Vec<PacketIdentifier, M>,
-        pid: PacketIdentifier,
-    ) -> bool {
-        if let Some(i) = vec.iter().position(|p| *p == pid) {
-            // Safety: The index has just been found in the vector
-            unsafe { vec.swap_remove_unchecked(i) };
-            true
-        } else {
-            false
-        }
     }
 
     /// Connect the client to an MQTT server on the other end of the `net` argument.
@@ -281,25 +411,18 @@ impl<
     {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to send CONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to send CONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
         if let Some(ref will) = options.will {
             assert!(
                 will.user_properties.len() <= MAX_USER_PROPERTIES,
-                "Attempted to send Will with {} > {} (MAX_USER_PROPERTIES) properties",
+                "attempted to send Will with {} > {} (MAX_USER_PROPERTIES) properties",
                 will.user_properties.len(),
                 MAX_USER_PROPERTIES
             );
         }
-
-        if options.clean_start {
-            self.session.clear();
-        }
-
-        self.pending_suback.clear();
-        self.pending_unsuback.clear();
 
         self.raw.set_net(net);
 
@@ -327,7 +450,7 @@ impl<
             MaximumPacketSize::Limit(l) => match l.get() {
                 0 => unreachable!("NonZero invariant"),
                 1 => panic!(
-                    "Every MQTT packet is at least 2 bytes long, a smaller maximum packet size makes no sense"
+                    "every MQTT packet is at least 2 bytes long, a smaller maximum packet size makes no sense"
                 ),
                 2..=129 => l.get() - 2,
                 130..=16_386 => l.get() - 3,
@@ -435,11 +558,6 @@ impl<
         if reason_code.is_success() {
             debug!("CONNACK packet indicates success");
 
-            if !session_present && !options.clean_start {
-                info!("server does not have the requested session present.");
-                self.session.clear();
-            }
-
             let client_identifier = assigned_client_identifier
                 .map(Property::into_inner)
                 .or(client_identifier)
@@ -448,6 +566,27 @@ impl<
                     self.raw.close_with(Some(ReasonCode::ProtocolError));
                     MqttError::Server
                 })?;
+
+            if session_present {
+                if options.clean_start {
+                    error!("server set the session present flag when clean start was set");
+                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    return Err(MqttError::Server);
+                } else {
+                    info!("connected to server and reconnected to session");
+                    self.session.reconnect();
+                }
+            } else {
+                #[allow(clippy::if_same_then_else)]
+                if options.clean_start {
+                    info!("connected to server");
+                } else {
+                    info!(
+                        "connected to server but server does not have the requested session present"
+                    );
+                }
+                self.session.clear();
+            }
 
             self.shared_config.session_expiry_interval =
                 session_expiry_interval.unwrap_or(options.session_expiry_interval);
@@ -478,8 +617,6 @@ impl<
             if let Some(s) = shared_subscription_available {
                 self.server_config.shared_subscription_supported = s.into_inner();
             }
-
-            info!("connected to server (session present: {})", session_present);
 
             Ok(Connected {
                 session_present,
@@ -575,7 +712,7 @@ impl<
     ) -> Result<PacketIdentifier, MqttError<'c, 0>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to send SUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to send SUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
@@ -594,14 +731,19 @@ impl<
             return Err(MqttError::UnsupportedByServer);
         }
 
-        if self.pending_suback.is_full() {
-            info!("maximum concurrent subscriptions reached");
+        let Some(handle) = self.session.free_handle() else {
+            info!("no free packet identifier");
             return Err(MqttError::SessionBuffer);
-        }
+        };
+        let pid = handle.packet_identifier;
+
+        handle.outbound_sub().map_err(|_| {
+            info!("maximum concurrent subscriptions reached");
+            MqttError::SessionBuffer
+        })?;
 
         let subscribe_filter = SubscriptionFilter::new(topic_filter, options);
 
-        let pid = self.packet_identifier();
         let subscribe_filters = [subscribe_filter].into();
         let packet = SubscribePacket::<1, MAX_USER_PROPERTIES>::new(
             pid,
@@ -624,9 +766,6 @@ impl<
 
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
-
-        // `!self.pending_suback.is_full` guarantees there is space
-        self.pending_suback.push(pid).unwrap();
 
         Ok(pid)
     }
@@ -659,17 +798,22 @@ impl<
     ) -> Result<PacketIdentifier, MqttError<'c, 0>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to send UNSUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to send UNSUBSCRIBE with {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
 
-        if self.pending_unsuback.is_full() {
-            info!("maximum concurrent unsubscriptions reached");
+        let Some(handle) = self.session.free_handle() else {
+            info!("no free packet identifier");
             return Err(MqttError::SessionBuffer);
-        }
+        };
+        let pid = handle.packet_identifier;
 
-        let pid = self.packet_identifier();
+        handle.outbound_unsub().map_err(|_| {
+            info!("maximum concurrent unsubscriptions reached");
+            MqttError::SessionBuffer
+        })?;
+
         let topic_filters = [topic_filter].into();
         let packet = UnsubscribePacket::<1, MAX_USER_PROPERTIES>::new(
             pid,
@@ -692,14 +836,12 @@ impl<
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
-        // `!self.pending_unsuback.is_full` guarantees there is space
-        self.pending_unsuback.push(pid).unwrap();
-
         Ok(pid)
     }
 
-    /// Publish a message. If [`QoS`] is greater than [`QoS::AtMostOnce`], the packet identifier is
-    /// also kept track of by the client.
+    /// Start the publication of a message. If [`QoS`] is greater than [`QoS::AtMostOnce`], the
+    /// packet identifier is also kept track of by the client and further steps are necessary
+    /// by the server and may be necessary by the client.
     ///
     /// Note:
     /// * The [`QoS`] should be less than or equal to the server's maximum [`QoS`].
@@ -733,6 +875,10 @@ impl<
     ///     the retain flag set to true is attempted
     ///   * if a topic alias is used and its value is greater than the maximum value specified in the
     ///     server's CONNACK packet
+    /// * [`MqttError::AllPacketIdentifiersUsed`] if there are no free packet identifiers in the pool
+    ///   of outgoing publications, SUBSCRIBEs and UNSUBSCRIBEs
+    /// * [`MqttError::ManualAckNotAllowed`] if the [`QoS`] is [`QoS::AtMostOnce`] or
+    ///   [`QoS::AtLeastOnce`] and [`PublicationOptions::ack_mode`] is [`AckMode::Manual`]
     ///
     /// # Panics
     ///
@@ -745,10 +891,16 @@ impl<
     ) -> Result<Option<PacketIdentifier>, MqttError<'c, 0>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
+
+        if (matches!(options.qos, QoS::AtMostOnce | QoS::AtLeastOnce)
+            && options.ack_mode == AckMode::Manual)
+        {
+            return Err(MqttError::ManualAckNotAllowed);
+        }
 
         if options.qos > self.server_config.maximum_qos {
             return Err(MqttError::UnsupportedByServer);
@@ -767,21 +919,29 @@ impl<
             return Err(MqttError::UnsupportedByServer);
         }
 
-        if options.qos > QoS::AtMostOnce {
+        let (identified_qos, handle) = if options.qos > QoS::AtMostOnce {
             if self.remaining_send_quota() == 0 {
                 info!("server receive maximum reached");
                 return Err(MqttError::SendQuotaExceeded);
             }
-            if self.session.cpublish_remaining_capacity() == 0 {
-                info!("client maximum concurrent publications reached");
-                return Err(MqttError::SessionBuffer);
-            }
-        }
 
-        let identified_qos = match options.qos {
-            QoS::AtMostOnce => IdentifiedQoS::AtMostOnce,
-            QoS::AtLeastOnce => IdentifiedQoS::AtLeastOnce(self.packet_identifier()),
-            QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(self.packet_identifier()),
+            let Some(handle) = self.session.free_handle() else {
+                return Err(MqttError::AllPacketIdentifiersUsed);
+            };
+
+            match options.qos {
+                QoS::AtMostOnce => unreachable!(),
+                QoS::AtLeastOnce => (
+                    IdentifiedQoS::AtLeastOnce(handle.packet_identifier),
+                    Some(handle),
+                ),
+                QoS::ExactlyOnce => (
+                    IdentifiedQoS::ExactlyOnce(handle.packet_identifier),
+                    Some(handle),
+                ),
+            }
+        } else {
+            (IdentifiedQoS::AtMostOnce, None)
         };
 
         let packet = PublishPacket::<0, MAX_USER_PROPERTIES>::new(
@@ -814,21 +974,18 @@ impl<
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
-        // Treat the packet as sent before successfully sending. In case of a network error,
-        // we have tracked the packet as in flight and can republish it.
-        let pid = match identified_qos {
-            IdentifiedQoS::AtMostOnce => None,
-            IdentifiedQoS::AtLeastOnce(packet_identifier) => Some({
-                // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
-                unsafe { self.session.await_puback(packet_identifier) };
-                packet_identifier
-            }),
-            IdentifiedQoS::ExactlyOnce(packet_identifier) => Some({
-                // Safety: `cpublish_remaining_capacity()` > 0 confirms that there is space.
-                unsafe { self.session.await_pubrec(packet_identifier) };
-                packet_identifier
-            }),
-        };
+        if let Some(handle) = handle {
+            // Treat the packet as sent before successfully sending. In case of a network error,
+            // we have tracked the packet as in flight and can republish it.
+            if let Err(e) = handle.outbound_publish(options.qos, options.ack_mode) {
+                match e {
+                    SmError::NoCapacity => return Err(MqttError::SessionBuffer),
+                    SmError::PacketIdentifierUnused
+                    | SmError::QoSMismatched
+                    | SmError::HandshakeStateMismatched => unreachable!(),
+                }
+            }
+        }
 
         match identified_qos.packet_identifier() {
             Some(pid) => debug!("sending PUBLISH packet with packet identifier {}", pid),
@@ -838,13 +995,13 @@ impl<
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
-        Ok(pid)
+        Ok(identified_qos.packet_identifier())
     }
 
     /// Resends a PUBLISH packet with DUP flag set.
     ///
     /// This method must be called and must only be called after a reconnection with clean start set to 0,
-    /// as resending packets at any other time is a protocol error.
+    /// for every unacknowledged PUBLISH packet, as resending packets at any other time is a protocol error.
     /// (Compare [Message delivery retry](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238), \[MQTT-4.4.0-1\]).
     ///
     /// Note:
@@ -859,6 +1016,8 @@ impl<
     ///     in the options parameter.
     ///   * If [`QoS`] is [`QoS::ExactlyOnce`], the in flight entry it must not already be awaiting
     ///     the PUBCOMP packet.
+    ///   * The previous PUBLISH packet must have been sent in a different, previous network
+    ///     connection.
     ///
     /// If a violation occurs, the client will not publish but prevent the protocol error
     /// and return an error. The server support of these requirements can be checked via
@@ -868,12 +1027,14 @@ impl<
     ///
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
-    /// * [`MqttError::RepublishQoSNotMatching`] if the [`QoS`] of this republish does not match the
-    ///   [`QoS`] that this packet identifier was originally published with    
-    /// * [`MqttError::PacketIdentifierAwaitingPubcomp`] if a PUBREC packet with this packet identifier
-    ///   has already been received and the server has therefore already received the PUBLISH
-    /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in the
-    ///   client's session
+    /// * [`MqttError::QoSMismatched`] if the [`QoS`] of this republish does not match the
+    ///   [`QoS`] that this packet identifier was originally published with
+    /// * [`MqttError::HandshakeStateMismatched`]
+    ///   * if a PUBREC packet with this packet identifier has already been received and the server
+    ///     has therefore already received the PUBLISH. Our next action is sending a PUBREL packet
+    ///   * if the previous PUBLISH packet was sent in the same network connection
+    /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in
+    ///   an outgoing publication in the client's session
     /// * [`MqttError::PacketMaximumLengthExceeded`] if the PUBLISH packet is too long to be encoded
     ///   with MQTT's [`VarByteInt`]
     /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
@@ -899,7 +1060,7 @@ impl<
     ) -> Result<(), MqttError<'c, 0>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to publish {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
@@ -927,39 +1088,10 @@ impl<
             return Err(MqttError::UnsupportedByServer);
         }
 
-        let identified_qos = match self.session.cpublish_flight_state(packet_identifier) {
-            Some(CPublishFlightState::AwaitingPuback) if options.qos == QoS::AtLeastOnce => {
-                IdentifiedQoS::AtLeastOnce(packet_identifier)
-            }
-            Some(CPublishFlightState::AwaitingPubrec) if options.qos == QoS::ExactlyOnce => {
-                IdentifiedQoS::ExactlyOnce(packet_identifier)
-            }
-
-            Some(CPublishFlightState::AwaitingPuback) => {
-                warn!(
-                    "packet identifier {} was originally published with QoS 1",
-                    packet_identifier
-                );
-                return Err(MqttError::RepublishQoSNotMatching);
-            }
-            Some(CPublishFlightState::AwaitingPubrec) => {
-                warn!(
-                    "packet identifier {} was originally published with QoS 2",
-                    packet_identifier
-                );
-                return Err(MqttError::RepublishQoSNotMatching);
-            }
-            Some(CPublishFlightState::AwaitingPubcomp) => {
-                warn!(
-                    "packet identifier {} is already awaiting PUBCOMP",
-                    packet_identifier
-                );
-                return Err(MqttError::PacketIdentifierAwaitingPubcomp);
-            }
-            None => {
-                warn!("packet identifier {} not in flight", packet_identifier);
-                return Err(MqttError::PacketIdentifierNotInFlight);
-            }
+        let identified_qos = match options.qos {
+            QoS::AtMostOnce => unreachable!(),
+            QoS::AtLeastOnce => IdentifiedQoS::AtLeastOnce(packet_identifier),
+            QoS::ExactlyOnce => IdentifiedQoS::ExactlyOnce(packet_identifier),
         };
 
         let packet = PublishPacket::<0, MAX_USER_PROPERTIES>::new(
@@ -992,9 +1124,22 @@ impl<
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
-        // We only republish a message if its quality of service and flight state is correct.
-        // In this case, we don't have to change its in flight tracking state as it already
-        // is in the desired state.
+        if let Err(e) = self.session.outbound_republish(identified_qos) {
+            match e {
+                SmError::NoCapacity => {
+                    unreachable!("a republish can not fail due to missing capacity")
+                }
+                SmError::PacketIdentifierUnused => {
+                    return Err(MqttError::PacketIdentifierNotInFlight);
+                }
+                SmError::QoSMismatched => {
+                    return Err(MqttError::QoSMismatched);
+                }
+                SmError::HandshakeStateMismatched => {
+                    return Err(MqttError::HandshakeStateMismatched);
+                }
+            }
+        }
 
         debug!(
             "resending PUBLISH packet with packet identifier {}",
@@ -1007,14 +1152,15 @@ impl<
         Ok(())
     }
 
-    /// Resends all pending PUBREL packets.
+    /// Resends all pending PUBREL packets that are belong to publication flows started  with the default
+    /// [`AckMode::Automatic`]. PUBREL packets associated with [`AckMode::Manual`] flows must be resent
+    /// manually on a per-packet basis with [`Client::manual_release`]. To include a reason string and/or
+    /// user properties in such a retransmitted PUBREL packet, [`Client::manual_release`] can be used for
+    /// individual packets and this method for any remaining, not manually retransmitted PUBREL packets.
     ///
-    /// This method must only be called immediately upon reconnection before any call to [`Client::publish`]
-    /// or [`Client::republish`] (with [`QoS::ExactlyOnce`]) followed by a call to [`Client::poll`] or
-    /// [`Client::poll_body`] returning [`Event::PublishReceived`], as this combination of events results in
-    /// a new session entry that would be rereleased in this method, causing a protocol error (Compare
-    /// [Message delivery retry](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238),
-    /// \[MQTT-4.4.0-1\]).
+    /// This method should only be called once after a reconnection with clean start set to 0, as resending
+    /// packets at any other time is a protocol error and is prevented by the client anyway.
+    /// (Compare [Message delivery retry](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238), \[MQTT-4.4.0-1\]).
     ///
     /// This method assumes that the server's receive maximum after the reconnection is great enough
     /// to handle as many publication flows as dragged between the two connections.
@@ -1024,21 +1170,370 @@ impl<
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
     pub async fn rerelease(&mut self) -> Result<(), MqttError<'c, 0>> {
-        for packet_identifier in self
-            .session
-            .pending_client_publishes
-            .iter()
-            .filter(|s| s.state == CPublishFlightState::AwaitingPubcomp)
-            .map(|p| p.packet_identifier)
-        {
-            let pubrel = PubrelPacket::<0>::new(packet_identifier, ReasonCode::Success);
+        let Some(mut handle) = self.session.outbound_iter() else {
+            return Ok(());
+        };
 
-            // Don't check whether length exceeds servers maximum packet size because we don't
-            // add properties to PUBREL packets -> length is always minimal at 6 bytes.
-            // The server really shouldn't reject this.
-            self.raw.send(&pubrel).await?;
+        loop {
+            if handle.state == LocalPublishState::DueRel(AckMode::Automatic) {
+                handle.outbound_pubrel().unwrap();
+
+                let pubrel =
+                    PubrelPacket::<0>::minimal(handle.packet_identifier(), ReasonCode::Success);
+
+                debug!("sending PUBREL packet {}", pubrel.packet_identifier);
+
+                // Don't check whether length exceeds servers maximum packet size because we don't
+                // add properties to automatically retransmitted PUBREL packets -> length is always
+                // minimal at 6 bytes. The server really shouldn't reject this.
+                self.raw.send(&pubrel).await?;
+            }
+            if let Some(next) = handle.next() {
+                handle = next;
+            } else {
+                break;
+            }
         }
 
+        self.raw.flush().await?;
+
+        Ok(())
+    }
+
+    /// Sends a PUBACK packet responding to an incoming [`QoS::AtLeastOnce`] PUBLISH packet, that
+    /// was marked with [`AckMode::Manual`].
+    ///
+    /// The reason code must be one of [`ReasonCode::Success`], [`ReasonCode::UnspecifiedError`],
+    /// [`ReasonCode::ImplementationSpecificError`], [`ReasonCode::NotAuthorized`],
+    /// [`ReasonCode::TopicNameInvalid`], [`ReasonCode::PacketIdentifierInUse`],
+    /// [`ReasonCode::QuotaExceeded`] or [`ReasonCode::PayloadFormatInvalid`]
+    /// (Compare [PUBACK Reason Code](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901124), \[MQTT-3.4.2-1\]).
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::IllegalReasonCode`] if the selected reason code is not allowed
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would
+    ///   be exceeded by sending this PUBACK packet
+    /// * [`MqttError::QoSMismatched`] if this packet identifier is actually part of an incoming
+    ///   [`QoS::ExactlyOnce`] publication
+    /// * [`MqttError::HandshakeStateMismatched`] if a reconnection occured and this
+    ///   the server has not resent the PUBLISH in this network connection.
+    /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in
+    ///   an incoming publication in the client's session
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`AckOptions`] is
+    /// greater than `MAX_USER_PROPERTIES`.
+    pub async fn manual_acknowledge(
+        &mut self,
+        packet_identifier: PacketIdentifier,
+        reason_code: ReasonCode,
+        options: &AckOptions<'_>,
+    ) -> Result<(), MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "attempted to send PUBACK with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
+        // Not allowed:
+        // ReasonCode::NoMatchingSubscribers - only sent by the server
+        if !matches!(
+            reason_code,
+            ReasonCode::Success
+                | ReasonCode::UnspecifiedError
+                | ReasonCode::ImplementationSpecificError
+                | ReasonCode::NotAuthorized
+                | ReasonCode::TopicNameInvalid
+                | ReasonCode::PacketIdentifierInUse
+                | ReasonCode::QuotaExceeded
+                | ReasonCode::PayloadFormatInvalid
+        ) {
+            return Err(MqttError::IllegalReasonCode);
+        }
+
+        let packet = PubackPacket::<MAX_USER_PROPERTIES>::new(
+            packet_identifier,
+            reason_code,
+            options
+                .reason_string
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+        );
+
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
+        }
+
+        self.session
+            .outbound_puback(packet_identifier)
+            .map_err(|e| match e {
+                SmError::NoCapacity => unreachable!(),
+                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
+                SmError::QoSMismatched => MqttError::QoSMismatched,
+                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
+            })?;
+
+        debug!("sending PUBACK packet {}", packet.packet_identifier);
+
+        self.raw.send(&packet).await?;
+        self.raw.flush().await?;
+
+        Ok(())
+    }
+
+    /// Sends a PUBREC packet responding to an incoming [`QoS::ExactlyOnce`] PUBLISH packet, that
+    /// was marked with [`AckMode::Manual`].
+    ///
+    /// The reason code must be one of [`ReasonCode::Success`], [`ReasonCode::UnspecifiedError`],
+    /// [`ReasonCode::ImplementationSpecificError`], [`ReasonCode::NotAuthorized`],
+    /// [`ReasonCode::TopicNameInvalid`], [`ReasonCode::PacketIdentifierInUse`],
+    /// [`ReasonCode::QuotaExceeded`] or [`ReasonCode::PayloadFormatInvalid`]
+    /// (Compare [PUBREC Reason Code](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901134), \[MQTT-3.5.2-1\]).
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::IllegalReasonCode`] if the selected reason code is not allowed
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would
+    ///   be exceeded by sending this PUBREC packet
+    /// * [`MqttError::QoSMismatched`] if this packet identifier is actually part of an incoming
+    ///   [`QoS::AtLeastOnce`] publication
+    /// * [`MqttError::HandshakeStateMismatched`]
+    ///   * if a PUBREC has already been sent for this packet identifier in this network connection
+    ///   * if a reconnection occured and the server has not resent the PUBLISH in this network
+    ///     connection
+    /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in
+    ///   an incoming publication in the client's session
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`AckOptions`] is
+    /// greater than `MAX_USER_PROPERTIES`.
+    pub async fn manual_receive(
+        &mut self,
+        packet_identifier: PacketIdentifier,
+        reason_code: ReasonCode,
+        options: &AckOptions<'_>,
+    ) -> Result<(), MqttError<'c, 0>> {
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "attempted to send PUBREC with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
+        // Not allowed:
+        // ReasonCode::NoMatchingSubscribers - only sent by the server
+        if !matches!(
+            reason_code,
+            ReasonCode::Success
+                | ReasonCode::UnspecifiedError
+                | ReasonCode::ImplementationSpecificError
+                | ReasonCode::NotAuthorized
+                | ReasonCode::TopicNameInvalid
+                | ReasonCode::PacketIdentifierInUse
+                | ReasonCode::QuotaExceeded
+                | ReasonCode::PayloadFormatInvalid
+        ) {
+            return Err(MqttError::IllegalReasonCode);
+        }
+
+        let packet = PubrecPacket::<MAX_USER_PROPERTIES>::new(
+            packet_identifier,
+            reason_code,
+            options
+                .reason_string
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+        );
+
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
+        }
+
+        self.session
+            .outbound_pubrec(packet_identifier, reason_code)
+            .map_err(|e| match e {
+                SmError::NoCapacity => unreachable!(),
+                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
+                SmError::QoSMismatched => MqttError::QoSMismatched,
+                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
+            })?;
+
+        debug!("sending PUBREC packet {}", packet.packet_identifier);
+
+        self.raw.send(&packet).await?;
+        self.raw.flush().await?;
+
+        Ok(())
+    }
+
+    /// Sends a PUBREL packet responding to an incoming PUBREC packet belonging to an
+    /// outgoing publication flow configured with [`AckMode::Manual`].
+    ///
+    /// The reason code is implicitely [`ReasonCode::Success`] as the only other allowed
+    /// reason code is erroneous and packet identifier related, which is something the
+    /// client handles.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would
+    ///   be exceeded by sending this PUBREL packet
+    /// * [`MqttError::QoSMismatched`] if this packet identifier is actually part of an outgoing
+    ///   [`QoS::AtLeastOnce`] publication
+    /// * [`MqttError::HandshakeStateMismatched`]
+    ///   * if the client hasn't yet received a PUBREC from the server for this packet identifier
+    ///   * if a PUBREL has already been sent for this packet identifier in this network connection
+    /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in
+    ///   an incoming publication in the client's session
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`AckOptions`] is
+    /// greater than `MAX_USER_PROPERTIES`.
+    pub async fn manual_release(
+        &mut self,
+        packet_identifier: PacketIdentifier,
+        options: &AckOptions<'_>,
+    ) -> Result<(), MqttError<'c, 0>> {
+        const REASON_CODE: ReasonCode = ReasonCode::Success;
+
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "attempted to send PUBREL with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
+        let packet = PubrelPacket::<MAX_USER_PROPERTIES>::new(
+            packet_identifier,
+            REASON_CODE,
+            options
+                .reason_string
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+        );
+
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
+        }
+
+        self.session
+            .outbound_pubrel(packet_identifier)
+            .map_err(|e| match e {
+                SmError::NoCapacity => unreachable!(),
+                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
+                SmError::QoSMismatched => MqttError::QoSMismatched,
+                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
+            })?;
+
+        debug!("sending PUBREL packet {}", packet.packet_identifier);
+
+        self.raw.send(&packet).await?;
+        self.raw.flush().await?;
+
+        Ok(())
+    }
+
+    /// Sends a PUBCOMP packet responding to an incoming PUBREL packet belonging to an
+    /// incoming publication flow, that was marked with [`AckMode::Manual`].
+    ///
+    /// The reason code is implicitely [`ReasonCode::Success`] as the only other allowed
+    /// reason code is erroneous and packet identifier related, which is something the
+    /// client handles.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would
+    ///   be exceeded by sending this PUBCOMP packet
+    /// * [`MqttError::QoSMismatched`] if this packet identifier is actually part of an outgoing
+    ///   [`QoS::AtLeastOnce`] publication
+    /// * [`MqttError::HandshakeStateMismatched`] if the client hasn't yet received a PUBREL from
+    ///   the server for this packet identifier in this network connection
+    /// * [`MqttError::PacketIdentifierNotInFlight`] if this packet identifier is not tracked in
+    ///   an incoming publication in the client's session
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`AckOptions`] is
+    /// greater than `MAX_USER_PROPERTIES`.
+    pub async fn manual_complete(
+        &mut self,
+        packet_identifier: PacketIdentifier,
+        options: &AckOptions<'_>,
+    ) -> Result<(), MqttError<'c, 0>> {
+        const REASON_CODE: ReasonCode = ReasonCode::Success;
+
+        assert!(
+            options.user_properties.len() <= MAX_USER_PROPERTIES,
+            "attempted to send PUBCOMP with {} > {} (MAX_USER_PROPERTIES) properties",
+            options.user_properties.len(),
+            MAX_USER_PROPERTIES
+        );
+
+        let packet = PubcompPacket::<MAX_USER_PROPERTIES>::new(
+            packet_identifier,
+            REASON_CODE,
+            options
+                .reason_string
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+        );
+
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
+        }
+
+        self.session
+            .outbound_pubcomp(packet_identifier)
+            .map_err(|e| match e {
+                SmError::NoCapacity => unreachable!(),
+                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
+                SmError::QoSMismatched => MqttError::QoSMismatched,
+                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
+            })?;
+
+        debug!("sending PUBCOMP packet {}", packet.packet_identifier);
+
+        self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
         Ok(())
@@ -1086,7 +1581,7 @@ impl<
     ) -> Result<(), MqttError<'c, 0>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
-            "Attempted to send DISCONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
+            "attempted to send DISCONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
             options.user_properties.len(),
             MAX_USER_PROPERTIES
         );
@@ -1267,9 +1762,10 @@ impl<
 
                 let pid = suback.packet_identifier;
 
-                if Self::remove_packet_identifier_if_exists(&mut self.pending_suback, pid) {
-                    // We only send SUBSCRIBE packets with exactly 1 topic
+                if let Some(h) = self.session.sub_handle(pid) {
+                    h.remove();
 
+                    // We only send SUBSCRIBE packets with exactly 1 topic
                     let [r] = suback.reason_codes.as_slice() else {
                         error!("received mismatched SUBACK");
                         self.raw.close_with(Some(ReasonCode::ProtocolError));
@@ -1312,7 +1808,9 @@ impl<
 
                 let pid = unsuback.packet_identifier;
 
-                if Self::remove_packet_identifier_if_exists(&mut self.pending_unsuback, pid) {
+                if let Some(h) = self.session.unsub_handle(pid) {
+                    h.remove();
+
                     // We only send UNSUBSCRIBE packets with exactly 1 topic
                     let [r] = unsuback.reason_codes.as_slice() else {
                         error!("received mismatched UNSUBACK");
@@ -1351,6 +1849,7 @@ impl<
                 };
 
                 let publish = Publish {
+                    ack_mode: AckMode::default(),
                     dup: publish.dup,
                     identified_qos: publish.identified_qos,
                     retain: publish.retain,
@@ -1377,60 +1876,75 @@ impl<
                     message: publish.message,
                 };
 
-                match publish.identified_qos {
-                    IdentifiedQoS::AtMostOnce => {
-                        debug!("received QoS 0 publication");
+                let ack_mode = if (self.manual_ack_when)(&publish) {
+                    AckMode::Manual
+                } else {
+                    AckMode::Automatic
+                };
 
-                        Event::Publish(publish)
-                    }
-                    IdentifiedQoS::AtLeastOnce(pid) => {
-                        debug!("received QoS 1 publication with packet identifier {}", pid);
+                let publish = Publish {
+                    ack_mode,
+                    ..publish
+                };
 
-                        // We could disconnect here using ReasonCode::ReceiveMaximumExceeded, but incoming QoS 1 publications
-                        // don't require resources outside of this scope which means we can just accept these packets.
+                let (action, event) = self
+                    .session
+                    .inbound_publish(publish.identified_qos, publish.ack_mode);
 
-                        let puback = PubackPacket::<0>::new(pid, ReasonCode::Success);
+                match action {
+                    Response::Release(_) | Response::Complete(_) => unreachable!(),
 
-                        debug!("sending PUBACK packet");
+                    Response::None => {}
+                    Response::Acknowledge(reason_code) => {
+                        let puback = PubackPacket::<0>::minimal(
+                            publish.identified_qos.packet_identifier().unwrap(),
+                            reason_code,
+                        );
+                        debug!("sending PUBACK packet {}", puback.packet_identifier);
 
                         // Don't check whether length exceeds servers maximum packet size because we don't
-                        // add properties to PUBACK packets -> length is always minimal at 6 bytes.
-                        // The server really shouldn't reject this.
+                        // add properties to automatically sent PUBACK packets -> length is always minimal
+                        // at 6 bytes. The server really shouldn't reject this.
                         self.raw.send(&puback).await?;
                         self.raw.flush().await?;
-
-                        Event::Publish(publish)
                     }
-                    IdentifiedQoS::ExactlyOnce(pid) => {
-                        debug!("received QoS 2 publication with packet identifier {}", pid);
-
-                        let event = match self.session.spublish_flight_state(pid) {
-                            Some(SPublishFlightState::AwaitingPubrel) => Event::Duplicate,
-                            None if self.session.spublish_remaining_capacity() > 0 => {
-                                // Safety: `spublish_remaining_capacity()` > 0 confirms that there is space.
-                                unsafe { self.session.await_pubrel(pid) };
-                                Event::Publish(publish)
-                            }
-                            None => {
-                                error!("server exceeded receive maximum");
-                                self.raw
-                                    .close_with(Some(ReasonCode::ReceiveMaximumExceeded));
-                                return Err(MqttError::Server);
-                            }
-                        };
-
-                        let pubrec = PubrecPacket::<0>::new(pid, ReasonCode::Success);
-
-                        debug!("sending PUBREC packet");
+                    Response::Receive(reason_code) => {
+                        let pubrec = PubrecPacket::<0>::minimal(
+                            publish.identified_qos.packet_identifier().unwrap(),
+                            reason_code,
+                        );
+                        debug!("sending PUBREC packet {}", pubrec.packet_identifier);
 
                         // Don't check whether length exceeds servers maximum packet size because we don't
-                        // add properties to PUBREC packets -> length is always minimal at 6 bytes.
-                        // The server really shouldn't reject this.
+                        // add properties to automatically sent PUBREC packets -> length is always minimal
+                        // at 6 bytes. The server really shouldn't reject this.
                         self.raw.send(&pubrec).await?;
                         self.raw.flush().await?;
-
-                        event
                     }
+                    Response::Disconnect(reason_code) => {
+                        error!("invalid PUBLISH packet rejected by state machine");
+                        self.raw.close_with(Some(reason_code));
+                    }
+                }
+
+                match event {
+                    SmEvent::Aborted
+                    | SmEvent::Rejected
+                    | SmEvent::Acknowledged
+                    | SmEvent::Received(_)
+                    | SmEvent::Released(_)
+                    | SmEvent::Completed => unreachable!(),
+
+                    SmEvent::Publish => Event::Publish(publish),
+                    SmEvent::Duplicate(ack_mode) => {
+                        let publish = Publish {
+                            ack_mode,
+                            ..publish
+                        };
+                        Event::Duplicate(publish)
+                    }
+                    SmEvent::Ignored => Event::Ignored,
+                    SmEvent::ServerError => return Err(MqttError::Server),
                 }
             }
             PacketType::Puback => {
@@ -1449,41 +1963,37 @@ impl<
                     return Err(MqttError::Server);
                 }
 
-                let pid = puback.packet_identifier;
-                let reason_code = puback.reason_code;
+                let (action, event) = self
+                    .session
+                    .inbound_puback(puback.packet_identifier, puback.reason_code);
 
-                match self.session.remove_cpublish(pid) {
-                    Some(CPublishFlightState::AwaitingPuback) if reason_code.is_success() => {
-                        debug!("publication with packet identifier {} complete", pid);
+                match action {
+                    Response::Acknowledge(_)
+                    | Response::Receive(_)
+                    | Response::Release(_)
+                    | Response::Complete(_) => unreachable!(),
 
-                        Event::PublishAcknowledged(Puback::from(puback))
+                    Response::None => {}
+                    Response::Disconnect(reason_code) => {
+                        error!("invalid PUBACK packet rejected by state machine");
+                        self.raw.close_with(Some(reason_code));
                     }
-                    Some(CPublishFlightState::AwaitingPuback) => {
-                        debug!("publication with packet identifier {} aborted", pid);
+                }
 
-                        Event::PublishRejected(Pubrej::from(puback))
+                match event {
+                    SmEvent::Publish
+                    | SmEvent::Duplicate(_)
+                    | SmEvent::Aborted
+                    | SmEvent::Received(_)
+                    | SmEvent::Released(_)
+                    | SmEvent::Completed => unreachable!(),
+
+                    SmEvent::Ignored => Event::Ignored,
+                    SmEvent::Rejected => Event::PublishRejected(Pubrej::from(puback)),
+                    SmEvent::Acknowledged => {
+                        Event::PublishAcknowledged(Puback::new(puback, AckMode::default()))
                     }
-                    Some(
-                        s @ CPublishFlightState::AwaitingPubrec
-                        | s @ CPublishFlightState::AwaitingPubcomp,
-                    ) => {
-                        warn!("packet identifier {} in PUBACK is actually {:?}", pid, s);
-
-                        // Readd this packet identifier to the session so that it can be republished
-                        // after reconnecting.
-
-                        // Safety: Session::remove_cpublish returning Some and therefore successfully
-                        // removing a cpublish frees space to add a new in flight entry.
-                        unsafe { self.session.r#await(pid, s) };
-
-                        error!("received mismatched PUBACK");
-                        self.raw.close_with(Some(ReasonCode::ProtocolError));
-                        return Err(MqttError::Server);
-                    }
-                    None => {
-                        debug!("packet identifier {} in PUBACK not in use", pid);
-                        Event::Ignored
-                    }
+                    SmEvent::ServerError => return Err(MqttError::Server),
                 }
             }
             PacketType::Pubrec => {
@@ -1502,69 +2012,46 @@ impl<
                     return Err(MqttError::Server);
                 }
 
-                let pid = pubrec.packet_identifier;
-                let reason_code = pubrec.reason_code;
+                let (action, event) = self
+                    .session
+                    .inbound_pubrec(pubrec.packet_identifier, pubrec.reason_code);
 
-                match self.session.remove_cpublish(pid) {
-                    Some(CPublishFlightState::AwaitingPubrec) if reason_code.is_success() => {
-                        // Safety: Session::remove_cpublish returning Some and therefore successfully
-                        // removing a cpublish frees space to add a new in flight entry.
-                        unsafe { self.session.await_pubcomp(pid) };
-
-                        let pubrel = PubrelPacket::<0>::new(pid, ReasonCode::Success);
-
-                        debug!("sending PUBREL packet");
-
-                        // Don't check whether length exceeds servers maximum packet size because we don't
-                        // add properties to PUBREL packets -> length is always minimal at 6 bytes.
-                        // The server really shouldn't reject this.
-                        self.raw.send(&pubrel).await?;
-                        self.raw.flush().await?;
-
-                        Event::PublishReceived(Puback::from(pubrec))
+                match action {
+                    Response::Acknowledge(_) | Response::Receive(_) | Response::Complete(_) => {
+                        unreachable!()
                     }
-                    Some(CPublishFlightState::AwaitingPubrec) => {
-                        // After receiving an erroneous PUBREC, we have to treat any subsequent PUBLISH packet
-                        // with the same packet identifier as a new message. This is achieved by already having
-                        // removed the packet identifier's in flight entry.
 
-                        debug!("publication with packet identifier {} aborted", pid);
-
-                        Event::PublishRejected(Pubrej::from(pubrec))
-                    }
-                    Some(
-                        s @ CPublishFlightState::AwaitingPuback
-                        | s @ CPublishFlightState::AwaitingPubcomp,
-                    ) => {
-                        warn!("packet identifier {} in PUBREC is actually {:?}", pid, s);
-
-                        // Readd this packet identifier to the session so that it can be republished
-                        // after reconnecting.
-
-                        // Safety: Session::remove_cpublish returning Some and therefore successfully
-                        // removing a cpublish frees space to add a new in flight entry.
-                        unsafe { self.session.r#await(pid, s) };
-
-                        error!("received mismatched PUBREC");
-                        self.raw.close_with(Some(ReasonCode::ProtocolError));
-                        return Err(MqttError::Server);
-                    }
-                    None => {
-                        debug!("packet identifier {} in PUBREC not in use", pid);
-
+                    Response::None => {}
+                    Response::Release(reason_code) => {
                         let pubrel =
-                            PubrelPacket::<0>::new(pid, ReasonCode::PacketIdentifierNotFound);
+                            PubrelPacket::<0>::minimal(pubrec.packet_identifier, reason_code);
 
-                        debug!("sending PUBREL packet");
+                        debug!("sending PUBREL packet {}", pubrel.packet_identifier);
 
                         // Don't check whether length exceeds servers maximum packet size because we don't
-                        // add properties to PUBREL packets -> length is always minimal at 6 bytes.
-                        // The server really shouldn't reject this.
+                        // add properties to automatically sent PUBREL packets -> length is always minimal
+                        // at 6 bytes. The server really shouldn't reject this.
                         self.raw.send(&pubrel).await?;
                         self.raw.flush().await?;
-
-                        Event::Ignored
                     }
+                    Response::Disconnect(reason_code) => {
+                        error!("invalid PUBREC packet rejected by state machine");
+                        self.raw.close_with(Some(reason_code));
+                    }
+                }
+
+                match event {
+                    SmEvent::Publish
+                    | SmEvent::Duplicate(_)
+                    | SmEvent::Aborted
+                    | SmEvent::Acknowledged
+                    | SmEvent::Released(_)
+                    | SmEvent::Completed => unreachable!(),
+
+                    SmEvent::Ignored => Event::Ignored,
+                    SmEvent::Rejected => Event::PublishRejected(Pubrej::from(pubrec)),
+                    SmEvent::Received(mode) => Event::PublishReceived(Puback::new(pubrec, mode)),
+                    SmEvent::ServerError => return Err(MqttError::Server),
                 }
             }
             PacketType::Pubrel => {
@@ -1583,44 +2070,46 @@ impl<
                     return Err(MqttError::Server);
                 }
 
-                let pid = pubrel.packet_identifier;
-                let reason_code = pubrel.reason_code;
+                let (action, event) = self
+                    .session
+                    .inbound_pubrel(pubrel.packet_identifier, pubrel.reason_code);
 
-                match self.session.remove_spublish(pid) {
-                    Some(SPublishFlightState::AwaitingPubrel) if reason_code.is_success() => {
-                        let pubcomp = PubcompPacket::<0>::new(pid, ReasonCode::Success);
-
-                        debug!("sending PUBCOMP packet");
-
-                        // Don't check whether length exceeds servers maximum packet size because we don't
-                        // add properties to PUBCOMP packets -> length is always minimal at 6 bytes.
-                        // The server really shouldn't reject this.
-                        self.raw.send(&pubcomp).await?;
-                        self.raw.flush().await?;
-
-                        Event::PublishReleased(Puback::from(pubrel))
+                match action {
+                    Response::Acknowledge(_) | Response::Receive(_) | Response::Release(_) => {
+                        unreachable!()
                     }
-                    Some(SPublishFlightState::AwaitingPubrel) => {
-                        debug!("publication with packet identifier {} aborted", pid);
 
-                        Event::PublishRejected(Pubrej::from(pubrel))
-                    }
-                    None => {
-                        debug!("packet identifier {} in PUBREL not in use", pid);
-
+                    Response::None => {}
+                    Response::Complete(reason_code) => {
                         let pubcomp =
-                            PubcompPacket::<0>::new(pid, ReasonCode::PacketIdentifierNotFound);
+                            PubcompPacket::<0>::minimal(pubrel.packet_identifier, reason_code);
 
-                        debug!("sending PUBCOMP packet");
+                        debug!("sending PUBCOMP packet {}", pubcomp.packet_identifier);
 
                         // Don't check whether length exceeds servers maximum packet size because we don't
-                        // add properties to PUBCOMP packets -> length is always minimal at 6 bytes.
-                        // The server really shouldn't reject this.
+                        // add properties to automatically sent PUBCOMP packets -> length is always minimal
+                        // at 6 bytes. The server really shouldn't reject this.
                         self.raw.send(&pubcomp).await?;
                         self.raw.flush().await?;
-
-                        Event::Ignored
                     }
+                    Response::Disconnect(reason_code) => {
+                        error!("invalid PUBREL packet rejected by state machine");
+                        self.raw.close_with(Some(reason_code));
+                    }
+                }
+
+                match event {
+                    SmEvent::Publish
+                    | SmEvent::Duplicate(_)
+                    | SmEvent::Rejected
+                    | SmEvent::Acknowledged
+                    | SmEvent::Received(_)
+                    | SmEvent::Completed => unreachable!(),
+
+                    SmEvent::Ignored => Event::Ignored,
+                    SmEvent::Aborted => Event::PublishAborted(Pubrej::from(pubrel)),
+                    SmEvent::Released(mode) => Event::PublishReleased(Puback::new(pubrel, mode)),
+                    SmEvent::ServerError => return Err(MqttError::Server),
                 }
             }
             PacketType::Pubcomp => {
@@ -1639,41 +2128,37 @@ impl<
                     return Err(MqttError::Server);
                 }
 
-                let pid = pubcomp.packet_identifier;
-                let reason_code = pubcomp.reason_code;
+                let (action, event) = self
+                    .session
+                    .inbound_pubcomp(pubcomp.packet_identifier, pubcomp.reason_code);
 
-                match self.session.remove_cpublish(pid) {
-                    Some(CPublishFlightState::AwaitingPubcomp) if reason_code.is_success() => {
-                        debug!("publication with packet identifier {} complete", pid);
+                match action {
+                    Response::Acknowledge(_)
+                    | Response::Receive(_)
+                    | Response::Release(_)
+                    | Response::Complete(_) => unreachable!(),
 
-                        Event::PublishComplete(Puback::from(pubcomp))
+                    Response::None => {}
+                    Response::Disconnect(reason_code) => {
+                        error!("invalid PUBCOMP packet rejected by state machine");
+                        self.raw.close_with(Some(reason_code));
                     }
-                    Some(CPublishFlightState::AwaitingPubcomp) => {
-                        debug!("publication with packet identifier {} aborted", pid);
+                }
 
-                        Event::PublishRejected(Pubrej::from(pubcomp))
+                match event {
+                    SmEvent::Publish
+                    | SmEvent::Duplicate(_)
+                    | SmEvent::Aborted
+                    | SmEvent::Rejected
+                    | SmEvent::Acknowledged
+                    | SmEvent::Received(_)
+                    | SmEvent::Released(_) => unreachable!(),
+
+                    SmEvent::Ignored => Event::Ignored,
+                    SmEvent::Completed => {
+                        Event::PublishComplete(Puback::new(pubcomp, AckMode::default()))
                     }
-                    Some(
-                        s @ CPublishFlightState::AwaitingPuback
-                        | s @ CPublishFlightState::AwaitingPubrec,
-                    ) => {
-                        warn!("packet identifier {} in PUBCOMP is actually {:?}", pid, s);
-
-                        // Readd this packet identifier to the session so that it can be republished
-                        // after reconnecting.
-
-                        // Safety: Session::remove_cpublish returning Some and therefore successfully
-                        // removing a cpublish frees space to add a new in flight entry.
-                        unsafe { self.session.r#await(pid, s) };
-
-                        error!("received mismatched PUBCOMP");
-                        self.raw.close_with(Some(ReasonCode::ProtocolError));
-                        return Err(MqttError::Server);
-                    }
-                    None => {
-                        debug!("packet identifier {} in PUBCOMP not in use", pid);
-                        Event::Ignored
-                    }
+                    SmEvent::ServerError => return Err(MqttError::Server),
                 }
             }
             PacketType::Disconnect => {

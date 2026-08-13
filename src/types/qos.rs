@@ -1,4 +1,7 @@
-use crate::types::PacketIdentifier;
+use crate::{
+    session::{LocalPublishState, PeerPublishState},
+    types::PacketIdentifier,
+};
 
 /// MQTT's Quality of Service levels
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
@@ -32,6 +35,33 @@ impl From<IdentifiedQoS> for QoS {
             IdentifiedQoS::AtMostOnce => Self::AtMostOnce,
             IdentifiedQoS::AtLeastOnce(_) => Self::AtLeastOnce,
             IdentifiedQoS::ExactlyOnce(_) => Self::ExactlyOnce,
+        }
+    }
+}
+impl From<LocalPublishState> for QoS {
+    fn from(value: LocalPublishState) -> Self {
+        match value {
+            LocalPublishState::DuePublishAtLeastOnce | LocalPublishState::AwaitAck => {
+                QoS::AtLeastOnce
+            }
+            LocalPublishState::DuePublishExactlyOnce(_)
+            | LocalPublishState::AwaitRec(_)
+            | LocalPublishState::DueRel(_)
+            | LocalPublishState::AwaitComp(_) => QoS::ExactlyOnce,
+        }
+    }
+}
+impl From<PeerPublishState> for QoS {
+    fn from(value: PeerPublishState) -> Self {
+        match value {
+            PeerPublishState::AwaitPublishAtLeastOnce | PeerPublishState::DueAck => {
+                QoS::AtLeastOnce
+            }
+            PeerPublishState::AwaitPublishExactlyOnce(_)
+            | PeerPublishState::DueRec
+            | PeerPublishState::AwaitRel(_)
+            | PeerPublishState::AwaitReRel
+            | PeerPublishState::DueComp => QoS::ExactlyOnce,
         }
     }
 }
