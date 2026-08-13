@@ -89,3 +89,84 @@ async fn too_many_user_properties() {
         .disconnect(&DisconnectOptions::new().user_properties(&user_properties[..]))
         .await;
 }
+
+#[ignore = "mosquitto has no configurable DISCONNECT maximum packet size"]
+#[tokio::test]
+#[test_log::test]
+async fn server_maximum_packet_size_not_exceeded_by_disconnect_hive_only() {
+    // fixed header, reason code, property length
+    const OVERHEAD: u32 = 4 + 1 + 3;
+
+    const SERVER_MAX_PACKET_SIZE: u32 = 2_000_000;
+
+    const PROPERTY_SIZE: u32 = SERVER_MAX_PACKET_SIZE - OVERHEAD;
+
+    let user_property = MqttStringPair::new(
+        MqttString::try_from(vec![b'a'; MqttString::MAX_LENGTH]).unwrap(),
+        MqttString::try_from(vec![b'a'; MqttString::MAX_LENGTH]).unwrap(),
+    );
+
+    const USER_PROPERTY_SIZE: u32 = (MqttString::MAX_LENGTH as u32 + 2) * 2 + 1;
+    const REASON_STRING_SIZE: u32 = PROPERTY_SIZE - (USER_PROPERTIES * USER_PROPERTY_SIZE) - 3;
+
+    const USER_PROPERTIES: u32 = PROPERTY_SIZE / USER_PROPERTY_SIZE;
+
+    let user_properties: [_; USER_PROPERTIES as usize] =
+        std::array::from_fn(|_| user_property.as_borrowed());
+
+    // Exceed the limit
+    let reason_string = MqttString::try_from(vec![b'a'; REASON_STRING_SIZE as usize]).unwrap();
+
+    let mut c =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    assert_ok!(
+        c.disconnect(
+            &DisconnectOptions::new()
+                .user_properties(&user_properties)
+                .reason_string(reason_string)
+        )
+        .await
+    );
+}
+
+#[ignore = "mosquitto has no configurable DISCONNECT maximum packet size"]
+#[tokio::test]
+#[test_log::test]
+async fn server_maximum_packet_size_exceeded_by_disconnect_hive_only() {
+    // fixed header, reason code, property length
+    const OVERHEAD: u32 = 4 + 1 + 3;
+
+    const SERVER_MAX_PACKET_SIZE: u32 = 2_000_000;
+
+    const PROPERTY_SIZE: u32 = SERVER_MAX_PACKET_SIZE - OVERHEAD;
+
+    let user_property = MqttStringPair::new(
+        MqttString::try_from(vec![b'a'; MqttString::MAX_LENGTH]).unwrap(),
+        MqttString::try_from(vec![b'a'; MqttString::MAX_LENGTH]).unwrap(),
+    );
+
+    const USER_PROPERTY_SIZE: u32 = (MqttString::MAX_LENGTH as u32 + 2) * 2 + 1;
+    const REASON_STRING_SIZE: u32 = PROPERTY_SIZE - (USER_PROPERTIES * USER_PROPERTY_SIZE) - 3;
+
+    const USER_PROPERTIES: u32 = PROPERTY_SIZE / USER_PROPERTY_SIZE;
+
+    let user_properties: [_; USER_PROPERTIES as usize] =
+        std::array::from_fn(|_| user_property.as_borrowed());
+    let reason_string = MqttString::try_from(vec![b'a'; REASON_STRING_SIZE as usize + 1]).unwrap();
+
+    let mut c =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let e = assert_err!(
+        c.disconnect(
+            &DisconnectOptions::new()
+                .user_properties(&user_properties)
+                .reason_string(reason_string)
+        )
+        .await
+    );
+    assert_eq!(e, MqttError::ServerMaximumPacketSizeExceeded);
+
+    disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
+}
