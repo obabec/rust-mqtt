@@ -1576,6 +1576,8 @@ impl<
     /// * [`MqttError::IllegalDisconnectSessionExpiryInterval`] if the session expiry interval in the
     ///   CONNECT packet was zero and the session expiry interval in the [`DisconnectOptions`] is [`Some`]
     ///   and not [`SessionExpiryInterval::EndOnDisconnect`].
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
+    ///   exceeded by sending this DISCONNECT packet
     ///
     /// # Panics
     ///
