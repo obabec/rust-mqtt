@@ -60,15 +60,17 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
   - `log`: Enables logging via the `log` crate
   - `defmt`: Implements `defmt::Format` for crate items & enables logging via the `defmt` crate (version 1)
   - `log-level-*`: Enables logs at the selected level and more severe levels (error, warn, info, debug, trace). The trace log level also features detailed MQTT state machine logs.
-  - `log-verbose`: Enables high-overhead IO traces at the trace log level and enables `log-level-trace`
+  - `log-verbose`: Enables high-overhead I/O traces at the trace log level and enables `log-level-trace`
 
 ## Usage
 
 It is recommended to use a buffering `Write` implementation, as the current IO model makes fragmented `Write::write` calls. The client also calls `Read::read` frequently; if your underlying implementation involves expensive syscalls, consider using a buffering reader as well.
 
-### Illustrative API example
+### Quickstart
 
-Showing explicit session recovery and Quality of Service 2 retransmission after a network failure. The precise network and executor setup is omitted for brevity.
+The cargo examples in this repository require a broker with correct configuration. Refer to [the contributing guide](CONTRIBUTING.md) for further explanation and guidance.
+
+What follows is an illustrative API example showing explicit session recovery and Quality of Service 2 retransmission after a network failure. The precise network and executor setup is omitted for brevity.
 
 ```rust,ignore
 async fn main() {
@@ -143,75 +145,6 @@ async fn main() {
         Err(_) => panic!("Other error :("),
     }
 }
-```
-
-### Examples
-
-- 'demo' is a showcase of rust-mqtt's features over TCP. Note that the example usage is very strict and not really a good way of using the client.
-- 'tls' connects the client to a broker over TLS with client certificate authentication and server certificate verification using [embedded-tls](https://github.com/drogue-iot/embedded-tls).
-- 'manual_ack' shows the client's capabilities of manual acknowledgements by rudimentarily implementing the optional payload format check (see [MQTTv5, 3.3.2.3.2 Payload Format Indicator](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901111))
-
-Set up the broker for 'demo' and 'manual_ack' by installing, configuring and running Mosquitto using the CI configuration:
-
-```bash
-cp .ci/mqtt_pass_plain.txt .ci/mqtt_pass_hashed.txt
-chmod 700 .ci/mqtt_pass_hashed.txt
-mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
-mosquitto -c .ci/mosquitto.conf -v
-```
-
-Set up the broker for 'tls' by running Mosquitto with the tls config file. The required PKI files have been generated using the `.ci/pki/generate.sh` script.
-
-```bash
-mosquitto -c .ci/mosquitto-tls.conf -v
-```
-
-Then you can run the examples with different logging configs and the bump/alloc features:
-
-```bash
-RUST_LOG=info cargo run --example demo
-RUST_LOG=info cargo run --example tls
-RUST_LOG=trace cargo run --example manual_ack --no-default-features --features "v5 log bump log-level-trace"
-```
-
-### Tests
-
-Unit tests should be ran using both the 'alloc' and 'bump' features.
-
-```bash
-cargo test unit
-cargo test unit --no-default-features --features "v5 bump"
-```
-
-For integration tests, you can set up the mosquitto broker as used in the CI pipeline.
-You should restart the broker after every run of the integration test suite as it
-carries non-idempotent state that will impact the tests.
-
-```bash
-cp .ci/mqtt_pass_plain.txt .ci/mqtt_pass_hashed.txt
-chmod 700 .ci/mqtt_pass_hashed.txt
-mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
-mosquitto -c .ci/mosquitto.conf [-d]
-```
-
-Then you can run integration tests with the alloc feature.
-
-```bash
-cargo test integration
-```
-
-It can be helpful to see logging output when running tests.
-
-```bash
-RUST_LOG=trace cargo test unit --no-default-features --features "v5 bump log-verbose log" -- --show-output
-RUST_LOG=warn cargo test -- --show-output
-RUST_LOG=info cargo test integration --features "log" -- --show-output
-```
-
-The full test suite can run with the alloc feature, just make sure a fresh broker is up and running.
-
-```bash
-cargo test
 ```
 
 ## Acknowledgment
