@@ -22,6 +22,7 @@ use tokio::net::TcpStream;
 
 use crate::common::{
     FailingClient, TestClient,
+    assert::assert_ok,
     failing::{ByteLimit, FailingTcp},
     fmt::warn_inspect,
 };
@@ -106,10 +107,7 @@ pub async fn connected_failing_client(
 }
 
 pub async fn disconnect(client: &mut TestClient<'_>, options: &DisconnectOptions<'_>) {
-    let _ = warn_inspect!(
-        client.disconnect(options).await,
-        "Client::disconnect() failed"
-    );
+    assert_ok!(client.disconnect(options).await);
 }
 
 pub async fn subscribe<'c>(

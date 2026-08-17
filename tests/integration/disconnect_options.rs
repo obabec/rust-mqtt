@@ -1,11 +1,10 @@
-use std::{assert_eq, format, num::NonZero};
+use std::{assert_eq, format, num::NonZero, panic};
 
 use rust_mqtt::{
     client::{MqttError, options::DisconnectOptions},
     config::SessionExpiryInterval,
     types::{MqttString, MqttStringPair},
 };
-use tokio_test::assert_err;
 
 use crate::common::{
     BROKER_ADDRESS, DEFAULT_DC_OPTIONS, NO_SESSION_CONNECT_OPTIONS,
@@ -21,13 +20,17 @@ async fn connect_session_expiry_zero_disconnect_session_expiry_non_zero() {
 
     let options = DisconnectOptions::new().session_expiry_interval(SessionExpiryInterval::NeverEnd);
 
-    let e = assert_err!(c.disconnect(&options).await);
+    let Err(e) = c.disconnect(&options).await else {
+        panic!();
+    };
     assert_eq!(e, MqttError::IllegalDisconnectSessionExpiryInterval);
 
     let options = DisconnectOptions::new()
         .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(1).unwrap()));
 
-    let e = assert_err!(c.disconnect(&options).await);
+    let Err(e) = c.disconnect(&options).await else {
+        panic!();
+    };
     assert_eq!(e, MqttError::IllegalDisconnectSessionExpiryInterval);
 
     disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
@@ -158,14 +161,17 @@ async fn server_maximum_packet_size_exceeded_by_disconnect_hive_only() {
     let mut c =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let e = assert_err!(
-        c.disconnect(
+    let Err(e) = c
+        .disconnect(
             &DisconnectOptions::new()
                 .user_properties(&user_properties)
-                .reason_string(reason_string)
+                .reason_string(reason_string),
         )
         .await
-    );
+    else {
+        panic!()
+    };
+
     assert_eq!(e, MqttError::ServerMaximumPacketSizeExceeded);
 
     disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
