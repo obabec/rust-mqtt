@@ -40,6 +40,7 @@ pub mod options;
 pub mod raw;
 
 pub use err::Error as MqttError;
+pub use raw::AbortError;
 
 /// An MQTT client.
 ///
@@ -519,12 +520,12 @@ impl<
             Ok(t) => {
                 error!("received unexpected {:?} packet header", t);
 
-                self.raw.close_with(Some(ReasonCode::ProtocolError));
+                self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                 return Err(MqttError::Server);
             }
             Err(_) => {
                 error!("received invalid header {:?}", header);
-                self.raw.close_with(Some(ReasonCode::MalformedPacket));
+                self.raw.prepare_disconnect(ReasonCode::MalformedPacket);
                 return Err(MqttError::Server);
             }
         }
@@ -551,7 +552,7 @@ impl<
 
         if !options.request_response_information && response_information.is_some() {
             error!("server sent response information when request response information was false");
-            self.raw.close_with(Some(ReasonCode::ProtocolError));
+            self.raw.prepare_disconnect(ReasonCode::ProtocolError);
             return Err(MqttError::Server);
         }
 
@@ -563,14 +564,14 @@ impl<
                 .or(client_identifier)
                 .ok_or_else(|| {
                     error!("server did not assign a client identifier when it was required.");
-                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                     MqttError::Server
                 })?;
 
             if session_present {
                 if options.clean_start {
                     error!("server set the session present flag when clean start was set");
-                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                     return Err(MqttError::Server);
                 } else {
                     info!("connected to server and reconnected to session");
@@ -632,7 +633,7 @@ impl<
             debug!("CONNACK packet indicates rejection");
             info!("connection rejected by server (reason: {:?})", reason_code);
 
-            self.raw.close_with(None);
+            self.raw.prepare_close();
 
             info!("disconnected from server");
 
@@ -1552,11 +1553,12 @@ impl<
     ///
     /// This function may panic if the client has not returned an unrecoverable error before.
     #[inline]
-    pub async fn abort(&mut self) {
-        match self.raw.abort().await {
-            Ok(()) => info!("connection aborted"),
-            Err(e) => warn!("connection abort failed: {:?}", e),
-        }
+    pub async fn abort(&mut self) -> Result<N, AbortError> {
+        self.raw
+            .abort()
+            .await
+            .inspect(|_| info!("connection aborted"))
+            .inspect_err(|e| warn!("connection abort failed due to invalid state: {:?}", e))
     }
 
     /// Disconnects gracefully from the server by sending a DISCONNECT packet.
@@ -1587,7 +1589,7 @@ impl<
     pub async fn disconnect(
         &mut self,
         options: &DisconnectOptions<'_>,
-    ) -> Result<(), MqttError<'c, 0>> {
+    ) -> Result<N, MqttError<'c, 0>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
             "attempted to send DISCONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
@@ -1668,12 +1670,10 @@ impl<
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
-        // Terminates (closes) the connection by dropping it
-        self.raw.close_with(None);
-
         info!("disconnected from server");
 
-        Ok(())
+        self.raw.prepare_close();
+        Ok(self.raw.abort().await.unwrap())
     }
 
     /// Combines [`Self::poll_header`] and [`Self::poll_body`].
@@ -1730,7 +1730,7 @@ impl<
             );
         } else {
             error!("received invalid header {:?}", header);
-            self.raw.close_with(Some(ReasonCode::MalformedPacket));
+            self.raw.prepare_disconnect(ReasonCode::MalformedPacket);
             return Err(MqttError::Server);
         }
 
@@ -1739,7 +1739,7 @@ impl<
                 "received a packet exceeding maximum packet size, remaining length={:?}",
                 header.remaining_len.value()
             );
-            self.raw.close_with(Some(ReasonCode::PacketTooLarge));
+            self.raw.prepare_disconnect(ReasonCode::PacketTooLarge);
             return Err(MqttError::Server);
         }
 
@@ -1799,7 +1799,7 @@ impl<
                     error!(
                         "server sent reason string or user properties when request problem information was false"
                     );
-                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                     return Err(MqttError::Server);
                 }
 
@@ -1811,7 +1811,7 @@ impl<
                     // We only send SUBSCRIBE packets with exactly 1 topic
                     let [r] = suback.reason_codes.as_slice() else {
                         error!("received mismatched SUBACK");
-                        self.raw.close_with(Some(ReasonCode::ProtocolError));
+                        self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                         return Err(MqttError::Server);
                     };
 
@@ -1845,7 +1845,7 @@ impl<
                     error!(
                         "server sent reason string or user properties when request problem information was false"
                     );
-                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                     return Err(MqttError::Server);
                 }
 
@@ -1857,7 +1857,7 @@ impl<
                     // We only send UNSUBSCRIBE packets with exactly 1 topic
                     let [r] = unsuback.reason_codes.as_slice() else {
                         error!("received mismatched UNSUBACK");
-                        self.raw.close_with(Some(ReasonCode::ProtocolError));
+                        self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                         return Err(MqttError::Server);
                     };
 
@@ -1887,7 +1887,7 @@ impl<
                 // Our topic alias maximum is always 0, the moment we receive a topic alias, this is an error.
                 let TopicReference::Name(topic) = publish.topic else {
                     error!("received disallowed topic alias");
-                    self.raw.close_with(Some(ReasonCode::TopicAliasInvalid));
+                    self.raw.prepare_disconnect(ReasonCode::TopicAliasInvalid);
                     return Err(MqttError::Server);
                 };
 
@@ -1966,7 +1966,7 @@ impl<
                     }
                     Response::Disconnect(reason_code) => {
                         error!("invalid PUBLISH packet rejected by state machine");
-                        self.raw.close_with(Some(reason_code));
+                        self.raw.prepare_disconnect(reason_code);
                     }
                 }
 
@@ -2002,7 +2002,7 @@ impl<
                     error!(
                         "server sent reason string or user properties when request problem information was false"
                     );
-                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                     return Err(MqttError::Server);
                 }
 
@@ -2019,7 +2019,7 @@ impl<
                     Response::None => {}
                     Response::Disconnect(reason_code) => {
                         error!("invalid PUBACK packet rejected by state machine");
-                        self.raw.close_with(Some(reason_code));
+                        self.raw.prepare_disconnect(reason_code);
                     }
                 }
 
@@ -2051,7 +2051,7 @@ impl<
                     error!(
                         "server sent reason string or user properties when request problem information was false"
                     );
-                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                     return Err(MqttError::Server);
                 }
 
@@ -2079,7 +2079,7 @@ impl<
                     }
                     Response::Disconnect(reason_code) => {
                         error!("invalid PUBREC packet rejected by state machine");
-                        self.raw.close_with(Some(reason_code));
+                        self.raw.prepare_disconnect(reason_code);
                     }
                 }
 
@@ -2109,7 +2109,7 @@ impl<
                     error!(
                         "server sent reason string or user properties when request problem information was false"
                     );
-                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                     return Err(MqttError::Server);
                 }
 
@@ -2137,7 +2137,7 @@ impl<
                     }
                     Response::Disconnect(reason_code) => {
                         error!("invalid PUBREL packet rejected by state machine");
-                        self.raw.close_with(Some(reason_code));
+                        self.raw.prepare_disconnect(reason_code);
                     }
                 }
 
@@ -2167,7 +2167,7 @@ impl<
                     error!(
                         "server sent reason string or user properties when request problem information was false"
                     );
-                    self.raw.close_with(Some(ReasonCode::ProtocolError));
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                     return Err(MqttError::Server);
                 }
 
@@ -2184,7 +2184,7 @@ impl<
                     Response::None => {}
                     Response::Disconnect(reason_code) => {
                         error!("invalid PUBCOMP packet rejected by state machine");
-                        self.raw.close_with(Some(reason_code));
+                        self.raw.prepare_disconnect(reason_code);
                     }
                 }
 
@@ -2212,7 +2212,7 @@ impl<
 
                 // The server initiated the disconnect. We must close the transport on our side
                 // as well so that subsequent error handling (e.g. `abort`) sees a non-Ok network state.
-                self.raw.close_with(None);
+                self.raw.prepare_close();
 
                 return Err(MqttError::Disconnect {
                     reason: disconnect.reason_code,
@@ -2234,13 +2234,13 @@ impl<
                     t
                 );
 
-                self.raw.close_with(Some(ReasonCode::ProtocolError));
+                self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                 return Err(MqttError::Server);
             }
             PacketType::Connack => {
                 error!("received unexpected CONNACK packet");
 
-                self.raw.close_with(Some(ReasonCode::ProtocolError));
+                self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                 return Err(MqttError::Server);
             }
             PacketType::Auth => {
@@ -2249,7 +2249,7 @@ impl<
                 // Receiving a AUTH packet is currently always a protocol error because we never send
                 // an Authentication Method property in the CONNECT packet.
                 // <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901217>
-                self.raw.close_with(Some(ReasonCode::ProtocolError));
+                self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                 return Err(MqttError::AuthPacketReceived);
             }
         };
