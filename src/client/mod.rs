@@ -20,8 +20,8 @@ use crate::{
     packet::{Packet, TxPacket},
     session::{Error as SmError, Event as SmEvent, LocalPublishState, Response, Session},
     types::{
-        IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, PacketIdentifier, QoS, ReasonCode,
-        NoLocalSharedSubscription, SubscriptionFilter, TopicFilter, TopicName, VarByteInt,
+        IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, NoLocalSharedSubscription,
+        PacketIdentifier, QoS, ReasonCode, SubscriptionFilter, TopicFilter, TopicName, VarByteInt,
     },
     v5::{
         packet::{
