@@ -1,5 +1,7 @@
+mod ack_options;
 mod connect_options;
 mod creds;
+mod disconnect_options;
 mod message_retry;
 mod pub_properties;
 mod pub_sub;

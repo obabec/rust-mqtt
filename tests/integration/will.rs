@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZero, time::Duration};
 
 use rust_mqtt::{
     client::{
@@ -158,7 +158,7 @@ async fn disconnect_with_will_message_recovered() {
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(10))
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(10).unwrap()))
         .will(will);
 
     let mut tx = assert_ok!(
@@ -331,6 +331,79 @@ async fn properties() {
     };
 
     join!(receiver, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn max_user_properties() {
+    let (will_topic_name, will_topic_filter) = unique_topic();
+
+    let will_msg = "I want to die peacefully in my sleep, just like my grandfather. Not screaming in terror like the passengers in his car.";
+    let will_user_properties: [_; 16] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let will = WillOptions::new(
+        will_topic_name.clone(),
+        MqttBinary::from_slice(will_msg.as_bytes()).unwrap(),
+    )
+    .user_properties(&will_user_properties);
+
+    let will_connect_options = NO_SESSION_CONNECT_OPTIONS.clone().will(will);
+
+    let mut tx = assert_ok!(connected_client(BROKER_ADDRESS, &will_connect_options, None).await);
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        sleep(Duration::from_secs(1)).await;
+        assert_ok!(tx.disconnect(DEFAULT_DC_OPTIONS).await);
+    };
+
+    let receiver = async {
+        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, will_topic_filter);
+
+        let Publish {
+            message,
+            user_properties,
+            ..
+        } = assert_recv_excl!(rx, will_topic_name);
+
+        assert_eq!(&*message, will_msg.as_bytes());
+        assert_eq!(user_properties.as_slice(), will_user_properties);
+
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+#[should_panic]
+#[tokio::test]
+#[test_log::test]
+async fn too_many_user_properties() {
+    let (will_topic_name, _) = unique_topic();
+
+    let will_msg = "I’m spending my children’s inheritance one test case at a time.";
+    let will_user_properties: [_; 17] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let will = WillOptions::new(
+        will_topic_name.clone(),
+        MqttBinary::from_slice(will_msg.as_bytes()).unwrap(),
+    )
+    .user_properties(&will_user_properties);
+
+    let will_connect_options = NO_SESSION_CONNECT_OPTIONS.clone().will(will);
+
+    let _ = connected_client(BROKER_ADDRESS, &will_connect_options, None).await;
 }
 
 #[tokio::test]
@@ -585,7 +658,7 @@ async fn will_delay_interval_basic() {
 #[ignore = "enable this test once the fix of https://github.com/eclipse-mosquitto/mosquitto/issues/3505 (mosquitto v2.1.3) is available"]
 #[tokio::test]
 #[test_log::test]
-async fn session_expires_right_after_disconnect() {
+async fn session_expires_right_after_disconnect_hive_only() {
     let (will_topic_name, will_topic_filter) = unique_topic();
     let will_msg = "Death may be the greatest of all human blessings";
 
@@ -636,7 +709,7 @@ async fn session_expires_before_will_delay_interval() {
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(5))
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(5).unwrap()))
         .will(will);
 
     let mut tx = assert_ok!(connected_client(BROKER_ADDRESS, &will_connect_options, None).await);
@@ -716,7 +789,7 @@ async fn will_delay_interval_completely_expired() {
 #[ignore = "enable this test once mosquitto v2.1.3 is used"]
 #[tokio::test]
 #[test_log::test]
-async fn clean_start_override_before_will_scheduled() {
+async fn clean_start_override_before_will_scheduled_hive_only() {
     let id = MqttString::from_str("WILL_CLEAN_START_BEFORE_WILL_SCHEDULED").unwrap();
 
     let (will_topic_name, will_topic_filter) = unique_topic();
@@ -731,7 +804,7 @@ async fn clean_start_override_before_will_scheduled() {
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
         .will(will)
-        .session_expiry_interval(SessionExpiryInterval::Seconds(100));
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(100).unwrap()));
 
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, &will_connect_options, Some(id.clone())).await);
@@ -796,7 +869,7 @@ async fn will_existing_session_taken_over_with_session_expiry() {
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(100))
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(100).unwrap()))
         .will(will);
 
     let mut tx =
@@ -848,7 +921,7 @@ async fn will_existing_session_taken_over_with_session_expiry() {
 #[ignore = "enable this test once mosquitto v2.1.3 is used"]
 #[tokio::test]
 #[test_log::test]
-async fn will_existing_session_taken_over_with_will_delay() {
+async fn will_existing_session_taken_over_with_will_delay_hive_only() {
     let id = MqttString::from_str("WILL_EXISTING_SESSION_TAKEN_OVER_WITH_WILL_DELAY").unwrap();
 
     let (will_topic_name, will_topic_filter) = unique_topic();
@@ -915,7 +988,7 @@ async fn will_existing_session_taken_over_with_will_delay() {
 #[ignore = "enable this test once mosquitto v2.1.3 is used"]
 #[tokio::test]
 #[test_log::test]
-async fn will_existing_session_taken_over_with_clean_start() {
+async fn will_existing_session_taken_over_with_clean_start_hive_only() {
     let id = MqttString::from_str("WILL_EXISTING_SESSION_TAKEN_OVER_WITH_CLEAN_START").unwrap();
 
     let (will_topic_name, will_topic_filter) = unique_topic();
@@ -929,7 +1002,7 @@ async fn will_existing_session_taken_over_with_clean_start() {
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(100))
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(100).unwrap()))
         .will(will);
 
     let mut tx =
@@ -990,7 +1063,7 @@ async fn no_will_existing_session_taken_over() {
 
     let will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
-        .session_expiry_interval(SessionExpiryInterval::Seconds(1))
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(1).unwrap()))
         .will(will);
 
     let mut tx =
@@ -1058,7 +1131,7 @@ async fn session_recovered_before_session_expires() {
     let mut will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
         .will(will)
-        .session_expiry_interval(SessionExpiryInterval::Seconds(5));
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(5).unwrap()));
 
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, &will_connect_options, Some(id.clone())).await);
@@ -1119,7 +1192,7 @@ async fn session_recovered_before_will_delay_interval() {
     let mut will_connect_options = NO_SESSION_CONNECT_OPTIONS
         .clone()
         .will(will)
-        .session_expiry_interval(SessionExpiryInterval::Seconds(10));
+        .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(10).unwrap()));
 
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, &will_connect_options, Some(id.clone())).await);

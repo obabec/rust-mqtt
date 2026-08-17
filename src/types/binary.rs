@@ -1,3 +1,6 @@
+#[cfg(feature = "alloc")]
+use alloc::{boxed::Box, vec::Vec};
+
 use const_fn::const_fn;
 
 use crate::{
@@ -32,6 +35,12 @@ use crate::{
 /// let from_bytes_unchecked = MqttBinary::from_bytes_unchecked(Bytes::Borrowed(&slice));
 /// assert_eq!(from_bytes_unchecked.as_bytes(), &slice);
 ///
+/// let from_vec = MqttBinary::try_from(vec![0, 1, 2])?;
+/// assert_eq!(from_vec.as_bytes(), &[0, 1, 2]);
+///
+/// let from_boxed_slice = MqttBinary::try_from(vec![3, 4, 5].into_boxed_slice())?;
+/// assert_eq!(from_boxed_slice.as_bytes(), &[3, 4, 5]);
+///
 /// # Ok::<(), TooLargeToEncode>(())
 /// ```
 #[derive(Default, Clone, PartialEq, Eq)]
@@ -64,6 +73,23 @@ impl<'b> TryFrom<&'b str> for MqttBinary<'b> {
         Self::from_slice(value.as_bytes())
     }
 }
+#[cfg(feature = "alloc")]
+impl TryFrom<Vec<u8>> for MqttBinary<'_> {
+    type Error = TooLargeToEncode;
+
+    fn try_from(value: Vec<u8>) -> Result<Self, Self::Error> {
+        Self::try_from(value.into_boxed_slice())
+    }
+}
+#[cfg(feature = "alloc")]
+impl TryFrom<Box<[u8]>> for MqttBinary<'_> {
+    type Error = TooLargeToEncode;
+
+    fn try_from(value: Box<[u8]>) -> Result<Self, Self::Error> {
+        Self::from_bytes(Bytes::Owned(value))
+    }
+}
+
 impl<'b> From<MqttString<'b>> for MqttBinary<'b> {
     fn from(value: MqttString<'b>) -> Self {
         Self(value.0.0)

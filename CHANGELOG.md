@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Detect protocol error on a response information property in CONNACK after CONNECT with request response information set to 0
 - Add request problem information support
 - Add reason string to incoming PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK, UNSUBACK
-- Detect protocol error when server sends user properties (only when `MAX_USER_PROPERTIES` > 0) or a reason string in the PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK and UNSUBACK packets
+- Detect protocol error when server sends user properties (only when `MAX_USER_PROPERTIES` > 0) or a reason string in the PUBACK, PUBREC, PUBREL, PUBCOMP, SUBACK and UNSUBACK packets when request problem information was false
 - Fix client not dropping network connection on receival of a DISCONNECT packet leading to a panic on subsequent call to `Client::abort` in debug builds
 - Use `NonZero<u16>` for topic alias values in `TopicReference`
 - Remove `From<TopicName>` for `TopicFilter` (a correct topic name can be an incorrect shared subscription filter)
@@ -39,9 +39,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `Event::PublishAborted`
 - Add an `AckMode` field to to `Puback` events (`Event::PublishAcknowledged`, `Event::PublishReceived`, `Event::PublishReleased` and `Event::PublishComplete`)
 - Add `AckMode` for specifying manual or automatic acknowledgement mode for publication flows
+- Add user property support for outgoing PUBACK, PUBREC, PUBREL and PUBCOMP packets
+- Add reason string to outgoing PUBACK, PUBREC, PUBREL and PUBCOMP packets
 - Add manual acknowledgements for incoming publications with a predicate on `Publish` events deciding the `AckMode`
 - Add manual acknowledgements for outgoing publications with a field in `PublicationOptions`
 - Add manual_ack example
+- Add `From<alloc::vec::Vec<u8>>` implementation for `Bytes`
+- Add `TryFrom<alloc::vec::Vec<u8>>` and `TryFrom<alloc::boxed::Box<[u8]>>` implementations for `MqttBinary`
+- Add `TryFrom<alloc::string::String>>`, `TryFrom<alloc::vec::Vec<u8>>`, `TryFrom<alloc::boxed::Box<str>>` and `TryFrom<alloc::boxed::Box<[u8]>>` implementations for `MqttString`
+- Add reason string to outgoing DISCONNECT packets
+- Use `NonZero<u32>` for `SessionExpiryInterval::Seconds`
+- Allow any valid reason code to be sent in DISCONNECT packets
 
 ## 0.5.1 - 2026-04-10
 

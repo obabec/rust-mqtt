@@ -1560,16 +1560,24 @@ impl<
 
     /// Disconnects gracefully from the server by sending a DISCONNECT packet.
     ///
-    /// # Preconditions:
-    /// - The client did not return a non-recoverable Error before
+    /// The reason code must be one of [`ReasonCode::Success`], [`ReasonCode::DisconnectWithWillMessage`],
+    /// [`ReasonCode::UnspecifiedError`], [`ReasonCode::MalformedPacket`], [`ReasonCode::ProtocolError`],
+    /// [`ReasonCode::ImplementationSpecificError`], [`ReasonCode::TopicNameInvalid`],
+    /// [`ReasonCode::ReceiveMaximumExceeded`], [`ReasonCode::TopicAliasInvalid`], [`ReasonCode::PacketTooLarge`],
+    /// [`ReasonCode::MessageRateTooHigh`], [`ReasonCode::QuotaExceeded`], [`ReasonCode::AdministrativeAction`] or
+    /// [`ReasonCode::PayloadFormatInvalid`]
+    /// (Compare [Disconnect Reason Code](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901208), \[MQTT-3.14.2-1\]).
     ///
     /// # Errors
     ///
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
     /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::IllegalReasonCode`] if the selected reason code is not allowed
     /// * [`MqttError::IllegalDisconnectSessionExpiryInterval`] if the session expiry interval in the
     ///   CONNECT packet was zero and the session expiry interval in the [`DisconnectOptions`] is [`Some`]
     ///   and not [`SessionExpiryInterval::EndOnDisconnect`].
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet size would be
+    ///   exceeded by sending this DISCONNECT packet
     ///
     /// # Panics
     ///
@@ -1586,6 +1594,42 @@ impl<
             MAX_USER_PROPERTIES
         );
 
+        // Not allowed:
+        // ReasonCode::NotAuthorized - only sent by the server
+        // ReasonCode::ServerBusy - only sent by the server
+        // ReasonCode::ServerShuttingDown - only sent by the server
+        // ReasonCode::KeepAliveTimeout - only sent by the server
+        // ReasonCode::SessionTakenOver - only sent by the server
+        // ReasonCode::TopicFilterInvalid - only sent by the server
+        // ReasonCode::RetainNotSupported - only sent by the server
+        // ReasonCode::QoSNotSupported - only sent by the server
+        // ReasonCode::UseAnotherServer - only sent by the server
+        // ReasonCode::ServerMoved - only sent by the server
+        // ReasonCode::SharedSubscriptionsNotSupported - only sent by the server
+        // ReasonCode::ConnectionRateExceeded - only sent by the server
+        // ReasonCode::MaximumConnectTime - only sent by the server
+        // ReasonCode::SubscriptionIdentifiersNotSupported - only sent by the server
+        // ReasonCode::WildcardSubscriptionsNotSupported - only sent by the server
+        if !matches!(
+            options.reason_code,
+            ReasonCode::Success
+                | ReasonCode::DisconnectWithWillMessage
+                | ReasonCode::UnspecifiedError
+                | ReasonCode::MalformedPacket
+                | ReasonCode::ProtocolError
+                | ReasonCode::ImplementationSpecificError
+                | ReasonCode::TopicNameInvalid
+                | ReasonCode::ReceiveMaximumExceeded
+                | ReasonCode::TopicAliasInvalid
+                | ReasonCode::PacketTooLarge
+                | ReasonCode::MessageRateTooHigh
+                | ReasonCode::QuotaExceeded
+                | ReasonCode::AdministrativeAction
+                | ReasonCode::PayloadFormatInvalid
+        ) {
+            return Err(MqttError::IllegalReasonCode);
+        }
+
         let connect_session_expiry_interval_was_zero =
             self.client_config.session_expiry_interval == SessionExpiryInterval::EndOnDisconnect;
         let disconnect_session_expiry_interval_is_non_zero = options
@@ -1598,14 +1642,14 @@ impl<
             return Err(MqttError::IllegalDisconnectSessionExpiryInterval);
         }
 
-        let reason_code = if options.publish_will {
-            ReasonCode::DisconnectWithWillMessage
-        } else {
-            ReasonCode::Success
-        };
-
-        let mut packet = DisconnectPacket::<0>::new(
-            reason_code,
+        let packet = DisconnectPacket::<MAX_USER_PROPERTIES>::new(
+            options.reason_code,
+            options.session_expiry_interval,
+            options
+                .reason_string
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
             options
                 .user_properties
                 .iter()
@@ -1613,15 +1657,13 @@ impl<
                 .map(Into::into)
                 .collect(),
         );
-        if let Some(s) = options.session_expiry_interval {
-            packet.add_session_expiry_interval(s);
+
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
         debug!("sending DISCONNECT packet");
 
-        // Don't check whether length exceeds servers maximum packet size because we don't
-        // add a reason string to the DISCONNECT packet -> length is always in the 4..=9 range in bytes.
-        // The server really shouldn't reject this.
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
 

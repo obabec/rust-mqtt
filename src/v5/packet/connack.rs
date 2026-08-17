@@ -330,7 +330,9 @@ mod unit {
 
         assert_eq!(
             packet.session_expiry_interval,
-            Some(SessionExpiryInterval::Seconds(1410754593))
+            Some(SessionExpiryInterval::Seconds(
+                NonZero::new(1410754593).unwrap()
+            ))
         );
         assert_eq!(
             packet.receive_maximum,

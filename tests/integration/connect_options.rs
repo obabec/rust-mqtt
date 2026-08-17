@@ -8,7 +8,7 @@ use rust_mqtt::{
         options::{PublicationOptions, SubscriptionOptions, TopicReference, WillOptions},
     },
     config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
-    types::{MqttBinary, MqttString, ReasonCode, TopicFilter, TopicName},
+    types::{MqttBinary, MqttString, MqttStringPair, ReasonCode, TopicFilter, TopicName},
 };
 use tokio::{
     join,
@@ -74,7 +74,7 @@ async fn maximum_packet_size_not_exceeded() {
 #[ignore = "enable this once mosquitto v2.1.3 is used, see https://github.com/eclipse-mosquitto/mosquitto/issues/3503"]
 #[tokio::test]
 #[test_log::test]
-async fn maximum_packet_size_barely_exceeded() {
+async fn maximum_packet_size_barely_exceeded_hive_only() {
     // Has to be a reasonable value not too close to 0, otherwise broker might not reply or something similar
     const MAX_PACKET_SIZE: u32 = 100;
     const PACKET_SIZE: usize = MAX_PACKET_SIZE as usize + 1;
@@ -854,4 +854,40 @@ async fn server_receive_maximum_exceeded() {
         }
     }
     assert_ok!(c.disconnect(DEFAULT_DC_OPTIONS).await);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn user_properties() {
+    let user_properties: [_; 16] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .user_properties(&user_properties);
+
+    let mut c = assert_ok!(connected_client(BROKER_ADDRESS, &connect_options, None).await);
+    disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
+}
+
+#[should_panic]
+#[tokio::test]
+#[test_log::test]
+async fn too_many_user_properties() {
+    let user_properties: [_; 17] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let connect_options = NO_SESSION_CONNECT_OPTIONS
+        .clone()
+        .user_properties(&user_properties);
+
+    let _ = connected_client(BROKER_ADDRESS, &connect_options, None).await;
 }

@@ -90,7 +90,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
 
         match &mut self.n {
             NetState::Faulted(n, r) => {
-                let packet = DisconnectPacket::<0>::new(*r, Vec::new());
+                let packet = DisconnectPacket::<0>::new(*r, None, None, Vec::new());
 
                 debug!("sending DISCONNECT packet with reason code: {:?}", r);
 

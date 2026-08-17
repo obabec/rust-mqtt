@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{num::NonZero, time::Duration};
 
 use rust_mqtt::{
     client::{
@@ -36,7 +36,8 @@ async fn outgoing_automatic_qos1_retry() {
     let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS1_TX_CLIENT").unwrap();
 
     let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+    tx_connect_options.session_expiry_interval =
+        SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
     let mut tx = assert_ok!(
         connected_client(
@@ -125,7 +126,8 @@ async fn outgoing_automatic_qos2_retry_publish() {
     let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS2_PUBLISH_TX_CLIENT").unwrap();
 
     let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+    tx_connect_options.session_expiry_interval =
+        SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
     let mut tx = assert_ok!(
         connected_client(
@@ -210,7 +212,8 @@ async fn outgoing_manual_qos2_retry_publish() {
     let tx_id = MqttString::from_str("RETRY_OUTGOING_MANUAL_QOS2_PUBLISH_TX_CLIENT").unwrap();
 
     let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+    tx_connect_options.session_expiry_interval =
+        SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
     let mut tx = assert_ok!(
         connected_client(
@@ -308,7 +311,8 @@ async fn outgoing_automatic_qos2_retry_pubrel() {
     let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS2_PUBREL_TX_CLIENT").unwrap();
 
     let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+    tx_connect_options.session_expiry_interval =
+        SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
     let mut tx = assert_ok!(
         connected_client(
@@ -412,7 +416,8 @@ async fn outgoing_manual_qos2_retry_pubrel() {
     let tx_id = MqttString::from_str("RETRY_OUTGOING_MANUAL_QOS2_PUBREL_TX_CLIENT").unwrap();
 
     let mut tx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    tx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+    tx_connect_options.session_expiry_interval =
+        SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
     let mut tx = assert_ok!(
         connected_client(
@@ -523,7 +528,8 @@ async fn incoming_automatic_qos2_retry_pubcomp() {
     let rx_id = MqttString::from_str("RETRY_INCOMING_AUTOMATIC_QOS2_RX_CLIENT").unwrap();
 
     let mut rx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    rx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+    rx_connect_options.session_expiry_interval =
+        SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
@@ -614,7 +620,8 @@ async fn incoming_manual_qos2_retry_pubcomp() {
     let rx_id = MqttString::from_str("RETRY_INCOMING_MANUAL_QOS2_RX_CLIENT").unwrap();
 
     let mut rx_connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-    rx_connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+    rx_connect_options.session_expiry_interval =
+        SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
@@ -724,7 +731,8 @@ async fn outgoing_automatic_qos1_write_fail_retry() {
         assert_ok!(subscribed.await);
 
         let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+        connect_options.session_expiry_interval =
+            SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -848,7 +856,8 @@ async fn outgoing_automatic_qos1_read_fail_retry() {
         assert_ok!(subscribed.await);
 
         let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+        connect_options.session_expiry_interval =
+            SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -957,7 +966,8 @@ async fn outgoing_automatic_qos2_write_fail_retry() {
         assert_ok!(subscribed.await);
 
         let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+        connect_options.session_expiry_interval =
+            SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -1133,7 +1143,8 @@ async fn outgoing_manual_qos2_write_fail_retry() {
         assert_ok!(subscribed.await);
 
         let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+        connect_options.session_expiry_interval =
+            SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -1319,7 +1330,8 @@ async fn outgoing_automatic_qos2_read_fail_retry() {
         assert_ok!(subscribed.await);
 
         let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+        connect_options.session_expiry_interval =
+            SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -1494,7 +1506,8 @@ async fn outgoing_manual_qos2_read_fail_retry() {
         assert_ok!(subscribed.await);
 
         let mut connect_options = NO_SESSION_CONNECT_OPTIONS.clone();
-        connect_options.session_expiry_interval = SessionExpiryInterval::Seconds(60);
+        connect_options.session_expiry_interval =
+            SessionExpiryInterval::Seconds(NonZero::new(60).unwrap());
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -1708,7 +1721,7 @@ async fn incoming_automatic_qos1_write_fail_retry() {
     let rx = async move {
         let connect_options = NO_SESSION_CONNECT_OPTIONS
             .clone()
-            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+            .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(60).unwrap()));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -1822,7 +1835,7 @@ async fn incoming_manual_qos1_write_fail_retry() {
     let rx = async move {
         let connect_options = NO_SESSION_CONNECT_OPTIONS
             .clone()
-            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+            .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(60).unwrap()));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -1949,7 +1962,7 @@ async fn incoming_automatic_qos1_read_fail_retry() {
     let rx = async move {
         let connect_options = NO_SESSION_CONNECT_OPTIONS
             .clone()
-            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+            .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(60).unwrap()));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -2063,7 +2076,7 @@ async fn incoming_manual_qos1_read_fail_retry() {
     let rx = async move {
         let connect_options = NO_SESSION_CONNECT_OPTIONS
             .clone()
-            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+            .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(60).unwrap()));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -2189,7 +2202,7 @@ async fn incoming_automatic_qos2_write_fail_retry() {
     let rx = async move {
         let connect_options = NO_SESSION_CONNECT_OPTIONS
             .clone()
-            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+            .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(60).unwrap()));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -2332,7 +2345,7 @@ async fn incoming_manual_qos2_write_fail_retry() {
     let rx = async move {
         let connect_options = NO_SESSION_CONNECT_OPTIONS
             .clone()
-            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+            .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(60).unwrap()));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -2501,7 +2514,7 @@ async fn incoming_automatic_qos2_read_fail_retry() {
     let rx = async move {
         let connect_options = NO_SESSION_CONNECT_OPTIONS
             .clone()
-            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+            .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(60).unwrap()));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;
@@ -2658,7 +2671,7 @@ async fn incoming_manual_qos2_read_fail_retry() {
     let rx = async move {
         let connect_options = NO_SESSION_CONNECT_OPTIONS
             .clone()
-            .session_expiry_interval(SessionExpiryInterval::Seconds(60));
+            .session_expiry_interval(SessionExpiryInterval::Seconds(NonZero::new(60).unwrap()));
 
         let mut reconnect_options = NO_SESSION_CONNECT_OPTIONS.clone();
         reconnect_options.clean_start = false;

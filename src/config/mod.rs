@@ -43,7 +43,7 @@ pub enum SessionExpiryInterval {
     /// The session is not ended under any circumstances.
     NeverEnd,
     /// The session ends after this many seconds have passed after a DISCONNECT packet is sent or the network connection closes.
-    Seconds(u32),
+    Seconds(NonZero<u32>),
 }
 
 /// Maximum packet size. Exceeding this is a protocol error.

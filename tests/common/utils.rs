@@ -71,7 +71,7 @@ pub async fn tcp_connection(
 
 pub async fn connected_client(
     broker: SocketAddr,
-    options: &ConnectOptions<'static>,
+    options: &ConnectOptions<'_>,
     client_identifier: Option<MqttString<'_>>,
 ) -> Result<TestClient<'static>, MqttError<'static, 16>> {
     let mut client = Client::new(ALLOC.get());

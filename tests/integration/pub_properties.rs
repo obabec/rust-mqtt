@@ -62,7 +62,7 @@ async fn message_expiry_interval_basic() {
 #[ignore = "enable this test once https://github.com/hivemq/hivemq-community-edition/issues/616 is fixed"]
 #[tokio::test]
 #[test_log::test]
-async fn message_expiry_interval_partially_expired() {
+async fn message_expiry_interval_partially_expired_mosquitto_only() {
     let (topic_name, topic_filter) = unique_topic();
     let msg = "It's not a bug, it's an undocumented feature!";
 
@@ -382,10 +382,82 @@ async fn user_properties() {
 
 #[tokio::test]
 #[test_log::test]
+async fn max_user_properties() {
+    let publish_user_properties: [_; 16] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let (topic_name, topic_filter) = unique_topic();
+    let msg =
+        "The best thing about a boolean is that even if you are wrong, you are only off by a bit.";
+
+    let mut rx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        sleep(Duration::from_secs(1)).await;
+
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+            .user_properties(&publish_user_properties);
+
+        assert_published!(tx, pub_options, msg.into());
+
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter.clone());
+
+        let Publish {
+            user_properties, ..
+        } = assert_recv_excl!(rx, topic_name);
+
+        // The Server MUST maintain the order of User Properties when forwarding the Application Message [MQTT-3.3.2-18]
+        assert_eq!(
+            user_properties.as_slice(),
+            publish_user_properties.as_slice()
+        );
+
+        disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    join!(receiver, publisher);
+}
+
+#[should_panic]
+#[tokio::test]
+#[test_log::test]
+async fn too_many_user_properties() {
+    let user_properties: [_; 17] = std::array::from_fn(|i| {
+        MqttStringPair::new(
+            MqttString::try_from(format!("key_{i}")).unwrap(),
+            MqttString::try_from(format!("value_{i}")).unwrap(),
+        )
+    });
+
+    let mut c =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let _ = c
+        .publish(
+            &PublicationOptions::new(TopicReference::Name(unique_topic().0))
+                .user_properties(&user_properties),
+            "There are two ways to write error-free programs; only the third one works.".into(),
+        )
+        .await;
+}
+
+#[tokio::test]
+#[test_log::test]
 async fn content_type() {
     let publish_content_type = MqttString::from_str("application/octet-stream").unwrap();
     let (topic_name, topic_filter) = unique_topic();
-    let msg = "The good thing about reinventing the wheel is that you can get a round one.";
+    let msg = "A QA engineer walks into a bar and orders a beer. Then 0 beers. Then 999999999 beers. Then a lizard.";
 
     let mut rx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
