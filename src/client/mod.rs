@@ -361,27 +361,31 @@ impl<
         self.raw.buffer_mut()
     }
 
-    /// Connect the client to an MQTT server on the other end of the `net` argument.
-    /// Sends a CONNECT message and awaits the CONNACK response by the server.
+    /// Establishes a connection to an MQTT server over the provided [`Transport`].
     ///
-    /// Only call this when
-    /// - the client is newly constructed.
-    /// - a non-recoverable error has occured and [`Self::abort`] has been called.
-    /// - [`Self::disconnect`] has been called.
+    /// Sends a CONNECT packet  and awaits the CONNACK response by the server. It initializes
+    /// the internal state of the client, including session information and negotiated server
+    /// capabilities.
     ///
-    /// The session expiry interval in [`ConnectOptions`] overrides the one in the session of the client.
+    /// This function must only be called if:
+    /// - The client is newly constructed and has not yet been connected.
+    /// - A previous connection was closed gracefully via [`Self::disconnect`].
+    /// - An unrecoverable error occurred and the error handling was performed with [`Self::abort`].
     ///
     /// Configuration that was negotiated with the server is stored in the `client_config`,
     /// `server_config`, `shared_config`, and `session` fields, which have getters
     /// ([`Self::client_config`], [`Self::server_config`], [`Self::shared_config`],
     /// [`Self::session`]).
     ///
-    /// If the server does not have a session present, the client's session is cleared. In case you would want
-    /// to keep the session state, you can call [`Self::session`] and clone the session before.
+    /// If the server indicates that no session is present (Session Present flag is 0), the
+    /// client's local session state is cleared. To persist state across connections,
+    /// call [`Self::session`] to clone the state before calling this method.
     ///
-    /// # Returns:
-    /// Information about the session/connection that the client does currently not use and therefore  not store
-    /// in its configuration fields.
+    /// # Returns
+    ///
+    /// - [`Ok(Connected)`]: Contains information from the CONNACK packet that is not persisted
+    ///   in the client's internal configuration fields.
+    /// - [`Err(MqttError)`]: If the connection attempt failed.
     ///
     /// # Errors
     ///
@@ -399,8 +403,12 @@ impl<
     /// # Panics
     ///
     /// This function panics if the length of the `user_properties` slice in the [`ConnectOptions`]
-    /// or the length of the `user_properties` slice in the will in [`ConnectOptions`] is greater
-    /// than `MAX_USER_PROPERTIES`.
+    /// or the length of the `user_properties` slice in the [`WillOptions`] in [`ConnectOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Ok(Connected)`]: crate::client::event::Connected
+    /// [`Err(MqttError)`]: crate::client::MqttError
+    /// [`WillOptions`]: crate::client::options::WillOptions
     pub async fn connect<'d>(
         &mut self,
         net: N,
@@ -1541,17 +1549,40 @@ impl<
         Ok(())
     }
 
-    /// Disconnects from the server after an error occured in a situation-aware way by either:
-    /// - dropping the connection
-    /// - sending a DISCONNECT with the deposited reason code and dropping the connection.
+    /// Completes the disconnection from the server after an unrecoverable error in a
+    /// situation-aware way.
     ///
-    /// After an MQTT communication fails, usually either the client or the server closes the connection.
+    /// If the server caused the error, it sends a DISCONNECT with the deposited reason code.
+    /// Otherwise, it performs no network operations.
     ///
-    /// This is not cancel-safe but you can set a timeout if reconnecting later anyway or you don't reuse the client.
+    /// This function must only be called once after an unrecoverable error occurred and
+    /// only if [`Client::connect`] was called previously. If called on a healthy connection,
+    /// or if [`Client::connect`] was never called, it does nothing and the network
+    /// connection remains as is.
+    ///
+    /// # Returns
+    ///
+    /// - [`Ok(T)`]: The underlying network connection from the previous [`Client::connect`].
+    ///   The returned network should be used to close network connection.
+    /// - [`Err(AbortError::Connected`]: If the call was incorrect because the MQTT protocol
+    ///   connection and the transport connection is healthy. In debug builds, this will panic
+    ///   instead.
+    /// - [`Err(AbortError::Terminated)`]: If the call was incorrect because the client holds
+    ///   no underlying disconnection. In debug builds, this will panic instead.
+    ///
+    /// # Cancel Safety
+    ///
+    /// This future is not cancel-safe. If cancelled, it cannot be called again to retrieve
+    /// the network connection. However, the client logic for disconnection/abortion is
+    /// still completed, allowing for a subsequent [`Client::connect`].
     ///
     /// # Panics
     ///
-    /// This function may panic if the client has not returned an unrecoverable error before.
+    /// This function may panic if the client has not returned an unrecoverable error, or if called
+    /// twice without a [`Client::connect`] in-between.
+    ///
+    /// [`Err(AbortError::Connected)`]: crate::client::AbortError::Connected
+    /// [`Err(AbortError::Terminated)`]: crate::client::AbortError::Terminated
     #[inline]
     pub async fn abort(&mut self) -> Result<N, AbortError> {
         self.raw
@@ -1571,6 +1602,13 @@ impl<
     /// [`ReasonCode::PayloadFormatInvalid`]
     /// (Compare [Disconnect Reason Code](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901208), \[MQTT-3.14.2-1\]).
     ///
+    /// # Returns
+    ///
+    /// - [`Ok(N)`]: The underlying network connection from the previous [`Client::connect`]. The client is
+    ///   terminated; a subsequent call to [`Client::abort`] is incorrect.
+    /// - [`Err(MqttError)`]: If the disconnection failed. If the error is unrecoverable, a call to [`Client::abort`]
+    ///   is required to retrieve the network connection.
+    ///
     /// # Errors
     ///
     /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
@@ -1586,6 +1624,8 @@ impl<
     ///
     /// This function panics if the length of the `user_properties` slice in the [`DisconnectOptions`]
     /// is greater than `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Err(MqttError)`]: crate::client::MqttError
     pub async fn disconnect(
         &mut self,
         options: &DisconnectOptions<'_>,
