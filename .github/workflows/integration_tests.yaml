@@ -66,28 +66,36 @@ jobs:
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
 
-      - name: Start HiveMQ
+      - name: Prepare HiveMQ Configuration
         run: |
-          curl -LO https://github.com/hivemq/hivemq-community-edition/releases/download/2025.5/hivemq-ce-2025.5.zip
-          unzip hivemq-ce-2025.5.zip
           curl -LO https://github.com/hivemq/hivemq-file-rbac-extension/releases/download/4.6.8/hivemq-file-rbac-extension-4.6.8.zip
           unzip hivemq-file-rbac-extension-4.6.8.zip
-          mv hivemq-file-rbac-extension hivemq-ce-2025.5/extensions
-          cp .ci/hive_config.xml hivemq-ce-2025.5/conf/config.xml
-          cp .ci/hive_cred.xml hivemq-ce-2025.5/extensions/hivemq-file-rbac-extension/credentials.xml
-          cp .ci/hive_extension_config.xml hivemq-ce-2025.5/extensions/hivemq-file-rbac-extension/conf/config.xml
-          hivemq-ce-2025.5/bin/run.sh &
-          sleep 3
+          cp .ci/hive_cred.xml hivemq-file-rbac-extension/conf/credentials.xml
+          cp .ci/hive_extension_config.xml hivemq-file-rbac-extension/conf/config.xml
+
+      - name: Start HiveMQ
+        run: |
+          docker run -d \
+            --name hivemq \
+            -p 1883:1883 \
+            -v $PWD/.ci/hive_config.xml:/opt/hivemq/conf/config.xml \
+            -v $PWD/hivemq-file-rbac-extension:/opt/hivemq/extensions/hivemq-file-rbac-extension \
+            hivemq/hivemq-ce:2026.5
+          timeout 30s sh -c 'until docker logs hivemq 2>&1 | grep "Started HiveMQ in"; do sleep 0.1; done'
 
       - name: Run integration tests
         run: RUST_LOG=trace cargo test integration --features "log" -- --show-output
 
       - name: Restart HiveMQ
         run: |
-          pkill -f hivemq-ce || true
-          sleep 5
-          hivemq-ce-2025.5/bin/run.sh &
-          sleep 3
+          docker rm -f hivemq
+          docker run -d \
+            --name hivemq \
+            -p 1883:1883 \
+            -v $PWD/.ci/hive_config.xml:/opt/hivemq/conf/config.xml \
+            -v $PWD/hivemq-file-rbac-extension:/opt/hivemq/extensions/hivemq-file-rbac-extension \
+            hivemq/hivemq-ce:2026.5
+          timeout 30s sh -c 'until docker logs hivemq 2>&1 | grep "Started HiveMQ in"; do sleep 0.1; done'
 
       - name: Run hive-only integration tests
         run: RUST_LOG=trace cargo test hive_only --features "log" -- --show-output --ignored
