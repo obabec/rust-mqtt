@@ -152,14 +152,16 @@ mod unit {
             SubscriptionFilter::new(
                 TopicFilter::new(MqttString::try_from("test/hello").unwrap()).unwrap(),
                 &SubscriptionOptions::new().no_local(),
-            ),
+            )
+            .unwrap(),
             SubscriptionFilter::new(
                 TopicFilter::new(MqttString::try_from("asdfjklo/#").unwrap()).unwrap(),
                 &SubscriptionOptions::new()
                     .retain_handling(RetainHandling::NeverSend)
                     .retain_as_published()
                     .exactly_once(),
-            ),
+            )
+            .unwrap(),
         ];
         let packet: SubscribePacket<'_, 2, 0> = SubscribePacket::new(
             PacketIdentifier::new(NonZero::new(23197).unwrap()),
@@ -215,7 +217,8 @@ mod unit {
                 .retain_handling(RetainHandling::SendIfNotSubscribedBefore)
                 .retain_as_published()
                 .subscription_identifier(VarByteInt::from(23459u16)),
-        )];
+        )
+        .unwrap()];
 
         let user_properties = [
             UserProperty(MqttStringPair::new(

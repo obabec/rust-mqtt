@@ -223,6 +223,16 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize> {
     /// Recoverable error. No action has been taken by the client.
     UnsupportedByServer,
 
+    /// A shared subscription with the no local flag set to [`true`] was attempted. This would cause a protocol
+    /// error.
+    ///
+    /// Recoverable error. No action has been taken by the client. Ensure that at max only one of
+    /// [`TopicFilter::is_shared`] and the `no_local` field in the [`SubscriptionOptions`] is [`true`].
+    ///
+    /// [`SubscriptionOptions`]: crate::client::options::SubscriptionOptions
+    /// [`TopicFilter::is_shared`]: crate::types::TopicFilter::is_shared
+    IllegalNoLocalSharedSubscription,
+
     /// A disconnect now with the given session expiry interval would cause a protocol error.
     ///
     /// A disconnection was attempted with a session expiry interval change where the session expiry interval in the
@@ -255,6 +265,7 @@ impl<const MAX_USER_PROPERTIES: usize> Error<'_, MAX_USER_PROPERTIES> {
                 | Self::SessionBuffer
                 | Self::SendQuotaExceeded
                 | Self::UnsupportedByServer
+                | Self::IllegalNoLocalSharedSubscription
                 | Self::IllegalDisconnectSessionExpiryInterval
         )
     }
@@ -295,6 +306,7 @@ impl<'e> Error<'e, 0> {
             Self::SessionBuffer => Error::SessionBuffer,
             Self::SendQuotaExceeded => Error::SendQuotaExceeded,
             Self::UnsupportedByServer => Error::UnsupportedByServer,
+            Self::IllegalNoLocalSharedSubscription => Error::IllegalNoLocalSharedSubscription,
             Self::IllegalDisconnectSessionExpiryInterval => {
                 Error::IllegalDisconnectSessionExpiryInterval
             }

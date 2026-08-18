@@ -305,6 +305,12 @@ pub struct SubscriptionFilter<'t> {
     subscription_options: u8,
 }
 
+/// The no local flag is set for a shared subscription, which is not allowed:
+///
+/// It is a Protocol Error to set the No Local bit to 1 on a Shared Subscription [MQTT-3.8.3-4].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NoLocalSharedSubscription;
+
 impl<const MAX_TOPIC_FILTERS: usize> Writable for Vec<SubscriptionFilter<'_>, MAX_TOPIC_FILTERS> {
     fn written_len(&self) -> usize {
         self.iter()
@@ -324,7 +330,14 @@ impl<const MAX_TOPIC_FILTERS: usize> Writable for Vec<SubscriptionFilter<'_>, MA
 }
 
 impl<'t> SubscriptionFilter<'t> {
-    pub const fn new(topic: TopicFilter<'t>, options: &SubscriptionOptions) -> Self {
+    pub fn new(
+        topic: TopicFilter<'t>,
+        options: &SubscriptionOptions,
+    ) -> Result<Self, NoLocalSharedSubscription> {
+        if options.no_local && topic.is_shared() {
+            return Err(NoLocalSharedSubscription);
+        }
+
         let retain_handling_bits = match options.retain_handling {
             RetainHandling::AlwaysSend => 0x00,
             RetainHandling::SendIfNotSubscribedBefore => 0x10,
@@ -346,10 +359,10 @@ impl<'t> SubscriptionFilter<'t> {
         let subscribe_options_bits =
             retain_handling_bits | retain_as_published_bit | no_local_bit | qos_bits;
 
-        Self {
+        Ok(Self {
             topic,
             subscription_options: subscribe_options_bits,
-        }
+        })
     }
 }
 

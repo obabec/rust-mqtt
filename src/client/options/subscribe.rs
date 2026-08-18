@@ -17,7 +17,7 @@ pub struct Options<'s> {
     /// If set to true, the server does not forward any publications matching
     /// this subscription to connections with client identifiers the same as
     /// the client identifier of this connection.
-    /// If set to true on a shared subscription, a protocol error is triggered.
+    /// Can not be set to true for a shared subscription.
     pub no_local: bool,
 
     /// The maximum quality of service that the server is allowed to forward publications

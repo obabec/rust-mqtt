@@ -9,7 +9,7 @@ mod string;
 mod topic;
 mod will;
 
-pub(crate) use topic::SubscriptionFilter;
+pub(crate) use topic::{NoLocalSharedSubscription, SubscriptionFilter};
 pub(crate) use will::Will;
 
 pub use binary::MqttBinary;
