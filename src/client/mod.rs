@@ -1562,9 +1562,9 @@ impl<
     ///
     /// # Returns
     ///
-    /// - [`Ok(T)`]: The underlying network connection from the previous [`Client::connect`].
+    /// - [`Ok(N)`]: The underlying network connection from the previous [`Client::connect`].
     ///   The returned network should be used to close network connection.
-    /// - [`Err(AbortError::Connected`]: If the call was incorrect because the MQTT protocol
+    /// - [`Err(AbortError::Connected)`]: If the call was incorrect because the MQTT protocol
     ///   connection and the transport connection is healthy. In debug builds, this will panic
     ///   instead.
     /// - [`Err(AbortError::Terminated)`]: If the call was incorrect because the client holds
@@ -1581,6 +1581,7 @@ impl<
     /// This function may panic if the client has not returned an unrecoverable error, or if called
     /// twice without a [`Client::connect`] in-between.
     ///
+    /// [`Ok(N)`]: crate::io::Transport
     /// [`Err(AbortError::Connected)`]: crate::client::AbortError::Connected
     /// [`Err(AbortError::Terminated)`]: crate::client::AbortError::Terminated
     #[inline]
@@ -1625,6 +1626,7 @@ impl<
     /// This function panics if the length of the `user_properties` slice in the [`DisconnectOptions`]
     /// is greater than `MAX_USER_PROPERTIES`.
     ///
+    /// [`Ok(N)`]: crate::io::Transport
     /// [`Err(MqttError)`]: crate::client::MqttError
     pub async fn disconnect(
         &mut self,
