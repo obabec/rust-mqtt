@@ -14,31 +14,42 @@ jobs:
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
 
-      - name: Install Mosquitto
-        run: |
-          sudo apt-get update
-          sudo add-apt-repository -y ppa:mosquitto-dev/mosquitto-ppa
-          sudo apt-get update
-          sudo apt install -y mosquitto
-          sudo service mosquitto stop
-
-      - name: Configure & Start Mosquitto
+      - name: Prepare Mosquitto Configuration
         run: |
           cp .ci/mqtt_pass_plain.txt .ci/mqtt_pass_hashed.txt
-          chmod 700 .ci/mqtt_pass_hashed.txt
-          mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
-          mosquitto -c .ci/mosquitto.conf -d
-          sleep 1
+          sudo chown root:root .ci/mqtt_pass_hashed.txt
+          sudo chmod 600 .ci/mqtt_pass_hashed.txt
+
+          docker run --rm \
+            -v $PWD/.ci:/.ci \
+            eclipse-mosquitto:2.1.2-alpine \
+            mosquitto_passwd -U .ci/mqtt_pass_hashed.txt
+
+          sudo chown 1883:1883 .ci/mqtt_pass_hashed.txt
+
+      - name: Start Mosquitto
+        run: |
+          docker run -d \
+            --name mosquitto \
+            -p 1883:1883 \
+            -v $PWD/.ci:/.ci \
+            -v $PWD/.ci/mosquitto.conf:/mosquitto/config/mosquitto.conf \
+            eclipse-mosquitto:2.1.2-alpine
+          timeout 10s sh -c 'until docker logs mosquitto 2>&1 | grep "mosquitto version 2.1.2 running"; do sleep 0.1; done'
 
       - name: Run integration tests
         run: RUST_LOG=trace cargo test integration --features "log" -- --show-output
 
       - name: Restart Mosquitto
         run: |
-          pkill mosquitto || true
-          sleep 1
-          mosquitto -c .ci/mosquitto.conf -d
-          sleep 1
+          docker rm -f mosquitto
+          docker run -d \
+            --name mosquitto \
+            -p 1883:1883 \
+            -v $PWD/.ci:/.ci \
+            -v $PWD/.ci/mosquitto.conf:/mosquitto/config/mosquitto.conf \
+            eclipse-mosquitto:2.1.2-alpine
+          timeout 10s sh -c 'until docker logs mosquitto 2>&1 | grep "mosquitto version 2.1.2 running"; do sleep 0.1; done'
 
       - name: Run mosquitto-only integration tests
         run: RUST_LOG=trace cargo test mosquitto_only --features "log" -- --show-output --ignored
