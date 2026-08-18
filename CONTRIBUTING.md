@@ -52,7 +52,7 @@ RUST_LOG=trace cargo run --example manual_ack --no-default-features --features "
 
 ## Tests
 
-The CI pipeline run unit, integration and doc tests as well as linting and other checks thoroughly. However, you should still run these tests locally.
+The CI pipeline runs unit, integration and doc tests as well as linting and other checks thoroughly. However, you should still run these tests locally.
 
 ### Unit
 
