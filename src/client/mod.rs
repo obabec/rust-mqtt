@@ -737,7 +737,7 @@ impl<
 
         let Some(handle) = self.session.free_handle() else {
             info!("no free packet identifier");
-            return Err(MqttError::SessionBuffer);
+            return Err(MqttError::AllPacketIdentifiersUsed);
         };
         let pid = handle.packet_identifier;
 
@@ -806,7 +806,7 @@ impl<
 
         let Some(handle) = self.session.free_handle() else {
             info!("no free packet identifier");
-            return Err(MqttError::SessionBuffer);
+            return Err(MqttError::AllPacketIdentifiersUsed);
         };
         let pid = handle.packet_identifier;
 
