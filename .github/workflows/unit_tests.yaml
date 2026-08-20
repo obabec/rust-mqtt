@@ -11,6 +11,9 @@ jobs:
       - name: Install toolchain
         run: rustup show
 
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+
       - name: Run unit tests with alloc feature
         run: RUST_LOG=trace cargo test unit --features "log" -- --show-output
 

@@ -1,5 +1,6 @@
 use std::{
     net::{Ipv4Addr, SocketAddr},
+    panic,
     time::{Duration, SystemTime},
 };
 
@@ -107,5 +108,8 @@ async fn main() {
 
     sleep(Duration::from_secs(5)).await;
 
-    client.disconnect(&DisconnectOptions::new()).await.unwrap();
+    let tls = client.disconnect(&DisconnectOptions::new()).await.unwrap();
+    let Ok(_) = tls.close().await else {
+        panic!();
+    };
 }
