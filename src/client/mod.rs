@@ -1712,9 +1712,10 @@ impl<
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
 
+        self.raw.prepare_close();
+
         info!("disconnected from server");
 
-        self.raw.prepare_close();
         Ok(self.raw.abort().await.unwrap())
     }
 

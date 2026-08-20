@@ -69,7 +69,10 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
     }
 
     pub fn prepare_disconnect(&mut self, reason_code: ReasonCode) {
-        debug_assert!(self.n.is_ok());
+        debug_assert!(
+            self.n.is_ok(),
+            "connection must be in a healthy state to transition into failed state."
+        );
 
         self.n.fail(reason_code);
     }
@@ -88,7 +91,7 @@ impl<'b, N: Transport, B: BufferProvider<'b>> Raw<'b, N, B> {
     /// This expects the network to be in neither `Ok(N)` nor `Terminated` state
     pub async fn abort(&mut self) -> Result<N, AbortError> {
         debug_assert!(
-            !self.n.is_terminated(),
+            !self.n.is_terminated() && !self.n.is_ok(),
             "network must be in DueDisconnect(N, ReasonCode) or Inactive(N) state to disconnect due to an error."
         );
 
