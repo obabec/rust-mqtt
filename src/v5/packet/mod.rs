@@ -1,4 +1,4 @@
-// mod auth;
+mod auth;
 mod connack;
 mod connect;
 mod disconnect;
@@ -9,7 +9,7 @@ mod subacks;
 mod subscribe;
 mod unsubscribe;
 
-// pub use auth::AuthPacket;
+pub use auth::AuthPacket;
 pub use connack::ConnackPacket;
 pub use connect::ConnectPacket;
 pub use disconnect::DisconnectPacket;
