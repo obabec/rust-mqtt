@@ -51,7 +51,8 @@ pub use raw::AbortError;
 /// - `RECEIVE_MAXIMUM`: MQTT's control flow mechanism. The maximum amount of incoming [`QoS::AtLeastOnce`] and
 ///   [`QoS::ExactlyOnce`] publications (accumulated). Must not be 0 and must not be greater than 65535.
 /// - `SEND_MAXIMUM`: The maximum amount of outgoing [`QoS::AtLeastOnce`] and [`QoS::ExactlyOnce`] publications. The server
-///   can further limit this with its receive maximum. The client will use the minimum of this value and [`Self::server_config`].
+///   can further limit this with its receive maximum. The client will use the minimum of this value and the value in
+///   [`Client::server_config`].
 /// - `MAX_SUBSCRIPTION_IDENTIFIERS`: The maximum amount of subscription identifier properties the client can receive within a
 ///   single PUBLISH packet. If a packet with more subscription identifiers is received, the later identifers will be discarded.
 /// - `MAX_USER_PROPERTIES`: The maximum amount of user properties that the client can send and receive in one packet.
@@ -258,8 +259,9 @@ impl<
     /// Creates a new, disconnected MQTT client using a buffer provider to store
     /// dynamically sized fields of received packets.
     /// The session state is initialised as a new session. If you want to start the
-    /// client with an existing session, use [`Self::with_session`].
-    /// All publications and acknowledgements will be acknowledged automatically.
+    /// client with an existing session, use [`Client::with_session`].
+    /// All publications and acknowledgements will be acknowledged automatically by
+    /// default.
     pub fn new(buffer: &'c mut B) -> Self {
         const {
             const_assert!(
@@ -363,23 +365,24 @@ impl<
 
     /// Establishes a connection to an MQTT server over the provided [`Transport`].
     ///
-    /// Sends a CONNECT packet  and awaits the CONNACK response by the server. It initializes
+    /// Sends a CONNECT packet and awaits the CONNACK response by the server. It initializes
     /// the internal state of the client, including session information and negotiated server
     /// capabilities.
     ///
     /// This function must only be called if:
     /// - The client is newly constructed and has not yet been connected.
-    /// - A previous connection was closed gracefully via [`Self::disconnect`].
-    /// - An unrecoverable error occurred and the error handling was performed with [`Self::abort`].
+    /// - A previous connection was closed gracefully via [`Client::disconnect`].
+    /// - An unrecoverable error occurred and the error handling was performed with
+    ///   [`Client::abort`].
     ///
     /// Configuration that was negotiated with the server is stored in the `client_config`,
     /// `server_config`, `shared_config`, and `session` fields, which have getters
-    /// ([`Self::client_config`], [`Self::server_config`], [`Self::shared_config`],
-    /// [`Self::session`]).
+    /// ([`Client::client_config`], [`Client::server_config`], [`Client::shared_config`],
+    /// [`Client::session`]).
     ///
     /// If the server indicates that no session is present (Session Present flag is 0), the
     /// client's local session state is cleared. To persist state across connections,
-    /// call [`Self::session`] to clone the state before calling this method.
+    /// call [`Client::session`] to clone the state before calling this method.
     ///
     /// # Returns
     ///
@@ -1719,7 +1722,7 @@ impl<
         Ok(self.raw.abort().await.unwrap())
     }
 
-    /// Combines [`Self::poll_header`] and [`Self::poll_body`].
+    /// Combines [`Client::poll_header`] and [`Client::poll_body`].
     ///
     /// Polls the network for a full packet. Not cancel-safe.
     ///
@@ -1753,7 +1756,7 @@ impl<
     /// - The client did not return a non-recoverable Error before
     ///
     /// # Returns:
-    /// The received fixed header with a valid packet type. It can be used to call [`Self::poll_body`].
+    /// The received fixed header with a valid packet type. It can be used to call [`Client::poll_body`].
     ///
     /// # Errors
     ///
