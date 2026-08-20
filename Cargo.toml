@@ -14,7 +14,7 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/obabec/rust-mqtt"
 keywords = ["embedded", "async", "mqtt", "no_std"]
 categories = ["embedded", "network-programming", "no-std"]
-exclude = [".github", ".ci"]
+exclude = [".github", ".ci", ".gitignore", "CONTRIBUTING.md", "rust-toolchain.toml", "rustfmt.toml"]
 
 [dependencies]
 embedded-io-async = { version = "0.7.0" }
