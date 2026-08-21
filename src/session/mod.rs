@@ -311,12 +311,17 @@ impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MA
             })
     }
 
-    fn active_inbound_publishes(&self) -> u16 {
+    /// Returns the amount of inbound, in-flight publications.
+    #[must_use]
+    pub fn active_inbound_publishes(&self) -> u16 {
         debug_assert!(u16::try_from(self.inbound_publishes.len()).is_ok());
 
         self.inbound_publishes.len() as u16
     }
-    pub(crate) fn active_outbound_publishes(&self) -> u16 {
+
+    /// Returns the amount of outbound, in-flight publications.
+    #[must_use]
+    pub fn active_outbound_publishes(&self) -> u16 {
         debug_assert!(u16::try_from(self.outbound_publishes.len()).is_ok());
 
         self.outbound_publishes.len() as u16
