@@ -990,14 +990,14 @@ impl<
         if let Some(handle) = handle {
             // Treat the packet as sent before successfully sending. In case of a network error,
             // we have tracked the packet as in flight and can republish it.
-            if let Err(e) = handle.outbound_publish(options.qos, options.ack_mode) {
-                match e {
-                    SmError::NoCapacity => return Err(MqttError::SessionBuffer),
+            handle
+                .outbound_publish(options.qos, options.ack_mode)
+                .map_err(|e| match e {
+                    SmError::NoCapacity => MqttError::SessionBuffer,
                     SmError::PacketIdentifierUnused
                     | SmError::QoSMismatched
                     | SmError::HandshakeStateMismatched => unreachable!(),
-                }
-            }
+                })?;
         }
 
         match identified_qos.packet_identifier() {
@@ -1137,22 +1137,16 @@ impl<
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
-        if let Err(e) = self.session.outbound_republish(identified_qos) {
-            match e {
+        self.session
+            .outbound_republish(identified_qos)
+            .map_err(|e| match e {
                 SmError::NoCapacity => {
                     unreachable!("a republish can not fail due to missing capacity")
                 }
-                SmError::PacketIdentifierUnused => {
-                    return Err(MqttError::PacketIdentifierNotInFlight);
-                }
-                SmError::QoSMismatched => {
-                    return Err(MqttError::QoSMismatched);
-                }
-                SmError::HandshakeStateMismatched => {
-                    return Err(MqttError::HandshakeStateMismatched);
-                }
-            }
-        }
+                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
+                SmError::QoSMismatched => MqttError::QoSMismatched,
+                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
+            })?;
 
         debug!(
             "resending PUBLISH packet with packet identifier {}",
@@ -2017,7 +2011,8 @@ impl<
                 }
 
                 match event {
-                    SmEvent::Aborted
+                    SmEvent::Ignored
+                    | SmEvent::Aborted
                     | SmEvent::Rejected
                     | SmEvent::Acknowledged
                     | SmEvent::Received(_)
@@ -2032,7 +2027,6 @@ impl<
                         };
                         Event::Duplicate(publish)
                     }
-                    SmEvent::Ignored => Event::Ignored,
                     SmEvent::ServerError => return Err(MqttError::Server),
                 }
             }
@@ -2238,7 +2232,6 @@ impl<
                     SmEvent::Publish
                     | SmEvent::Duplicate(_)
                     | SmEvent::Aborted
-                    | SmEvent::Rejected
                     | SmEvent::Acknowledged
                     | SmEvent::Received(_)
                     | SmEvent::Released(_) => unreachable!(),
@@ -2247,6 +2240,7 @@ impl<
                     SmEvent::Completed => {
                         Event::PublishComplete(Puback::new(pubcomp, AckMode::default()))
                     }
+                    SmEvent::Rejected => Event::PublishRejected(Pubrej::from(pubcomp)),
                     SmEvent::ServerError => return Err(MqttError::Server),
                 }
             }
