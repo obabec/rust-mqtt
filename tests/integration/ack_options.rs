@@ -392,7 +392,7 @@ async fn pubrel_too_many_user_properties() {
 #[ignore = "mosquitto has no configurable PUBACK maximum packet size"]
 #[tokio::test]
 #[test_log::test]
-async fn server_maximum_packet_size_not_exceeded_by_puback_hive_only() {
+async fn server_maximum_packet_size_not_exceeded_by_puback_emqx_only_hive_only() {
     // fixed header, packet identifier, reason code, property length
     const OVERHEAD: u32 = 4 + 2 + 1 + 3;
 
@@ -468,7 +468,7 @@ async fn server_maximum_packet_size_not_exceeded_by_puback_hive_only() {
 #[ignore = "mosquitto has no configurable PUBACK maximum packet size"]
 #[tokio::test]
 #[test_log::test]
-async fn server_maximum_packet_size_exceeded_by_puback_hive_only() {
+async fn server_maximum_packet_size_exceeded_by_puback_emqx_only_hive_only() {
     // fixed header, packet identifier, reason code, property length
     const OVERHEAD: u32 = 4 + 2 + 1 + 3;
 
@@ -546,7 +546,7 @@ async fn server_maximum_packet_size_exceeded_by_puback_hive_only() {
 #[ignore = "mosquitto has no configurable PUBREC/PUBCOMP maximum packet size"]
 #[tokio::test]
 #[test_log::test]
-async fn server_maximum_packet_size_not_exceeded_by_pubrec_pubcomp_hive_only() {
+async fn server_maximum_packet_size_not_exceeded_by_pubrec_pubcomp_emqx_only_hive_only() {
     // fixed header, packet identifier, reason code, property length
     const OVERHEAD: u32 = 4 + 2 + 1 + 3;
 
@@ -636,7 +636,7 @@ async fn server_maximum_packet_size_not_exceeded_by_pubrec_pubcomp_hive_only() {
 #[ignore = "mosquitto has no configurable PUBREC maximum packet size"]
 #[tokio::test]
 #[test_log::test]
-async fn server_maximum_packet_size_exceeded_by_pubrec_hive_only() {
+async fn server_maximum_packet_size_exceeded_by_pubrec_emqx_only_hive_only() {
     // fixed header, packet identifier, reason code, property length
     const OVERHEAD: u32 = 4 + 2 + 1 + 3;
 
@@ -714,7 +714,7 @@ async fn server_maximum_packet_size_exceeded_by_pubrec_hive_only() {
 #[ignore = "mosquitto has no configurable PUBCOMP maximum packet size"]
 #[tokio::test]
 #[test_log::test]
-async fn server_maximum_packet_size_exceeded_by_pubcomp_hive_only() {
+async fn server_maximum_packet_size_exceeded_by_pubcomp_emqx_only_hive_only() {
     // fixed header, packet identifier, reason code, property length
     const OVERHEAD: u32 = 4 + 2 + 1 + 3;
 
@@ -800,7 +800,7 @@ async fn server_maximum_packet_size_exceeded_by_pubcomp_hive_only() {
 #[ignore = "mosquitto has no configurable PUBREL maximum packet size"]
 #[tokio::test]
 #[test_log::test]
-async fn server_maximum_packet_size_not_exceeded_by_pubrel_hive_only() {
+async fn server_maximum_packet_size_not_exceeded_by_pubrel_emqx_only_hive_only() {
     // fixed header, packet identifier, reason code, property length
     const OVERHEAD: u32 = 4 + 2 + 1 + 3;
 
@@ -858,7 +858,7 @@ async fn server_maximum_packet_size_not_exceeded_by_pubrel_hive_only() {
 #[ignore = "mosquitto has no configurable PUBREL maximum packet size"]
 #[tokio::test]
 #[test_log::test]
-async fn server_maximum_packet_size_exceeded_by_pubrel_hive_only() {
+async fn server_maximum_packet_size_exceeded_by_pubrel_emqx_only_hive_only() {
     // fixed header, packet identifier, reason code, property length
     const OVERHEAD: u32 = 4 + 2 + 1 + 3;
 
