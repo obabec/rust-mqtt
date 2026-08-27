@@ -99,3 +99,42 @@ jobs:
 
       - name: Run hive-only integration tests
         run: RUST_LOG=trace cargo test hive_only --features "log" -- --show-output --ignored
+
+  integration_tests_emqx:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install toolchain
+        run: rustup show
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Start EMQX
+        run: |
+          docker run -d \
+            --name emqx \
+            -p 1883:1883 \
+            -v $PWD/.ci/emqx.conf:/opt/emqx/etc/emqx.conf \
+            -v $PWD/.ci/emqx_users.csv:/opt/emqx/etc/auth-built-in-db-bootstrap.csv \
+            emqx/emqx:6.2.2
+          timeout 30s sh -c 'until docker logs emqx 2>&1 | grep "EMQX Enterprise 6.2.2 is running now!"; do sleep 0.1; done'
+
+      - name: Run integration tests
+        run: RUST_LOG=trace cargo test integration --features "log" -- --show-output
+
+      - name: Restart EMQX
+        run: |
+          docker rm -f emqx
+          docker run -d \
+            --name emqx \
+            -p 1883:1883 \
+            -v $PWD/.ci/emqx.conf:/opt/emqx/etc/emqx.conf \
+            -v $PWD/.ci/emqx_users.csv:/opt/emqx/etc/auth-built-in-db-bootstrap.csv \
+            emqx/emqx:6.2.2
+          timeout 30s sh -c 'until docker logs emqx 2>&1 | grep "EMQX Enterprise 6.2.2 is running now!"; do sleep 0.1; done'
+
+      - name: Run emqx-only integration tests
+        run: RUST_LOG=trace cargo test emqx_only --features "log" -- --show-output --ignored
