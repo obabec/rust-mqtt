@@ -112,29 +112,46 @@ jobs:
       - name: Rust Cache
         uses: swatinem/rust-cache@v2
 
-      - name: Start EMQX
+      - name: Start & Configure EMQX
         run: |
           docker run -d \
             --name emqx \
             -p 1883:1883 \
+            -p 18083:18083 \
             -v $PWD/.ci/emqx.conf:/opt/emqx/etc/emqx.conf \
             -v $PWD/.ci/emqx_users.csv:/opt/emqx/etc/auth-built-in-db-bootstrap.csv \
             emqx/emqx:6.2.2
           timeout 30s sh -c 'until docker logs emqx 2>&1 | grep "EMQX Enterprise 6.2.2 is running now!"; do sleep 0.1; done'
 
+          API_JSON=$(docker exec emqx emqx ctl api_keys add --api-secret abcdefghijklmnopqrstuvwxyz0123456789 --name admin)
+          API_KEY=$(echo $API_JSON | grep -o '"api_key" : "[^"]*"' | cut -d'"' -f4)
+          curl -s --user "${API_KEY}:abcdefghijklmnopqrstuvwxyz0123456789" \
+              -X POST "http://localhost:18083/api/v5/authentication/scram:built_in_database/users" \
+              -H "Content-Type: application/json" \
+              -d "{\"user_id\": \"test\",\"password\": \"testPass\"}"
+
       - name: Run integration tests
         run: RUST_LOG=trace cargo test integration --features "log" -- --show-output
 
-      - name: Restart EMQX
+      - name: Restart & Configure  EMQX
         run: |
           docker rm -f emqx
           docker run -d \
             --name emqx \
             -p 1883:1883 \
+            -p 18083:18083 \
             -v $PWD/.ci/emqx.conf:/opt/emqx/etc/emqx.conf \
             -v $PWD/.ci/emqx_users.csv:/opt/emqx/etc/auth-built-in-db-bootstrap.csv \
             emqx/emqx:6.2.2
           timeout 30s sh -c 'until docker logs emqx 2>&1 | grep "EMQX Enterprise 6.2.2 is running now!"; do sleep 0.1; done'
+
+          API_JSON=$(docker exec emqx emqx ctl api_keys add --api-secret abcdefghijklmnopqrstuvwxyz0123456789 --name admin)
+          API_KEY=$(echo $API_JSON | grep -o '"api_key" : "[^"]*"' | cut -d'"' -f4)
+          curl -s --user "${API_KEY}:abcdefghijklmnopqrstuvwxyz0123456789" \
+              -X POST "http://localhost:18083/api/v5/authentication/scram:built_in_database/users" \
+              -H "Content-Type: application/json" \
+              -d "{\"user_id\": \"test\",\"password\": \"testPass\"}"
+
 
       - name: Run emqx-only integration tests
         run: RUST_LOG=trace cargo test emqx_only --features "log" -- --show-output --ignored
