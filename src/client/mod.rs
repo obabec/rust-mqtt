@@ -3,7 +3,7 @@
 use core::{matches, num::NonZero};
 
 use crate::{
-    auth::{AuthMechanism, AuthOptions},
+    auth::{AuthMechanism, AuthOptions, ReAuthState},
     buffer::BufferProvider,
     bytes::Bytes,
     client::{
@@ -168,6 +168,7 @@ pub struct Client<
 
     manual_ack_when:
         &'c dyn Fn(&Publish<'_, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>) -> bool,
+    reauth_state: ReAuthState,
 }
 
 impl<
@@ -199,6 +200,7 @@ impl<
             .field("server_config", &self.server_config)
             .field("session", &self.session)
             .field("raw", &self.raw)
+            .field("reauth_state", &self.reauth_state)
             .finish_non_exhaustive()
     }
 }
@@ -229,12 +231,13 @@ impl<
     fn format(&self, fmt: defmt::Formatter) {
         defmt::write!(
             fmt,
-            "Client {{ client_config: {:?}, shared_config: {:?}, server_config: {:?}, session: {:?}, raw: {:?}, .. }}",
+            "Client {{ client_config: {:?}, shared_config: {:?}, server_config: {:?}, session: {:?}, raw: {:?}, reauth_state: {:?}, .. }}",
             self.client_config,
             self.shared_config,
             self.server_config,
             self.session,
             self.raw,
+            self.reauth_state,
         );
     }
 }
@@ -296,6 +299,7 @@ impl<
             raw: Raw::new_disconnected(buffer),
 
             manual_ack_when: &|_| false,
+            reauth_state: ReAuthState::Inactive,
         }
     }
 
@@ -388,6 +392,8 @@ impl<
                 MAX_USER_PROPERTIES
             );
         }
+
+        self.reauth_state = ReAuthState::Inactive;
 
         // Set client session expiry interval because it is relevant to determine
         // which session expiry interval can be sent in DISCONNECT packet.

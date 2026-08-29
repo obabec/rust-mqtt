@@ -7,6 +7,14 @@ use crate::{
     types::{MqttBinary, MqttString, MqttStringPair, ReasonCode},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub(crate) enum ReAuthState {
+    Inactive,
+    AwaitAuth,
+    DueAuth,
+}
+
 /// Options for enhanced authentication for the AUTH packet.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
