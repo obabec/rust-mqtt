@@ -50,6 +50,11 @@ pem-parser = "0.1.1"
 signature = "2.2.0"
 p256 = "0.13.2"
 
+hmac = "0.13.0"
+sha2 = "0.11.0"
+pbkdf2 = "0.13.0"
+base64 = "0.23.1"
+
 
 [features]
 default = ["v5", "alloc", "log-level-info"]
