@@ -10,10 +10,11 @@ use crate::{
     packet::{Packet, RxError, RxPacket},
     types::{ReasonCode, VarByteInt},
     v5::property::{
-        AssignedClientIdentifier, AtMostOnceProperty, MaximumQoS, PropertyType, ReasonString,
-        ReceiveMaximum, ResponseInformation, RetainAvailable, ServerKeepAlive, ServerReference,
-        SharedSubscriptionAvailable, SubscriptionIdentifierAvailable, TopicAliasMaximum,
-        UserProperty, WildcardSubscriptionAvailable,
+        AssignedClientIdentifier, AtMostOnceProperty, AuthenticationData, AuthenticationMethod,
+        MaximumQoS, PropertyType, ReasonString, ReceiveMaximum, ResponseInformation,
+        RetainAvailable, ServerKeepAlive, ServerReference, SharedSubscriptionAvailable,
+        SubscriptionIdentifierAvailable, TopicAliasMaximum, UserProperty,
+        WildcardSubscriptionAvailable,
     },
 };
 
@@ -39,10 +40,8 @@ pub struct ConnackPacket<'p, const MAX_USER_PROPERTIES: usize> {
     pub server_keep_alive: Option<ServerKeepAlive>,
     pub response_information: Option<ResponseInformation<'p>>,
     pub server_reference: Option<ServerReference<'p>>,
-    // authentication method is currently unused and does not have to be read into memory.
-    // pub authentication_method: Option<AuthenticationMethod<'p>>,
-    // authentication data is currently unused and does not have to be read into memory.
-    // pub authentication_data: Option<AuthenticationData<'p>>,
+    pub authentication_method: Option<AuthenticationMethod<'p>>,
+    pub authentication_data: Option<AuthenticationData<'p>>,
 }
 
 impl<const MAX_USER_PROPERTIES: usize> Packet for ConnackPacket<'_, MAX_USER_PROPERTIES> {
@@ -126,9 +125,8 @@ impl<'p, const MAX_USER_PROPERTIES: usize> RxPacket<'p> for ConnackPacket<'p, MA
         let mut server_keep_alive = None;
         let mut response_information = None;
         let mut server_reference = None;
-
-        let mut seen_authentication_method = false;
-        let mut seen_authentication_data = false;
+        let mut authentication_method = None;
+        let mut authentication_data = None;
 
         while r.remaining_len() > 0 {
             verbose!(
@@ -167,20 +165,8 @@ impl<'p, const MAX_USER_PROPERTIES: usize> RxPacket<'p> for ConnackPacket<'p, MA
                 PropertyType::ServerKeepAlive => server_keep_alive.try_set(r).await?,
                 PropertyType::ResponseInformation => response_information.try_set(r).await?,
                 PropertyType::ServerReference => server_reference.try_set(r).await?,
-                PropertyType::AuthenticationMethod if seen_authentication_method => return Err(RxError::ProtocolError),
-                PropertyType::AuthenticationMethod => {
-                    seen_authentication_method = true;
-                    let len = u16::read(r).await? as usize;
-                    verbose!("skipping authentication method ({} bytes)", len);
-                    r.skip(len).await?;
-                }
-                PropertyType::AuthenticationData if seen_authentication_data => return Err(RxError::ProtocolError),
-                PropertyType::AuthenticationData => {
-                    seen_authentication_data = true;
-                    let len = u16::read(r).await? as usize;
-                    verbose!("skipping authentication data ({} bytes)", len);
-                    r.skip(len).await?;
-                }
+                PropertyType::AuthenticationMethod => authentication_method.try_set(r).await?,
+                PropertyType::AuthenticationData => authentication_data.try_set(r).await?,
                 p => {
                     // Malformed packet according to <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901029>
                     trace!("invalid CONNACK property: {:?}", p);
@@ -207,6 +193,8 @@ impl<'p, const MAX_USER_PROPERTIES: usize> RxPacket<'p> for ConnackPacket<'p, MA
             server_keep_alive,
             response_information,
             server_reference,
+            authentication_method,
+            authentication_data,
         })
     }
 }
@@ -218,14 +206,15 @@ mod unit {
     use crate::{
         config::{KeepAlive, MaximumPacketSize, SessionExpiryInterval},
         test::rx::decode,
-        types::{MqttString, MqttStringPair, QoS, ReasonCode},
+        types::{MqttBinary, MqttString, MqttStringPair, QoS, ReasonCode},
         v5::{
             packet::ConnackPacket,
             property::{
-                AssignedClientIdentifier, MaximumQoS, ReasonString, ReceiveMaximum,
-                ResponseInformation, RetainAvailable, ServerKeepAlive, ServerReference,
-                SharedSubscriptionAvailable, SubscriptionIdentifierAvailable, TopicAliasMaximum,
-                UserProperty, WildcardSubscriptionAvailable,
+                AssignedClientIdentifier, AuthenticationData, AuthenticationMethod, MaximumQoS,
+                ReasonString, ReceiveMaximum, ResponseInformation, RetainAvailable,
+                ServerKeepAlive, ServerReference, SharedSubscriptionAvailable,
+                SubscriptionIdentifierAvailable, TopicAliasMaximum, UserProperty,
+                WildcardSubscriptionAvailable,
             },
         },
     };
@@ -253,8 +242,8 @@ mod unit {
         assert!(packet.server_keep_alive.is_none());
         assert!(packet.response_information.is_none());
         assert!(packet.server_reference.is_none());
-        // assert!(packet.authentication_method.is_none());
-        // assert!(packet.authentication_data.is_none());
+        assert!(packet.authentication_method.is_none());
+        assert!(packet.authentication_data.is_none());
     }
 
     #[tokio::test]
@@ -393,18 +382,18 @@ mod unit {
                 MqttString::try_from("server.example.com").unwrap()
             ))
         );
-        // assert_eq!(
-        //     packet.authentication_method,
-        //     Some(AuthenticationMethod(
-        //         MqttString::try_from("SCRAM-SHA-256").unwrap()
-        //     ))
-        // );
-        // assert_eq!(
-        //     packet.authentication_data,
-        //     Some(AuthenticationData(
-        //         MqttBinary::try_from("auth_data".as_bytes()).unwrap()
-        //     ))
-        // );
+        assert_eq!(
+            packet.authentication_method,
+            Some(AuthenticationMethod(
+                MqttString::try_from("SCRAM-SHA-256").unwrap()
+            ))
+        );
+        assert_eq!(
+            packet.authentication_data,
+            Some(AuthenticationData(
+                MqttBinary::try_from("auth_data".as_bytes()).unwrap()
+            ))
+        );
     }
 
     #[tokio::test]

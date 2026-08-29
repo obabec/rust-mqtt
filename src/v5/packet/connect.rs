@@ -206,6 +206,13 @@ impl<'p, const MAX_USER_PROPERTIES: usize> ConnectPacket<'p, MAX_USER_PROPERTIES
         VarByteInt::new_unchecked(len as u32)
     }
 
+    pub fn add_authentication_method(&mut self, authentication_method: AuthenticationMethod<'p>) {
+        self.authentication_method = Some(authentication_method);
+    }
+    pub fn add_authentication_data(&mut self, authentication_data: AuthenticationData<'p>) {
+        self.authentication_data = Some(authentication_data);
+    }
+
     pub fn add_user_name(&mut self, user_name: MqttString<'p>) {
         self.user_name = Some(user_name);
     }
@@ -283,7 +290,7 @@ mod unit {
     #[tokio::test]
     #[test_log::test]
     async fn encode_properties() {
-        let packet = ConnectPacket::<16>::new(
+        let mut packet = ConnectPacket::<16>::new(
             MqttString::try_from("a").unwrap(),
             false,
             KeepAlive::Infinite,
@@ -309,10 +316,22 @@ mod unit {
             .into(),
         );
 
+        packet.add_authentication_method(
+            MqttString::from_str("browser_tab_entropy_verification")
+                .unwrap()
+                .into(),
+        );
+        packet.add_authentication_data(
+            MqttBinary::from_slice("tabs=247;unknown_tab_playing_music=true".as_bytes())
+                .unwrap()
+                .into(),
+        );
+
         #[rustfmt::skip]
         encode!(packet, [
             0x10,       //
-            0x54,       // remaining length
+            0xA2,       // remaining length
+            0x01,       // remaining length
             0x00,       // ---
             0x04,       //
             b'M',       //
@@ -323,7 +342,8 @@ mod unit {
             0b00000000, // Connect flags
             0x00,       // Keep alive MSB
             0x00,       // Keep alive LSB
-            0x46,       // Property length
+            0x93,       // Property length
+            0x01,       // Property length
 
             0x11,       // Session expiry interval
             0x00, 0x7C, 0x26, 0xC7,
@@ -349,6 +369,14 @@ mod unit {
             0x26,       // User property
             0x00, 0x08, b't', b'r', b'i', b'p', b'l', b'e', b' ', b'3',
             0x00, 0x05, b't', b'r', b'a', b'c', b'k',
+
+            0x15,       // Authentication Method
+            0x00, 0x20, b'b', b'r', b'o', b'w', b's', b'e', b'r', b'_', b't', b'a', b'b', b'_', b'e', b'n', b't',
+            b'r', b'o', b'p', b'y', b'_', b'v', b'e', b'r', b'i', b'f', b'i', b'c', b'a', b't', b'i', b'o', b'n',
+
+            0x16,       // Authentication Data
+            0x00, 0x27, b't', b'a', b'b', b's', b'=', b'2', b'4', b'7', b';', b'u', b'n', b'k', b'n', b'o', b'w', b'n', b'_', b't', b'a',
+            b'b', b'_', b'p', b'l', b'a', b'y', b'i', b'n', b'g', b'_', b'm', b'u', b's', b'i', b'c', b'=', b't', b'r', b'u', b'e',
 
             0x00,       // Client identifier len MSB
             0x01,       // Client identifier len LSB
