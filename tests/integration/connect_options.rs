@@ -723,10 +723,10 @@ async fn keep_alive_not_kept_alive_will_timing() {
 #[test_log::test]
 async fn receive_maximum() {
     let (topic_name, topic_filter) = unique_topic();
-    let mut rx: Client<'_, _, _, 1, 2, 0, 0, 16> = Client::new(ALLOC.get());
+    let mut rx: Client<'_, '_, _, _, 1, 2, 0, 0, 16> = Client::new(ALLOC.get());
     // EMQX calculates its server receive maximum as min(client_receive_maximum, emqx_max_inflight),
     // so we need to go up to 10 on our RECEIVE_MAXIMUM
-    let mut tx: Client<'_, _, _, 1, 10, 10, 0, 16> = Client::new(ALLOC.get());
+    let mut tx: Client<'_, '_, _, _, 1, 10, 10, 0, 16> = Client::new(ALLOC.get());
 
     let tcp_rx = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
     let tcp_tx = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -793,7 +793,8 @@ async fn send_maximum_buffer_exceeded() {
 
     // EMQX calculates its server receive maximum as min(client_receive_maximum, emqx_max_inflight),
     // so we need to go up to 3 on our RECEIVE_MAXIMUM
-    let mut c: Client<'_, _, _, 1, 3, SEND_MAXIMUM_BUFFER_SIZE, 0, 16> = Client::new(ALLOC.get());
+    let mut c: Client<'_, '_, _, _, 1, 3, SEND_MAXIMUM_BUFFER_SIZE, 0, 16> =
+        Client::new(ALLOC.get());
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
 
@@ -830,7 +831,7 @@ async fn send_maximum_buffer_exceeded() {
 #[test_log::test]
 async fn server_receive_maximum_exceeded() {
     let topic_name = unique_topic().0;
-    let mut c: Client<'_, _, _, 1, 1, 256, 0, 16> = Client::new(ALLOC.get());
+    let mut c: Client<'_, '_, _, _, 1, 1, 256, 0, 16> = Client::new(ALLOC.get());
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
 

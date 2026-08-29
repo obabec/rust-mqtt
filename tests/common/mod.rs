@@ -19,7 +19,7 @@ pub mod failing;
 pub mod fmt;
 pub mod utils;
 
-type DefaultClient<'a, T> = Client<'a, T, AllocBuffer, 1, 1, 1, 1, 16>;
+type DefaultClient<'a, T> = Client<'static, 'a, T, AllocBuffer, 1, 1, 1, 1, 16>;
 
 pub type TestClient<'a> = DefaultClient<'a, FromTokio<TcpStream>>;
 pub type FailingClient<'a> = DefaultClient<'a, FromTokio<FailingTcp>>;
@@ -38,6 +38,7 @@ pub const NO_SESSION_CONNECT_OPTIONS: &ConnectOptions<'static> = &ConnectOptions
     request_response_information: false,
     request_problem_information: true,
     user_properties: &[],
+    authentication_data: None,
     user_name: Some(USERNAME),
     password: Some(PASSWORD),
     will: None,
