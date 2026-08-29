@@ -148,6 +148,7 @@ pub use raw::AbortError;
 ///   packets with unused packet identifiers that require a responding packet are received (PUBREC and PUBREL), no session entry
 ///   is created and the responding packet (PUBREL and PUBCOMP) is sent automatically by the client.
 pub struct Client<
+    'a,
     'c,
     N: Transport,
     B: BufferProvider<'c>,
@@ -157,7 +158,7 @@ pub struct Client<
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
     const MAX_USER_PROPERTIES: usize,
 > {
-    client_config: ClientConfig,
+    client_config: ClientConfig<'a>,
     shared_config: SharedConfig,
     server_config: ServerConfig,
     session: Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
@@ -179,6 +180,7 @@ impl<
     const MAX_USER_PROPERTIES: usize,
 > core::fmt::Debug
     for Client<
+        '_,
         'c,
         N,
         B,
@@ -212,7 +214,8 @@ impl<
     const MAX_USER_PROPERTIES: usize,
 > defmt::Format
     for Client<
-        'c,
+        '_,
+        '_,
         N,
         B,
         SUBSCRIBE_MAXIMUM,
@@ -236,6 +239,7 @@ impl<
 }
 
 impl<
+    'a,
     'c,
     N: Transport,
     B: BufferProvider<'c>,
@@ -246,6 +250,7 @@ impl<
     const MAX_USER_PROPERTIES: usize,
 >
     Client<
+        'a,
         'c,
         N,
         B,
@@ -327,7 +332,7 @@ impl<
 
     /// Returns configuration for this client.
     #[inline]
-    pub fn client_config(&self) -> &ClientConfig {
+    pub fn client_config(&self) -> &ClientConfig<'a> {
         &self.client_config
     }
 
