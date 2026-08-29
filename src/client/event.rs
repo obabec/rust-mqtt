@@ -37,6 +37,9 @@ pub struct Connected<'i, const MAX_USER_PROPERTIES: usize> {
 
     /// Another server which can be used.
     pub server_reference: Option<MqttString<'i>>,
+
+    /// The authentication data in the CONNACK packet.
+    pub authentication_data: Option<MqttBinary<'i>>,
 }
 
 /// Events emitted by the client when receiving an MQTT packet.
