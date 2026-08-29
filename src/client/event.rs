@@ -356,3 +356,23 @@ impl<'p, T, const MAX_USER_PROPERTIES: usize> From<GenericPubackPacket<'p, T, MA
         }
     }
 }
+
+/// Content of [`Event::Auth`]. The authentication method
+/// is not included as it is always the value that configured
+/// when calling [`Client::connect_enhanced`].
+///
+/// [`Client::connect_enhanced`]: crate::client::Client::connect_enhanced
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Auth<'a, const MAX_USER_PROPERTIES: usize> {
+    /// Reason code of the AUTH packet. When this is [`ReasonCode::Success`],
+    /// the authentication exchange is complete.
+    pub reason_code: ReasonCode,
+    /// The authentication data of the AUTH packet.
+    pub authentication_data: Option<MqttBinary<'a>>,
+    /// The reason string of the AUTH packet.
+    pub reason_string: Option<MqttString<'a>>,
+    /// The user property entries in the AUTH packet.
+    /// If the vector is full, this list might not be exhaustive.
+    pub user_properties: Vec<MqttStringPair<'a>, MAX_USER_PROPERTIES>,
+}
