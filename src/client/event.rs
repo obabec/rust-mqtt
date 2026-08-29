@@ -194,6 +194,14 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PRO
     /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
     /// [`Client::ack_manually_when`]: crate::client::Client::ack_manually_when
     Duplicate(Publish<'e, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>),
+
+    /// The server sent an AUTH packet. This event is only emitted if
+    /// [`Client::connect_enhanced`] was used for the current network connection. Consequently,
+    /// if the connection was established with [`Client::connect`], this event is never emitted.
+    ///
+    /// [`Client::connect_enhanced`]: crate::client::Client::connect_enhanced
+    /// [`Client::connect`]: crate::client::Client::connect
+    Auth(Auth<'e, MAX_USER_PROPERTIES>),
 }
 
 /// Content of [`Event::Suback`].

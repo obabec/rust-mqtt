@@ -10,7 +10,7 @@ use crate::{
         event::{Auth, Connected, Event, Puback, Publish, Pubrej, Suback},
         options::{
             AckMode, AckOptions, ConnectOptions, DisconnectOptions, PublicationOptions,
-            SubscriptionOptions, TopicReference, UnsubscriptionOptions,
+            ReAuthOptions, SubscriptionOptions, TopicReference, UnsubscriptionOptions,
         },
         raw::Raw,
     },
@@ -1877,6 +1877,91 @@ impl<
         Ok(())
     }
 
+    /// Initiates or continues a re-authentication by sending an AUTH packet.
+    ///
+    /// The client internally tracks the re-authentication state and determines the
+    /// [`ReasonCode`] to use. If no re-authentication is currently in progress
+    /// because none has been initialized since establishing the connection or the last
+    /// re-authentication exchange has been completed with an AUTH packet with
+    /// [`ReasonCode::Success`] sent by the server, [`ReasonCode::ReAuthenticate`] is
+    /// used. If a re-authentication is in progress and this method hasn't been called
+    /// since the last [`Event::Auth`], [`ReasonCode::ContinueAuthentication`] is used.
+    /// Otherwise, no AUTH packet may be sent.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet
+    ///   size would be exceeded by sending this PUBCOMP packet
+    /// * [`MqttError::NoEnhancedAuthentication`] if enhanced authentication is not
+    ///   possible in this network connection because no authentication method has been
+    ///   specified in the CONNECT packet. [`Client::connect`] has been used to
+    ///   establish the connection instead of the required [`Client::connect_enhanced`].
+    /// * [`MqttError::ReauthenticationHandshakeStateMismatched`] if a re-authentication
+    ///   exchange is currently in progress, but the server has not yet sent an AUTH
+    ///   packet in response to the client's last AUTH packet.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the
+    /// [`ReAuthOptions`] is greater than `MAX_USER_PROPERTIES`.
+    pub async fn reauthenticate(
+        &mut self,
+        options: &ReAuthOptions<'_>,
+    ) -> Result<(), MqttError<'c, 0>> {
+        let Some(authentication_method) = self
+            .client_config
+            .authentication_method
+            .as_ref()
+            .map(MqttString::as_borrowed)
+        else {
+            return Err(MqttError::NoEnhancedAuthentication);
+        };
+
+        let reason_code = match self.reauth_state {
+            ReAuthState::Inactive => ReasonCode::ReAuthenticate,
+            ReAuthState::AwaitAuth => {
+                return Err(MqttError::ReauthenticationHandshakeStateMismatched);
+            }
+            ReAuthState::DueAuth => ReasonCode::ContinueAuthentication,
+        };
+
+        let packet = AuthPacket::<MAX_USER_PROPERTIES>::new(
+            reason_code,
+            authentication_method.into(),
+            options
+                .authentication_data
+                .as_ref()
+                .map(MqttBinary::as_borrowed)
+                .map(Into::into),
+            options
+                .reason_string
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+        );
+
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
+        }
+
+        self.reauth_state = ReAuthState::AwaitAuth;
+
+        debug!("sending AUTH packet");
+
+        self.raw.send(&packet).await?;
+        self.raw.flush().await?;
+
+        Ok(())
+    }
+
     /// Completes the disconnection from the server after an unrecoverable error in a
     /// situation-aware way.
     ///
@@ -2142,7 +2227,6 @@ impl<
     ///     the client expects for this packet identifier from its session state
     ///   * the fixed header has the packet type CONNECT/SUBSCRIBE/UNSUBSCRIBE/PINGREQ
     /// * [`MqttError::Disconnect`] if a DISCONNECT packet is received
-    /// * [`MqttError::AuthPacketReceived`] if the fixed header has the packet type AUTH
     pub async fn poll_body(
         &mut self,
         header: FixedHeader,
@@ -2615,13 +2699,44 @@ impl<
                 return Err(MqttError::Server);
             }
             PacketType::Auth => {
-                error!("received unexpected AUTH packet");
+                // We don't have to check whether we sent an authentication method because
+                // when no authentication method was set at the time of the connection,
+                // the re-authentication state remains `ReauthState::Inactive`
+                if self.reauth_state != ReAuthState::AwaitAuth {
+                    error!("received unexpected AUTH packet");
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                    return Err(MqttError::Server);
+                }
 
-                // Receiving a AUTH packet is currently always a protocol error because we never send
-                // an Authentication Method property in the CONNECT packet.
-                // <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901217>
-                self.raw.prepare_disconnect(ReasonCode::ProtocolError);
-                return Err(MqttError::AuthPacketReceived);
+                let auth = self
+                    .raw
+                    .recv_body::<AuthPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
+
+                // Must be a match statement instead of a match expression because
+                // attributes on expressions are experimental
+                #[expect(clippy::wildcard_in_or_patterns)]
+                #[expect(unreachable_patterns)]
+                match auth.reason_code {
+                    ReasonCode::Success => self.reauth_state = ReAuthState::Inactive,
+                    ReasonCode::ContinueAuthentication => self.reauth_state = ReAuthState::DueAuth,
+                    _ | ReasonCode::ReAuthenticate => {
+                        error!("server sent invalid AUTH reason code");
+                        self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                        return Err(MqttError::Server);
+                    }
+                }
+
+                Event::Auth(Auth {
+                    reason_code: auth.reason_code,
+                    authentication_data: auth.authentication_data.map(Property::into_inner),
+                    reason_string: auth.reason_string.map(Property::into_inner),
+                    user_properties: auth
+                        .user_properties
+                        .into_iter()
+                        .map(Property::into_inner)
+                        .collect(),
+                })
             }
         };
 

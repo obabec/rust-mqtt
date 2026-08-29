@@ -50,15 +50,6 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize, A = Infallible> {
     /// [`Client::abort`]: crate::client::Client::abort
     Alloc,
 
-    /// An AUTH packet header has been received by the client. AUTH packets are not supported by the client.
-    /// The client has scheduled a DISCONNECT packet with [`ReasonCode::ImplementationSpecificError`].
-    /// The packet body has not been decoded.
-    ///
-    /// Unrecoverable error. [`Client::abort`] should be called.
-    ///
-    /// [`Client::abort`]: crate::client::Client::abort
-    AuthPacketReceived,
-
     /// The client could not connect to the broker or the broker has sent a DISCONNECT packet.
     ///
     /// Unrecoverable error. [`Client::abort`] should be called.
@@ -243,6 +234,28 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize, A = Infallible> {
     /// [`TopicFilter::is_shared`]: crate::types::TopicFilter::is_shared
     IllegalNoLocalSharedSubscription,
 
+    /// Sending an AUTH packet in this network connection is not allowed because no authentication method was
+    /// specified in the CONNECT packet, as the connection was established with [`Client::connect`], which
+    /// doesn't provide this functionality.
+    ///
+    /// Recoverable error. No action has been taken by the client. [`Client::reauthenticate`] can be called in
+    /// a network/protocol connection established with [`Client::connect_enhanced`].
+    ///
+    /// [`Client::connect`]: crate::client::Client::connect
+    /// [`Client::reauthenticate`]: crate::client::Client::reauthenticate
+    /// [`Client::connect_enhanced`]: crate::client::Client::connect_enhanced
+    NoEnhancedAuthentication,
+
+    /// Sending an AUTH packet now is not possible because the client has not yet received the server's AUTH
+    /// packet of an ongoing authentication exchange.
+    ///
+    /// Recoverable error. No action has been taken by the client. Try again after an [`Event::Auth`] has been
+    /// emitted. This indicates that the authentication is either complete ([`ReasonCode::Success`]) or moved
+    /// to the next state, leaving the client to send the next AUTH packet.
+    ///
+    /// [`Event::Auth`]: crate::client::event::Event::Auth
+    ReauthenticationHandshakeStateMismatched,
+
     /// A disconnect now with the given session expiry interval would cause a protocol error.
     ///
     /// A disconnection was attempted with a session expiry interval change where the session expiry interval in the
@@ -276,6 +289,8 @@ impl<const MAX_USER_PROPERTIES: usize, A> Error<'_, MAX_USER_PROPERTIES, A> {
                 | Self::SendQuotaExceeded
                 | Self::UnsupportedByServer
                 | Self::IllegalNoLocalSharedSubscription
+                | Self::NoEnhancedAuthentication
+                | Self::ReauthenticationHandshakeStateMismatched
                 | Self::IllegalDisconnectSessionExpiryInterval
         )
     }
@@ -292,7 +307,6 @@ impl<'e, A> Error<'e, 0, A> {
             Self::Network(error_kind) => Error::Network(error_kind),
             Self::Server => Error::Server,
             Self::Alloc => Error::Alloc,
-            Self::AuthPacketReceived => Error::AuthPacketReceived,
             Self::Disconnect {
                 reason,
                 reason_string,
@@ -318,6 +332,10 @@ impl<'e, A> Error<'e, 0, A> {
             Self::SendQuotaExceeded => Error::SendQuotaExceeded,
             Self::UnsupportedByServer => Error::UnsupportedByServer,
             Self::IllegalNoLocalSharedSubscription => Error::IllegalNoLocalSharedSubscription,
+            Self::NoEnhancedAuthentication => Error::NoEnhancedAuthentication,
+            Self::ReauthenticationHandshakeStateMismatched => {
+                Error::ReauthenticationHandshakeStateMismatched
+            }
             Self::IllegalDisconnectSessionExpiryInterval => {
                 Error::IllegalDisconnectSessionExpiryInterval
             }
@@ -334,7 +352,6 @@ impl<'e, const MAX_USER_PROPERTIES: usize> Error<'e, MAX_USER_PROPERTIES> {
             Self::Network(error_kind) => Error::Network(error_kind),
             Self::Server => Error::Server,
             Self::Alloc => Error::Alloc,
-            Self::AuthPacketReceived => Error::AuthPacketReceived,
             Self::Disconnect {
                 reason,
                 reason_string,
@@ -359,6 +376,10 @@ impl<'e, const MAX_USER_PROPERTIES: usize> Error<'e, MAX_USER_PROPERTIES> {
             Self::SendQuotaExceeded => Error::SendQuotaExceeded,
             Self::UnsupportedByServer => Error::UnsupportedByServer,
             Self::IllegalNoLocalSharedSubscription => Error::IllegalNoLocalSharedSubscription,
+            Self::NoEnhancedAuthentication => Error::NoEnhancedAuthentication,
+            Self::ReauthenticationHandshakeStateMismatched => {
+                Error::ReauthenticationHandshakeStateMismatched
+            }
             Self::IllegalDisconnectSessionExpiryInterval => {
                 Error::IllegalDisconnectSessionExpiryInterval
             }
