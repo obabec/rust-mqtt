@@ -47,6 +47,9 @@ pub struct Options<'c> {
     /// [`Client`]: crate::client::Client
     pub user_properties: &'c [MqttStringPair<'c>],
 
+    /// The authentication data property of the CONNECT packet.
+    pub authentication_data: Option<MqttBinary<'c>>,
+
     /// The user name the client wishes to authenticate with.
     pub user_name: Option<MqttString<'c>>,
     /// The password the client wishes to perform basic authentication with.
@@ -77,6 +80,7 @@ impl<'c> Options<'c> {
             request_response_information: false,
             request_problem_information: false,
             user_properties: &[],
+            authentication_data: None,
             user_name: None,
             password: None,
             will: None,
@@ -129,6 +133,13 @@ impl<'c> Options<'c> {
     #[must_use]
     pub const fn user_properties(mut self, user_properties: &'c [MqttStringPair<'c>]) -> Self {
         self.user_properties = user_properties;
+        self
+    }
+    /// Sets the authentication data property of the CONNECT packet.
+    #[const_fn(cfg(not(feature = "alloc")))]
+    #[must_use]
+    pub const fn authentication_data(mut self, authentication_data: MqttBinary<'c>) -> Self {
+        self.authentication_data = Some(authentication_data);
         self
     }
     /// Sets the user name.
