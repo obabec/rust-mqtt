@@ -36,11 +36,10 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 - Request Problem Information
 - Reason String
 - User Property
+- Enhanced/Extended authentication and re-authentication
 
 ### Currently unsupported MQTT features & limitations
 
-- AUTH packet
-- Properties: Authentication Method, Authentication Data
 - Subscribing to multiple topics in a single packet
 - Topic alias in incoming publications
 

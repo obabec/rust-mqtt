@@ -26,6 +26,7 @@ mosquitto -c .ci/mosquitto-tls.conf -v
 - 'demo' is a showcase of rust-mqtt's features over TCP. Note that the example usage is very strict and not really a good way of using the client.
 - 'tls' connects the client to a broker over TLS with client certificate authentication and server certificate verification using [embedded-tls](https://github.com/drogue-iot/embedded-tls).
 - 'manual_ack' shows the client's capabilities of manual acknowledgements by rudimentarily implementing the optional payload format check (see [MQTTv5, 3.3.2.3.2 Payload Format Indicator](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901111))
+- 'auth' showcases MQTTv5's enhanced/extended authentication and re-authentication using the SCRAM-SHA-256 algorithm
 
 Set up the broker for 'demo' and 'manual_ack' by installing, configuring and running Mosquitto using the CI configuration:
 
@@ -42,12 +43,15 @@ Set up the broker for 'tls' by running Mosquitto with the tls config file. The r
 mosquitto -c .ci/mosquitto-tls.conf -v
 ```
 
+For 'auth', a broker that supports enhanced authentication is required. Unfortunately this does not come with Mosquitto out of the box. If you intend to run this example, you can set up an EMQX instance as in the integration test CI job.
+
 Then you can run the examples with different logging configs and the bump/alloc features:
 
 ```bash
 RUST_LOG=info cargo run --example demo
 RUST_LOG=info cargo run --example tls
 RUST_LOG=trace cargo run --example manual_ack --no-default-features --features "v5 log bump log-level-trace"
+RUST_LOG=debug cargo run --example auth     # 'auth' requires the alloc feature
 ```
 
 ## Tests
@@ -71,11 +75,12 @@ Set up the mosquitto broker as used in the CI pipeline (described above). You sh
 cargo test integration
 ```
 
-Because the test suite is quite comprehensive, some test cases are ignored because they may fail with the currently used release of a broker. However, these cases also follow a naming convention to be able to run them despite being ignored by default. To run these tests on the relevant broker that does behave correctly, you can run the following commands.
+Because the test suite is quite comprehensive, some test cases are ignored because they may fail with the currently used release of a broker. However, these cases also follow a naming convention to be able to run them despite being ignored by default. To run these tests on the relevant broker that does behave correctly, you can run the following commands. For EMQX-only tests, set up an instance as in the integration test CI job.
 
 ```bash
 cargo test mosquitto_only -- --ignored
 cargo test hive_only -- --ignored
+cargo test emqx_only -- --ignored
 ```
 
 ### Debugging

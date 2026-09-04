@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Prevent protocol error on shared subscription with no local set to true
 - Disallow calls to `Client::abort` when the client is disconnected and has no available network connection
 - Return the `Transport` network handle after a successful disconnection / abortion
+- Add enhanced authentication with `Client::connect_enhanced` and re-authentication with `Client::reauthenticate`
+- Add generic paramater to `MqttError` defaulting to `Infallible` for errors during enhanced authentication
 
 ## 0.5.1 - 2026-04-10
 
