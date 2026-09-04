@@ -78,6 +78,7 @@ log-verbose = ["log-level-trace"]
 
 [[example]]
 name = "auth"
+required-features = ["alloc"]
 
 [[example]]
 name = "demo"
