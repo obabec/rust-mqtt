@@ -218,7 +218,7 @@ impl<
 > defmt::Format
     for Client<
         '_,
-        '_,
+        'c,
         N,
         B,
         SUBSCRIBE_MAXIMUM,
