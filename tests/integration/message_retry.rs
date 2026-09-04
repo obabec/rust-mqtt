@@ -968,10 +968,9 @@ async fn outgoing_automatic_qos1_read_fail_retry() {
     join!(rx, tx);
 }
 
-#[ignore = "enable this once emqx v6.2.4 is used, see https://github.com/emqx/emqx/issues/18441"]
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_automatic_qos2_write_fail_retry_hive_only_mosquitto_only() {
+async fn outgoing_automatic_qos2_write_fail_retry() {
     let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS2_WRITE_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
@@ -1146,10 +1145,9 @@ async fn outgoing_automatic_qos2_write_fail_retry_hive_only_mosquitto_only() {
     join!(rx, tx);
 }
 
-#[ignore = "enable this once emqx v6.2.4 is used, see https://github.com/emqx/emqx/issues/18441"]
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_manual_qos2_write_fail_retry_hive_only_mosquitto_only() {
+async fn outgoing_manual_qos2_write_fail_retry() {
     let tx_id = MqttString::from_str("RETRY_OUTGOING_MANUAL_QOS2_WRITE_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
@@ -1334,10 +1332,9 @@ async fn outgoing_manual_qos2_write_fail_retry_hive_only_mosquitto_only() {
     join!(rx, tx);
 }
 
-#[ignore = "enable this once emqx v6.2.4 is used, see https://github.com/emqx/emqx/issues/18441"]
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_automatic_qos2_read_fail_retry_hive_only_mosquitto_only() {
+async fn outgoing_automatic_qos2_read_fail_retry() {
     let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS2_READ_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();

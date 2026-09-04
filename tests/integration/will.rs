@@ -917,12 +917,10 @@ async fn will_existing_session_taken_over_with_session_expiry() {
     join!(receiver, publisher, publisher_takeover);
 }
 
-#[expect(unused_attributes)]
-#[ignore = "enable this test once emqx v6.2.4 is used, see https://github.com/emqx/emqx/issues/18565"]
 #[ignore = "enable this test once mosquitto v2.1.3 is used"]
 #[tokio::test]
 #[test_log::test]
-async fn will_existing_session_taken_over_with_will_delay_hive_only() {
+async fn will_existing_session_taken_over_with_will_delay_emqx_only_hive_only() {
     let id = MqttString::from_str("WILL_EXISTING_SESSION_TAKEN_OVER_WITH_WILL_DELAY").unwrap();
 
     let (will_topic_name, will_topic_filter) = unique_topic();

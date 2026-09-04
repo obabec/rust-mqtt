@@ -136,7 +136,9 @@ async fn reauthenticate_emqx_only() {
     disconnect(&mut c, DEFAULT_DC_OPTIONS).await;
 }
 
+#[expect(unused_attributes)]
 #[ignore = "enhanced authentication is only supported out of the box by emqx"]
+#[ignore = "enable this test once https://github.com/emqx/emqx/issues/18797 is fixed"]
 #[tokio::test]
 #[test_log::test]
 async fn reauthenticate_with_publish_traffic_emqx_only() {
@@ -156,7 +158,7 @@ async fn reauthenticate_with_publish_traffic_emqx_only() {
             let pub_options =
                 PublicationOptions::new(TopicReference::Name(in_topic_name.as_borrowed())).retain();
 
-            sleep(Duration::from_millis(5)).await;
+            sleep(Duration::from_millis(25)).await;
             assert_published!(tx, pub_options, msg.into());
         }
 

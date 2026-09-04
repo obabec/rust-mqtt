@@ -23,10 +23,9 @@ use crate::common::{
     utils::{ALLOC, connected_client, disconnect, tcp_connection, unique_topic},
 };
 
-#[ignore = "enable this once emqx v6.3.0 is used, see https://github.com/emqx/emqx/issues/18425"]
 #[tokio::test]
 #[test_log::test]
-async fn maximum_packet_size_not_exceeded_hive_only_mosquitto_only() {
+async fn maximum_packet_size_not_exceeded() {
     // Has to be a reasonable value not too close to 0, otherwise broker might not reply or something similar
     const MAX_PACKET_SIZE: u32 = 100;
     const PACKET_SIZE: usize = MAX_PACKET_SIZE as usize;
