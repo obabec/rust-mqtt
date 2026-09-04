@@ -51,6 +51,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Use `NonZero<u32>` for `SessionExpiryInterval::Seconds`
 - Allow any valid reason code to be sent in DISCONNECT packets
 - Prevent protocol error on shared subscription with no local set to true
+- Disallow calls to `Client::abort` when the client is disconnected and has no available network connection
+- Return the `Transport` network handle after a successful disconnection / abortion
 
 ## 0.5.1 - 2026-04-10
 

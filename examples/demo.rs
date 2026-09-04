@@ -337,10 +337,16 @@ async fn main() {
     }
 
     match client.disconnect(&DisconnectOptions::new()).await {
-        Ok(()) => info!("Disconnected from server"),
+        Ok(_n) => {
+            // For a correct TCP disconnection, one should make sure the underlying TCP socket
+            // sends a FIN segment. However I could not get the tokio::TcpStream to behave that
+            // way, so we just do nothing here. It's fine for MQTT operability realistically,
+            // but for clean usage, the TCP should be closed properly.
+
+            info!("Disconnected from server")
+        }
         Err(e) => {
             error!("Failed to disconnect from server: {e:?}");
-            return;
         }
     }
 }

@@ -114,7 +114,7 @@ async fn main() {
     }
 
     // An error has occured (e.g. network failure)
-    client.abort().await;
+    client.abort().await.unwrap();
 
     let transport = ...;    // Open a fresh connection
 

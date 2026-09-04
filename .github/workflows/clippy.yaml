@@ -14,6 +14,9 @@ jobs:
       - name: Install toolchain
         run: rustup show
 
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+
       - name: Run clippy with alloc & log features
         run: cargo clippy --all-targets --features "log"
 
