@@ -134,8 +134,8 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize, A = Infallible> {
 
     /// The requested operation of a publication flow is not allowed at this stage of its quality of
     /// service specific handshake and would result in a protocol violation if carried out. For the exact
-    /// rules of manual acknowledgements, refer to TODO. An exemplary list of cases (potentially missing
-    /// some) when this applies is as follows:
+    /// rules of manual acknowledgements, refer to [`Client`]. An exemplary list of cases (potentially
+    /// missing some) when this applies is as follows:
     /// - Automatic acknowledgements:
     ///   - A republish of a packet whose corresponding PUBREL packet has already been sent was
     ///     attempted.
@@ -159,6 +159,8 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize, A = Infallible> {
     ///   - A manual PUBCOMP was attempted despite not having received a PUBREL yet.
     ///
     /// Recoverable error. No action has been taken by the client.
+    ///
+    /// [`Client`]: crate::client::Client
     HandshakeStateMismatched,
 
     /// A reason code not allowed for the requested operation was supplied. Refer to the
