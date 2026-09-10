@@ -61,7 +61,6 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PRO
     /// - [`QoS::AtMostOnce`]: No action
     /// - [`QoS::AtLeastOnce`] and [`Publish::ack_mode`] is [`AckMode::Automatic`]: A PUBACK packet has been sent to the server.
     /// - [`QoS::AtLeastOnce`] and [`Publish::ack_mode`] is [`AckMode::Manual`]: No action, the PUBACK must be sent manually by the user with [`Client::manual_acknowledge`].
-    /// - [`QoS::ExactlyOnce`]: A PUBREC packet has been sent to the server.
     /// - [`QoS::ExactlyOnce`] and [`Publish::ack_mode`] is [`AckMode::Automatic`]: A PUBREC packet has been sent to the server.
     /// - [`QoS::ExactlyOnce`] and [`Publish::ack_mode`] is [`AckMode::Manual`]: No action, the PUBREC must be sent manually by the user with [`Client::manual_receive`].
     ///
