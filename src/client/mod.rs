@@ -10,7 +10,7 @@ use crate::{
         event::{Auth, Connected, Event, Puback, Publish, Pubrej, Suback},
         options::{
             AckMode, AckOptions, ConnectOptions, DisconnectOptions, PublicationOptions,
-            ReAuthOptions, SubscriptionOptions, TopicReference, UnsubscriptionOptions,
+            ReAuthOptions, SubscriptionOptions, UnsubscriptionOptions,
         },
         raw::Raw,
     },
@@ -2338,18 +2338,19 @@ impl<
                     .await?;
 
                 // Our topic alias maximum is always 0, the moment we receive a topic alias, this is an error.
-                let TopicReference::Name(topic) = publish.topic else {
-                    error!("received disallowed topic alias");
-                    self.raw.prepare_disconnect(ReasonCode::TopicAliasInvalid);
-                    return Err(MqttError::Server);
-                };
+                // TODO check topic alias allowance
+                // let TopicReference::Name(topic) = publish.topic else {
+                //     error!("received disallowed topic alias");
+                //     self.raw.prepare_disconnect(ReasonCode::TopicAliasInvalid);
+                //     return Err(MqttError::Server);
+                // };
 
                 let publish = Publish {
                     ack_mode: AckMode::default(),
                     dup: publish.dup,
                     identified_qos: publish.identified_qos,
                     retain: publish.retain,
-                    topic,
+                    topic: publish.topic,
                     payload_format_indicator: publish
                         .payload_format_indicator
                         .map(Property::into_inner),
