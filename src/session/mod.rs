@@ -3556,4 +3556,80 @@ mod unit {
 
         assert!(sm.outbound_publishes.is_empty());
     }
+
+    #[test_log::test]
+    #[test]
+    fn inbound_topic_aliases() {
+        const ONE: NonZero<u16> = NonZero::new(1).unwrap();
+        const TWO: NonZero<u16> = NonZero::new(2).unwrap();
+
+        let mut session = Session::default();
+
+        fn cases(s: &mut Session<0, 0, 0, 2, 0>) {
+            assert!(!s.is_mapped_inbound_alias(ONE));
+            assert!(!s.is_mapped_inbound_alias(TWO));
+
+            // Only the correct alias is mapped
+            s.map_inbound_alias(ONE);
+            assert!(s.is_mapped_inbound_alias(ONE));
+            assert!(!s.is_mapped_inbound_alias(TWO));
+
+            // Remapping doesn't change anything
+            s.map_inbound_alias(ONE);
+            assert!(s.is_mapped_inbound_alias(ONE));
+            assert!(!s.is_mapped_inbound_alias(TWO));
+
+            s.map_inbound_alias(TWO);
+            assert!(s.is_mapped_inbound_alias(ONE));
+            assert!(s.is_mapped_inbound_alias(TWO));
+        }
+
+        cases(&mut session);
+
+        // Clearing the session should clear all mappings
+        session.clear();
+        cases(&mut session);
+
+        // Reconnecting the session should clear all mappings
+        session.reconnect();
+        cases(&mut session);
+    }
+
+    #[test_log::test]
+    #[test]
+    fn outbound_topic_aliases() {
+        const ONE: NonZero<u16> = NonZero::new(1).unwrap();
+        const TWO: NonZero<u16> = NonZero::new(2).unwrap();
+
+        let mut session = Session::default();
+
+        fn cases(s: &mut Session<0, 0, 0, 0, 2>) {
+            assert!(!s.is_mapped_outbound_alias(ONE));
+            assert!(!s.is_mapped_outbound_alias(TWO));
+
+            // Only the correct alias is mapped
+            s.map_outbound_alias(ONE);
+            assert!(s.is_mapped_outbound_alias(ONE));
+            assert!(!s.is_mapped_outbound_alias(TWO));
+
+            // Remapping doesn't change anything
+            s.map_outbound_alias(ONE);
+            assert!(s.is_mapped_outbound_alias(ONE));
+            assert!(!s.is_mapped_outbound_alias(TWO));
+
+            s.map_outbound_alias(TWO);
+            assert!(s.is_mapped_outbound_alias(ONE));
+            assert!(s.is_mapped_outbound_alias(TWO));
+        }
+
+        cases(&mut session);
+
+        // Clearing the session should clear all mappings
+        session.clear();
+        cases(&mut session);
+
+        // Reconnecting the session should clear all mappings
+        session.reconnect();
+        cases(&mut session);
+    }
 }
