@@ -175,7 +175,9 @@ pub struct Client<
         SUBSCRIBE_MAXIMUM,
         RECEIVE_MAXIMUM,
         SEND_MAXIMUM,
-        MAX_INCOMING_TOPIC_ALIASES, MAX_OUTGOING_TOPIC_ALIASES>,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
 
     raw: Raw<'c, N, B>,
 
@@ -194,7 +196,8 @@ impl<
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
     const MAX_USER_PROPERTIES: usize,
     const MAX_INCOMING_TOPIC_ALIASES: usize,
-    const MAX_OUTGOING_TOPIC_ALIASES: usize,> core::fmt::Debug
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+> core::fmt::Debug
     for Client<
         '_,
         'c,
@@ -206,7 +209,8 @@ impl<
         MAX_SUBSCRIPTION_IDENTIFIERS,
         MAX_USER_PROPERTIES,
         MAX_INCOMING_TOPIC_ALIASES,
-                MAX_OUTGOING_TOPIC_ALIASES,    >
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("Client")
@@ -231,7 +235,8 @@ impl<
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
     const MAX_USER_PROPERTIES: usize,
     const MAX_INCOMING_TOPIC_ALIASES: usize,
-    const MAX_OUTGOING_TOPIC_ALIASES: usize,> defmt::Format
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+> defmt::Format
     for Client<
         '_,
         'c,
@@ -243,7 +248,8 @@ impl<
         MAX_SUBSCRIPTION_IDENTIFIERS,
         MAX_USER_PROPERTIES,
         MAX_INCOMING_TOPIC_ALIASES,
-                MAX_OUTGOING_TOPIC_ALIASES,    >
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
     fn format(&self, fmt: defmt::Formatter) {
         defmt::write!(
@@ -335,8 +341,13 @@ impl<
     /// Creates a new, disconnected MQTT client using a buffer provider to store
     /// dynamically sized fields of received packets.
     pub fn with_session(
-        session: Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM, MAX_INCOMING_TOPIC_ALIASES,
-                MAX_OUTGOING_TOPIC_ALIASES,>,
+        session: Session<
+            SUBSCRIBE_MAXIMUM,
+            RECEIVE_MAXIMUM,
+            SEND_MAXIMUM,
+            MAX_INCOMING_TOPIC_ALIASES,
+            MAX_OUTGOING_TOPIC_ALIASES,
+        >,
         buffer: &'c mut B,
     ) -> Self {
         let mut s = Self::new(buffer);
@@ -387,8 +398,13 @@ impl<
     #[inline]
     pub fn session(
         &self,
-    ) -> &Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM, MAX_INCOMING_TOPIC_ALIASES,
-            MAX_OUTGOING_TOPIC_ALIASES,> {
+    ) -> &Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    > {
         &self.session
     }
 
@@ -2423,7 +2439,8 @@ impl<
                     .await?;
 
                 if let Some(alias) = publish.topic.alias()
-                    && usize::from(alias.get()) > MAX_INCOMING_TOPIC_ALIASES                {
+                    && usize::from(alias.get()) > MAX_INCOMING_TOPIC_ALIASES
+                {
                     error!("received disallowed topic alias {}", alias);
                     self.raw.prepare_disconnect(ReasonCode::TopicAliasInvalid);
                     return Err(MqttError::Server);
