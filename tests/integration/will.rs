@@ -686,7 +686,7 @@ async fn session_expires_right_after_disconnect_emqx_only_hive_only() {
             timeout(Duration::from_secs(2), receive_and_complete(&mut rx)).await
         ));
 
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
         assert_eq!(&*message, will_msg.as_bytes());
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
@@ -736,7 +736,7 @@ async fn session_expires_before_will_delay_interval() {
             timeout(Duration::from_secs(4), receive_and_complete(&mut rx)).await
         ));
 
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
         assert_eq!(&*message, will_msg.as_bytes());
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
@@ -845,7 +845,7 @@ async fn clean_start_override_before_will_scheduled_emqx_only_hive_only() {
             timeout(Duration::from_secs(3), receive_and_complete(&mut rx)).await
         ));
 
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -909,7 +909,7 @@ async fn will_existing_session_taken_over_with_session_expiry() {
         let Publish { topic, .. } = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(10), receive_and_complete(&mut rx)).await
         ));
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -977,7 +977,7 @@ async fn will_existing_session_taken_over_with_will_delay_hive_only() {
         let Publish { topic, .. } = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(10), receive_and_complete(&mut rx)).await
         ));
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -1040,7 +1040,7 @@ async fn will_existing_session_taken_over_with_clean_start_emqx_only_hive_only()
         let Publish { topic, .. } = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(10), receive_and_complete(&mut rx)).await
         ));
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };

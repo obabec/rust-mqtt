@@ -10,13 +10,34 @@ pub struct FreeHandle<
     const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
-    pub session: &'a mut Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    pub session: &'a mut Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
     pub packet_identifier: PacketIdentifier,
 }
 
-impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
-    FreeHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+>
+    FreeHandle<
+        '_,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
     pub fn outbound_sub(self) -> Result<(), Error> {
         self.session
@@ -96,13 +117,34 @@ pub struct SubHandle<
     const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
-    pub session: &'a mut Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    pub session: &'a mut Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
     pub i: usize,
 }
 
-impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
-    SubHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+>
+    SubHandle<
+        '_,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
     pub(crate) fn remove(self) {
         trace!("#{}: AwaitSuback -> Untracked", self.packet_identifier());
@@ -119,13 +161,34 @@ pub struct UnsubHandle<
     const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
-    pub session: &'a mut Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    pub session: &'a mut Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
     pub i: usize,
 }
 
-impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
-    UnsubHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+>
+    UnsubHandle<
+        '_,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
     pub(crate) fn remove(self) {
         trace!("#{}: AwaitUnsuback -> Untracked", self.packet_identifier());
@@ -142,14 +205,35 @@ pub struct InboundHandle<
     const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
-    pub session: &'a mut Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    pub session: &'a mut Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
     pub i: usize,
     pub state: PeerPublishState,
 }
 
-impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
-    InboundHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+>
+    InboundHandle<
+        '_,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
     fn set(&mut self, state: PeerPublishState) {
         trace!(
@@ -655,14 +739,35 @@ pub struct OutboundHandle<
     const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
-    pub session: &'a mut Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    pub session: &'a mut Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
     pub i: usize,
     pub state: LocalPublishState,
 }
 
-impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
-    OutboundHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+>
+    OutboundHandle<
+        '_,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
     fn set(&mut self, state: LocalPublishState) {
         trace!(

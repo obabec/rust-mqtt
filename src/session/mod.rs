@@ -1,6 +1,6 @@
 //! Contains utilities for session management.
 
-use core::cmp::min;
+use core::{cmp::min, num::NonZero};
 use heapless::Vec;
 
 use crate::{
@@ -184,16 +184,23 @@ pub(crate) enum Event {
     ServerError,
 }
 
-/// Session-associated information
+/// Session- and connection-associated information
 ///
 /// Client identifier is not stored here as it would lead to inconsistencies with the underyling allocation system.
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Session<
     const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
+    /// The mapped topic aliases in incoming publications.
+    pub inbound_topic_aliases: [bool; MAX_INCOMING_TOPIC_ALIASES],
+    /// The mapped topic aliases in outgoing publications.
+    pub outbound_topic_aliases: [bool; MAX_OUTGOING_TOPIC_ALIASES],
+
     /// The currently in-flight subscriptions.
     pub subs: Vec<PacketIdentifier, SUBSCRIBE_MAXIMUM>,
     /// The currently in-flight unsubscriptions.
@@ -205,8 +212,47 @@ pub struct Session<
     pub outbound_publishes: Vec<(PacketIdentifier, LocalPublishState), SEND_MAXIMUM>,
 }
 
-impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
-    Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+> Default
+    for Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
+{
+    fn default() -> Self {
+        Self {
+            inbound_topic_aliases: [Default::default(); MAX_INCOMING_TOPIC_ALIASES],
+            outbound_topic_aliases: [Default::default(); MAX_OUTGOING_TOPIC_ALIASES],
+            subs: Default::default(),
+            unsubs: Default::default(),
+            inbound_publishes: Default::default(),
+            outbound_publishes: Default::default(),
+        }
+    }
+}
+
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+>
+    Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
     /// Creates a handle to an unused packet identifier for usage in a new SUBSCRIBE, UNSUBSCRIBE
     /// or PUBLISH packet. Whether the specific type of category actually has free buffer space
@@ -214,7 +260,16 @@ impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MA
     /// block other packet types from being sent.
     pub(crate) fn free_handle(
         &mut self,
-    ) -> Option<FreeHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>> {
+    ) -> Option<
+        FreeHandle<
+            '_,
+            SUBSCRIBE_MAXIMUM,
+            RECEIVE_MAXIMUM,
+            SEND_MAXIMUM,
+            MAX_INCOMING_TOPIC_ALIASES,
+            MAX_OUTGOING_TOPIC_ALIASES,
+        >,
+    > {
         // TODO this can be a better search with a stack bitset / larger window of PIDs
 
         let mut packet_identifier = PacketIdentifier::ONE;
@@ -242,7 +297,16 @@ impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MA
     pub(crate) fn sub_handle(
         &mut self,
         packet_identifier: PacketIdentifier,
-    ) -> Option<SubHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>> {
+    ) -> Option<
+        SubHandle<
+            '_,
+            SUBSCRIBE_MAXIMUM,
+            RECEIVE_MAXIMUM,
+            SEND_MAXIMUM,
+            MAX_INCOMING_TOPIC_ALIASES,
+            MAX_OUTGOING_TOPIC_ALIASES,
+        >,
+    > {
         self.subs
             .iter()
             .position(|&p| p == packet_identifier)
@@ -253,7 +317,16 @@ impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MA
     pub(crate) fn unsub_handle(
         &mut self,
         packet_identifier: PacketIdentifier,
-    ) -> Option<UnsubHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>> {
+    ) -> Option<
+        UnsubHandle<
+            '_,
+            SUBSCRIBE_MAXIMUM,
+            RECEIVE_MAXIMUM,
+            SEND_MAXIMUM,
+            MAX_INCOMING_TOPIC_ALIASES,
+            MAX_OUTGOING_TOPIC_ALIASES,
+        >,
+    > {
         self.unsubs
             .iter()
             .position(|&p| p == packet_identifier)
@@ -264,7 +337,16 @@ impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MA
     fn inbound_handle(
         &mut self,
         packet_identifier: PacketIdentifier,
-    ) -> Option<InboundHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>> {
+    ) -> Option<
+        InboundHandle<
+            '_,
+            SUBSCRIBE_MAXIMUM,
+            RECEIVE_MAXIMUM,
+            SEND_MAXIMUM,
+            MAX_INCOMING_TOPIC_ALIASES,
+            MAX_OUTGOING_TOPIC_ALIASES,
+        >,
+    > {
         self.inbound_publishes
             .iter()
             .copied()
@@ -281,7 +363,16 @@ impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MA
     fn outbound_handle(
         &mut self,
         packet_identifier: PacketIdentifier,
-    ) -> Option<OutboundHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>> {
+    ) -> Option<
+        OutboundHandle<
+            '_,
+            SUBSCRIBE_MAXIMUM,
+            RECEIVE_MAXIMUM,
+            SEND_MAXIMUM,
+            MAX_INCOMING_TOPIC_ALIASES,
+            MAX_OUTGOING_TOPIC_ALIASES,
+        >,
+    > {
         self.outbound_publishes
             .iter()
             .copied()
@@ -300,7 +391,16 @@ impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MA
     /// currently in-flight PUBLISH packet / handshake.
     pub(crate) fn outbound_iter(
         &mut self,
-    ) -> Option<OutboundHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>> {
+    ) -> Option<
+        OutboundHandle<
+            '_,
+            SUBSCRIBE_MAXIMUM,
+            RECEIVE_MAXIMUM,
+            SEND_MAXIMUM,
+            MAX_INCOMING_TOPIC_ALIASES,
+            MAX_OUTGOING_TOPIC_ALIASES,
+        >,
+    > {
         self.outbound_publishes
             .first()
             .map(|(p, s)| (*p, *s))
@@ -371,9 +471,29 @@ impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MA
         trace!("#{}: Untracked -> {:?}", packet_identifier, state);
     }
 
+    fn alias_index(alias: NonZero<u16>) -> usize {
+        let i = alias.get() - 1;
+
+        usize::from(i)
+    }
+    pub(crate) fn is_mapped_inbound_alias(&self, alias: NonZero<u16>) -> bool {
+        self.inbound_topic_aliases[Self::alias_index(alias)]
+    }
+    pub(crate) fn is_mapped_outbound_alias(&self, alias: NonZero<u16>) -> bool {
+        self.outbound_topic_aliases[Self::alias_index(alias)]
+    }
+    pub(crate) fn map_inbound_alias(&mut self, alias: NonZero<u16>) {
+        self.inbound_topic_aliases[Self::alias_index(alias)] = true;
+    }
+    pub(crate) fn map_outbound_alias(&mut self, alias: NonZero<u16>) {
+        self.outbound_topic_aliases[Self::alias_index(alias)] = true;
+    }
+
     pub(crate) fn clear(&mut self) {
         trace!("resetting session completely by clearing all entries");
 
+        self.inbound_topic_aliases = [Default::default(); MAX_INCOMING_TOPIC_ALIASES];
+        self.outbound_topic_aliases = [Default::default(); MAX_OUTGOING_TOPIC_ALIASES];
         self.subs.clear();
         self.unsubs.clear();
         self.inbound_publishes.clear();
@@ -381,6 +501,9 @@ impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MA
     }
 
     pub(crate) fn reconnect(&mut self) {
+        self.inbound_topic_aliases = [Default::default(); MAX_INCOMING_TOPIC_ALIASES];
+        self.outbound_topic_aliases = [Default::default(); MAX_OUTGOING_TOPIC_ALIASES];
+
         trace!("reconnection resets:");
 
         for pid in &self.subs {
@@ -686,6 +809,7 @@ fn trace_nop(packet_identifier: PacketIdentifier) {
 
 #[cfg(test)]
 mod unit {
+    use core::num::NonZero;
     use std::vec::Vec;
 
     use crate::{
@@ -701,7 +825,7 @@ mod unit {
         ) => {
             #[test_log::test]
             fn $test_name() {
-                let mut sm = crate::session::Session::<10, 10, 10>::default();
+                let mut sm = crate::session::Session::<10, 10, 10, 10, 10>::default();
                 let pid = crate::types::PacketIdentifier::ONE;
 
                 sm_test!(@munch, 1, sm, pid, $($steps)*);
@@ -2072,7 +2196,7 @@ mod unit {
         #[test_log::test]
         #[test]
         fn no_sub_buffer_exceedance() {
-            let mut no_sub = Session::<0, 1, 1>::default();
+            let mut no_sub = Session::<0, 1, 1, 0, 0>::default();
             assert_err!(no_sub.free_handle().unwrap().outbound_sub());
             assert_err!(no_sub.free_handle().unwrap().outbound_unsub());
             assert_eq!(
@@ -2090,7 +2214,7 @@ mod unit {
             );
 
             const SOME: usize = 5;
-            let mut some_sub = Session::<SOME, 1, 1>::default();
+            let mut some_sub = Session::<SOME, 1, 1, 0, 0>::default();
             for _ in 0..SOME {
                 assert_ok!(some_sub.free_handle().unwrap().outbound_sub());
                 assert_ok!(some_sub.free_handle().unwrap().outbound_unsub());
@@ -2102,7 +2226,7 @@ mod unit {
         #[test_log::test]
         #[test]
         fn no_out_pub_buffer_exceedance() {
-            let mut no_out_pub = Session::<1, 1, 0>::default();
+            let mut no_out_pub = Session::<1, 1, 0, 0, 0>::default();
             let h = no_out_pub.free_handle().unwrap();
             let pid = h.packet_identifier;
             assert_ok!(h.outbound_sub());
@@ -2126,7 +2250,7 @@ mod unit {
             );
 
             const SOME: usize = 5;
-            let mut some_sub = Session::<1, 1, SOME>::default();
+            let mut some_sub = Session::<1, 1, SOME, 0, 0>::default();
             for _ in 0..SOME {
                 assert_ok!(
                     some_sub
@@ -2644,7 +2768,7 @@ mod unit {
         #[test_log::test]
         #[test]
         fn no_in_pub_buffer_exceedance() {
-            let mut no_in_pub = Session::<1, 0, 1>::default();
+            let mut no_in_pub = Session::<1, 0, 1, 0, 0>::default();
             let h = no_in_pub.free_handle().unwrap();
             let pid = h.packet_identifier;
             assert_ok!(h.outbound_sub());
@@ -2671,7 +2795,7 @@ mod unit {
             );
 
             const SOME: usize = 5;
-            let mut some_in_pub = Session::<1, SOME, 1>::default();
+            let mut some_in_pub = Session::<1, SOME, 1, 0, 0>::default();
             let mut pid = PacketIdentifier::ONE;
             for _ in 0..SOME {
                 assert_eq!(
@@ -2994,7 +3118,7 @@ mod unit {
     #[test_log::test]
     #[test]
     fn inbound_qos1() {
-        let mut sm = Session::<10, 10, 10>::default();
+        let mut sm = Session::<10, 10, 10, 0, 0>::default();
 
         let mut pid = PacketIdentifier::ONE;
         let mut pids = Vec::new();
@@ -3073,7 +3197,7 @@ mod unit {
     #[test_log::test]
     #[test]
     fn inbound_qos2_auto() {
-        let mut sm = Session::<10, 10, 10>::default();
+        let mut sm = Session::<10, 10, 10, 0, 0>::default();
 
         let mut pid = PacketIdentifier::ONE;
         let mut pids = Vec::new();
@@ -3147,7 +3271,7 @@ mod unit {
     #[test_log::test]
     #[test]
     fn inbound_qos2_manual() {
-        let mut sm = Session::<10, 10, 10>::default();
+        let mut sm = Session::<10, 10, 10, 0, 0>::default();
 
         let mut pid = PacketIdentifier::ONE;
         let mut pids = Vec::new();
@@ -3248,7 +3372,7 @@ mod unit {
     #[test_log::test]
     #[test]
     fn outbound_qos1() {
-        let mut sm = Session::<10, 10, 10>::default();
+        let mut sm = Session::<10, 10, 10, 0, 0>::default();
 
         let mut pids = Vec::new();
 
@@ -3291,7 +3415,7 @@ mod unit {
     #[test_log::test]
     #[test]
     fn outbound_qos2_auto() {
-        let mut sm = Session::<10, 10, 10>::default();
+        let mut sm = Session::<10, 10, 10, 0, 0>::default();
 
         let mut pids = Vec::new();
 
@@ -3354,7 +3478,7 @@ mod unit {
     #[test_log::test]
     #[test]
     fn outbound_qos2_manual() {
-        let mut sm = Session::<10, 10, 10>::default();
+        let mut sm = Session::<10, 10, 10, 0, 0>::default();
 
         let mut pids = Vec::new();
 
@@ -3431,5 +3555,81 @@ mod unit {
         }
 
         assert!(sm.outbound_publishes.is_empty());
+    }
+
+    #[test_log::test]
+    #[test]
+    fn inbound_topic_aliases() {
+        const ONE: NonZero<u16> = NonZero::new(1).unwrap();
+        const TWO: NonZero<u16> = NonZero::new(2).unwrap();
+
+        let mut session = Session::default();
+
+        fn cases(s: &mut Session<0, 0, 0, 2, 0>) {
+            assert!(!s.is_mapped_inbound_alias(ONE));
+            assert!(!s.is_mapped_inbound_alias(TWO));
+
+            // Only the correct alias is mapped
+            s.map_inbound_alias(ONE);
+            assert!(s.is_mapped_inbound_alias(ONE));
+            assert!(!s.is_mapped_inbound_alias(TWO));
+
+            // Remapping doesn't change anything
+            s.map_inbound_alias(ONE);
+            assert!(s.is_mapped_inbound_alias(ONE));
+            assert!(!s.is_mapped_inbound_alias(TWO));
+
+            s.map_inbound_alias(TWO);
+            assert!(s.is_mapped_inbound_alias(ONE));
+            assert!(s.is_mapped_inbound_alias(TWO));
+        }
+
+        cases(&mut session);
+
+        // Clearing the session should clear all mappings
+        session.clear();
+        cases(&mut session);
+
+        // Reconnecting the session should clear all mappings
+        session.reconnect();
+        cases(&mut session);
+    }
+
+    #[test_log::test]
+    #[test]
+    fn outbound_topic_aliases() {
+        const ONE: NonZero<u16> = NonZero::new(1).unwrap();
+        const TWO: NonZero<u16> = NonZero::new(2).unwrap();
+
+        let mut session = Session::default();
+
+        fn cases(s: &mut Session<0, 0, 0, 0, 2>) {
+            assert!(!s.is_mapped_outbound_alias(ONE));
+            assert!(!s.is_mapped_outbound_alias(TWO));
+
+            // Only the correct alias is mapped
+            s.map_outbound_alias(ONE);
+            assert!(s.is_mapped_outbound_alias(ONE));
+            assert!(!s.is_mapped_outbound_alias(TWO));
+
+            // Remapping doesn't change anything
+            s.map_outbound_alias(ONE);
+            assert!(s.is_mapped_outbound_alias(ONE));
+            assert!(!s.is_mapped_outbound_alias(TWO));
+
+            s.map_outbound_alias(TWO);
+            assert!(s.is_mapped_outbound_alias(ONE));
+            assert!(s.is_mapped_outbound_alias(TWO));
+        }
+
+        cases(&mut session);
+
+        // Clearing the session should clear all mappings
+        session.clear();
+        cases(&mut session);
+
+        // Reconnecting the session should clear all mappings
+        session.reconnect();
+        cases(&mut session);
     }
 }

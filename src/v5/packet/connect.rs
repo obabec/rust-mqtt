@@ -206,6 +206,10 @@ impl<'p, const MAX_USER_PROPERTIES: usize> ConnectPacket<'p, MAX_USER_PROPERTIES
         VarByteInt::new_unchecked(len as u32)
     }
 
+    pub fn add_topic_alias_maximum(&mut self, topic_alias_maximum: TopicAliasMaximum) {
+        self.topic_alias_maximum = Some(topic_alias_maximum)
+    }
+
     pub fn add_authentication_method(&mut self, authentication_method: AuthenticationMethod<'p>) {
         self.authentication_method = Some(authentication_method);
     }

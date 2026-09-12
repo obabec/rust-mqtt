@@ -15,7 +15,7 @@ use crate::{
         raw::Raw,
     },
     config::{ClientConfig, MaximumPacketSize, ServerConfig, SessionExpiryInterval, SharedConfig},
-    fmt::{assert, const_assert, debug, error, info, panic, trace, unreachable, warn},
+    fmt::{assert, assert_ne, const_assert, debug, error, info, panic, trace, unreachable, warn},
     header::{FixedHeader, PacketType},
     io::Transport,
     packet::{Packet, TxPacket},
@@ -61,6 +61,13 @@ pub use raw::AbortError;
 ///   - It is recommended (but not strictly required) to use a value >= 1, because if the value is 0, the client does not
 ///     guarantee to detect the protocol error and disconnect from the server when the request problem information property in
 ///     CONNECT is 0 and the server sends user properties in a packet other than CONNACK, DISCONNECT or PUBLISH.
+/// - `MAX_INCOMING_TOPIC_ALIASES´: The maximum number of topic aliases the client supports in inbound direction This is the
+///   same value as the client topic alias maximum and no topic aliases greater than this value can be used in PUBLISH packets
+///   sent by the server. If this value is greater than the MQTT default of 0, the client will ínclude this value in its topic
+///   alias maximum value in the CONNECT packet. Must not be greater than 65535.
+/// - `MAX_OUTGOING_TOPIC_ALIASES`: The maximum number of topic aliases the client supports in outbound direction. The server
+///   may limit the client to a lower number of topic aliases in PUBLISH packets sent by the client by setting its topic alias
+///   maximum in the CONNACK packet to a lower value. Must not be greater than 65535.
 ///
 /// The client has two modes of how the acknowledgements within handshakes of [`QoS::AtLeastOnce`] and [`QoS::ExactlyOnce`]
 /// publications are handled. These modes are the default [`AckMode::Automatic`] and the proactively configurable
@@ -158,11 +165,19 @@ pub struct Client<
     const SEND_MAXIMUM: usize,
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
     const MAX_USER_PROPERTIES: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
     client_config: ClientConfig<'a>,
     shared_config: SharedConfig,
     server_config: ServerConfig,
-    session: Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    session: Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
 
     raw: Raw<'c, N, B>,
 
@@ -180,6 +195,8 @@ impl<
     const SEND_MAXIMUM: usize,
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
     const MAX_USER_PROPERTIES: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > core::fmt::Debug
     for Client<
         '_,
@@ -191,6 +208,8 @@ impl<
         SEND_MAXIMUM,
         MAX_SUBSCRIPTION_IDENTIFIERS,
         MAX_USER_PROPERTIES,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
     >
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -215,6 +234,8 @@ impl<
     const SEND_MAXIMUM: usize,
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
     const MAX_USER_PROPERTIES: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > defmt::Format
     for Client<
         '_,
@@ -226,6 +247,8 @@ impl<
         SEND_MAXIMUM,
         MAX_SUBSCRIPTION_IDENTIFIERS,
         MAX_USER_PROPERTIES,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
     >
 {
     fn format(&self, fmt: defmt::Formatter) {
@@ -252,6 +275,8 @@ impl<
     const SEND_MAXIMUM: usize,
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
     const MAX_USER_PROPERTIES: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 >
     Client<
         'a,
@@ -263,6 +288,8 @@ impl<
         SEND_MAXIMUM,
         MAX_SUBSCRIPTION_IDENTIFIERS,
         MAX_USER_PROPERTIES,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
     >
 {
     /// Creates a new, disconnected MQTT client using a buffer provider to store
@@ -289,6 +316,14 @@ impl<
                 MAX_USER_PROPERTIES <= 1021,
                 "MAX_USER_PROPERTIES must be less than or equal to 1021"
             );
+            const_assert!(
+                MAX_INCOMING_TOPIC_ALIASES <= 65535,
+                "MAX_INCOMING_TOPIC_ALIASES must be less than or equal to 65535"
+            );
+            const_assert!(
+                MAX_OUTGOING_TOPIC_ALIASES <= 65535,
+                "MAX_OUTGOING_TOPIC_ALIASES must be less than or equal to 65535"
+            );
         }
 
         Self {
@@ -306,7 +341,13 @@ impl<
     /// Creates a new, disconnected MQTT client using a buffer provider to store
     /// dynamically sized fields of received packets.
     pub fn with_session(
-        session: Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+        session: Session<
+            SUBSCRIBE_MAXIMUM,
+            RECEIVE_MAXIMUM,
+            SEND_MAXIMUM,
+            MAX_INCOMING_TOPIC_ALIASES,
+            MAX_OUTGOING_TOPIC_ALIASES,
+        >,
         buffer: &'c mut B,
     ) -> Self {
         let mut s = Self::new(buffer);
@@ -355,7 +396,15 @@ impl<
 
     /// Returns session related configuration and tracking information.
     #[inline]
-    pub fn session(&self) -> &Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM> {
+    pub fn session(
+        &self,
+    ) -> &Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    > {
         &self.session
     }
 
@@ -457,6 +506,10 @@ impl<
                 .map(Into::into)
                 .collect(),
         );
+
+        if MAX_INCOMING_TOPIC_ALIASES > 0 {
+            packet.add_topic_alias_maximum((MAX_INCOMING_TOPIC_ALIASES as u16).into());
+        }
 
         if let Some(ref authentication_method) = self.client_config.authentication_method {
             packet.add_authentication_method(authentication_method.as_borrowed().into());
@@ -1189,6 +1242,8 @@ impl<
     /// * The [`QoS`] should be less than or equal to the server's maximum [`QoS`].
     /// * The retain flag should only be set if the server supports retain.
     /// * A topic alias must be less than or equal to the server's maximum topic alias.
+    /// * A topic alias must have an existing mapping in the current network connection.
+    /// * A topic alias must not be greater than `MAX_OUTGOING_TOPIC_ALIASES`.
     ///
     /// The server support of these requirements can be checked via [`Client::server_config`].
     /// If a violation occurs, the client will not publish but prevent the protocol error
@@ -1221,11 +1276,14 @@ impl<
     ///   of outgoing publications, SUBSCRIBEs and UNSUBSCRIBEs
     /// * [`MqttError::ManualAckNotAllowed`] if the [`QoS`] is [`QoS::AtMostOnce`] or
     ///   [`QoS::AtLeastOnce`] and [`PublicationOptions::ack_mode`] is [`AckMode::Manual`]
+    /// * [`MqttError::TopicAliasNotMapped`] if the topic is the [`TopicReference::Alias`] variant and
+    ///   its value has not been mapped previously in the network connection.
     ///
     /// # Panics
     ///
     /// This function panics if the length of the `user_properties` slice in the [`PublicationOptions`]
     /// is greater than `MAX_USER_PROPERTIES`.
+    /// This function panics if a topic alias is used and it's greater than `MAX_OUTGOING_TOPIC_ALIASES`.
     pub async fn publish(
         &mut self,
         options: &PublicationOptions<'_>,
@@ -1238,10 +1296,23 @@ impl<
             MAX_USER_PROPERTIES
         );
 
+        if let Some(alias) = options.topic.alias() {
+            assert!(
+                usize::from(alias.get()) <= MAX_OUTGOING_TOPIC_ALIASES,
+                "attempted to publish to a topic alias greater than the client's maximum"
+            );
+        }
+
         if (matches!(options.qos, QoS::AtMostOnce | QoS::AtLeastOnce)
             && options.ack_mode == AckMode::Manual)
         {
             return Err(MqttError::ManualAckNotAllowed);
+        }
+
+        if let TopicReference::Alias(alias) = options.topic {
+            if !self.session.is_mapped_outbound_alias(alias) {
+                return Err(MqttError::TopicAliasNotMapped);
+            }
         }
 
         if options.qos > self.server_config.maximum_qos {
@@ -1329,6 +1400,12 @@ impl<
                 })?;
         }
 
+        if let TopicReference::Mapping(_, alias) = options.topic {
+            trace!("(re-)mapping outgoing topic alias {}", alias);
+
+            self.session.map_outbound_alias(alias);
+        }
+
         match identified_qos.packet_identifier() {
             Some(pid) => debug!("sending PUBLISH packet with packet identifier {}", pid),
             None => debug!("sending PUBLISH packet"),
@@ -1351,6 +1428,7 @@ impl<
     ///   * The [`QoS`] should be less than or equal to the server's maximum [`QoS`].
     ///   * The retain flag should only be set if the server supports retain.
     ///   * A topic alias must be less than or equal to the server's maximum topic alias.
+    ///   * A topic alias must have an existing mapping in the current network connection.
     /// * Client-side preconditions:
     ///   * The [`QoS`] must be [`QoS::AtLeastOnce`] or [`QoS::ExactlyOnce`] and must be the same as
     ///     that of the original publication.
@@ -1360,6 +1438,7 @@ impl<
     ///     the PUBCOMP packet.
     ///   * The previous PUBLISH packet must have been sent in a different, previous network
     ///     connection.
+    ///   * A topic alias must not be greater than `MAX_OUTGOING_TOPIC_ALIASES`.
     ///
     /// If a violation occurs, the client will not publish but prevent the protocol error
     /// and return an error. The server support of these requirements can be checked via
@@ -1388,12 +1467,15 @@ impl<
     ///     the retain flag set to true is attempted
     ///   * if a topic alias is used and its value is greater than the maximum value specified in the
     ///     server's CONNACK packet
+    /// * [`MqttError::TopicAliasNotMapped`] if the topic is the [`TopicReference::Alias`] variant and
+    ///   its value has not been mapped previously in the network connection.
     ///
     /// # Panics
     ///
     /// This function may panic if the [`QoS`] in the `options` is [`QoS::AtMostOnce`].
     /// This function panics if the length of the `user_properties` slice in the [`PublicationOptions`]
     /// is greater than `MAX_USER_PROPERTIES`.
+    /// This function panics if a topic alias is used and it's greater than `MAX_OUTGOING_TOPIC_ALIASES`.
     pub async fn republish(
         &mut self,
         packet_identifier: PacketIdentifier,
@@ -1412,6 +1494,19 @@ impl<
             QoS::AtMostOnce,
             "QoS 0 packets cannot be republished"
         );
+
+        if let Some(alias) = options.topic.alias() {
+            assert!(
+                usize::from(alias.get()) < MAX_OUTGOING_TOPIC_ALIASES,
+                "attempted to publish to a topic alias greater than the client's maximum"
+            );
+        }
+
+        if let TopicReference::Alias(alias) = options.topic {
+            if !self.session.is_mapped_outbound_alias(alias) {
+                return Err(MqttError::TopicAliasNotMapped);
+            }
+        }
 
         if options.qos > self.server_config.maximum_qos {
             return Err(MqttError::UnsupportedByServer);
@@ -1476,6 +1571,12 @@ impl<
                 SmError::QoSMismatched => MqttError::QoSMismatched,
                 SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
             })?;
+
+        if let TopicReference::Mapping(_, alias) = options.topic {
+            trace!("(re-)mapping outgoing topic alias {}", alias);
+
+            self.session.map_outbound_alias(alias);
+        }
 
         debug!(
             "resending PUBLISH packet with packet identifier {}",
@@ -2337,19 +2438,32 @@ impl<
                     )
                     .await?;
 
-                // Our topic alias maximum is always 0, the moment we receive a topic alias, this is an error.
-                let TopicReference::Name(topic) = publish.topic else {
-                    error!("received disallowed topic alias");
-                    self.raw.prepare_disconnect(ReasonCode::TopicAliasInvalid);
-                    return Err(MqttError::Server);
-                };
+                if let Some(alias) = publish.topic.alias() {
+                    if usize::from(alias.get()) > MAX_INCOMING_TOPIC_ALIASES {
+                        error!("received disallowed topic alias {}", alias);
+                        self.raw.prepare_disconnect(ReasonCode::TopicAliasInvalid);
+                        return Err(MqttError::Server);
+                    }
+                }
+                if let TopicReference::Alias(alias) = publish.topic {
+                    if !self.session.is_mapped_inbound_alias(alias) {
+                        error!("received publish to unmapped topic alias {}", alias);
+                        self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                        return Err(MqttError::Server);
+                    }
+                }
+                if let TopicReference::Mapping(_, alias) = publish.topic {
+                    trace!("(re-)mapping incoming topic alias {}", alias);
+
+                    self.session.map_inbound_alias(alias);
+                }
 
                 let publish = Publish {
                     ack_mode: AckMode::default(),
                     dup: publish.dup,
                     identified_qos: publish.identified_qos,
                     retain: publish.retain,
-                    topic,
+                    topic: publish.topic,
                     payload_format_indicator: publish
                         .payload_format_indicator
                         .map(Property::into_inner),
