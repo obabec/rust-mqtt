@@ -3,10 +3,10 @@ use std::{assert_eq, num::NonZero, panic, time::Duration};
 use rust_mqtt::{
     client::{
         Client,
-        event::{Event, Publish},
+        event::{Event, Publish, Suback},
         options::{PublicationOptions, TopicReference},
     },
-    types::{MqttString, MqttStringPair},
+    types::{MqttString, MqttStringPair, ReasonCode},
 };
 use tokio::{
     join,
@@ -272,6 +272,66 @@ async fn outgoing_topic_alias_remap() {
     };
 
     join!(receiver1, receiver2, publisher);
+}
+
+#[tokio::test]
+#[test_log::test]
+async fn incoming_topic_alias_basic() {
+    let (topic_name, topic_filter) = unique_topic();
+    let msg = "There are two ways to write error-free programs. Only the third one works.";
+
+    let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16, 16, 0> = Client::new(ALLOC.get());
+    let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
+    assert_ok!(rx.connect(tcp, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let mut tx =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
+
+    let publisher = async {
+        sleep(Duration::from_secs(1)).await;
+
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+            .retain()
+            .at_least_once();
+
+        assert_published!(tx, pub_options.clone(), msg.into());
+
+        let pub_options = PublicationOptions::new(TopicReference::Name(topic_name.clone()))
+            .retain()
+            .at_least_once();
+
+        assert_published!(tx, pub_options.clone(), msg.into());
+
+        disconnect(&mut tx, DEFAULT_DC_OPTIONS).await;
+    };
+
+    let receiver = async {
+        let options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
+
+        assert_ok!(rx.subscribe(topic_filter, &options).await);
+        let e = assert_ok!(rx.poll().await);
+        let Event::Suback(Suback { reason_code, .. }) = e else {
+            panic!();
+        };
+        assert_eq!(reason_code, ReasonCode::GrantedQoS1);
+
+        let e = assert_ok!(rx.poll().await);
+        let Event::Publish(Publish { topic, .. }) = e else {
+            panic!();
+        };
+        assert_eq!(topic.name().unwrap(), &topic_name);
+        let alias = topic.alias().unwrap();
+
+        let e = assert_ok!(rx.poll().await);
+        let Event::Publish(Publish { topic, .. }) = e else {
+            panic!();
+        };
+        assert_eq!(topic, TopicReference::Alias(alias));
+
+        assert_ok!(rx.disconnect(DEFAULT_DC_OPTIONS).await);
+    };
+
+    join!(receiver, publisher);
 }
 
 #[tokio::test]
