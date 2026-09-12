@@ -1309,10 +1309,10 @@ impl<
             return Err(MqttError::ManualAckNotAllowed);
         }
 
-        if let TopicReference::Alias(alias) = options.topic
-            && !self.session.is_mapped_outbound_alias(alias)
-        {
-            return Err(MqttError::TopicAliasNotMapped);
+        if let TopicReference::Alias(alias) = options.topic {
+            if !self.session.is_mapped_outbound_alias(alias) {
+                return Err(MqttError::TopicAliasNotMapped);
+            }
         }
 
         if options.qos > self.server_config.maximum_qos {
@@ -1502,10 +1502,10 @@ impl<
             );
         }
 
-        if let TopicReference::Alias(alias) = options.topic
-            && !self.session.is_mapped_outbound_alias(alias)
-        {
-            return Err(MqttError::TopicAliasNotMapped);
+        if let TopicReference::Alias(alias) = options.topic {
+            if !self.session.is_mapped_outbound_alias(alias) {
+                return Err(MqttError::TopicAliasNotMapped);
+            }
         }
 
         if options.qos > self.server_config.maximum_qos {
@@ -2438,19 +2438,19 @@ impl<
                     )
                     .await?;
 
-                if let Some(alias) = publish.topic.alias()
-                    && usize::from(alias.get()) > MAX_INCOMING_TOPIC_ALIASES
-                {
-                    error!("received disallowed topic alias {}", alias);
-                    self.raw.prepare_disconnect(ReasonCode::TopicAliasInvalid);
-                    return Err(MqttError::Server);
+                if let Some(alias) = publish.topic.alias() {
+                    if usize::from(alias.get()) > MAX_INCOMING_TOPIC_ALIASES {
+                        error!("received disallowed topic alias {}", alias);
+                        self.raw.prepare_disconnect(ReasonCode::TopicAliasInvalid);
+                        return Err(MqttError::Server);
+                    }
                 }
-                if let TopicReference::Alias(alias) = publish.topic
-                    && !self.session.is_mapped_inbound_alias(alias)
-                {
-                    error!("received publish to unmapped topic alias {}", alias);
-                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
-                    return Err(MqttError::Server);
+                if let TopicReference::Alias(alias) = publish.topic {
+                    if !self.session.is_mapped_inbound_alias(alias) {
+                        error!("received publish to unmapped topic alias {}", alias);
+                        self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                        return Err(MqttError::Server);
+                    }
                 }
                 if let TopicReference::Mapping(_, alias) = publish.topic {
                     trace!("(re-)mapping incoming topic alias {}", alias);

@@ -229,8 +229,8 @@ impl<
 {
     fn default() -> Self {
         Self {
-            inbound_topic_aliases: [Default::default(); _],
-            outbound_topic_aliases: [Default::default(); _],
+            inbound_topic_aliases: [Default::default(); MAX_INCOMING_TOPIC_ALIASES],
+            outbound_topic_aliases: [Default::default(); MAX_OUTGOING_TOPIC_ALIASES],
             subs: Default::default(),
             unsubs: Default::default(),
             inbound_publishes: Default::default(),
@@ -492,8 +492,8 @@ impl<
     pub(crate) fn clear(&mut self) {
         trace!("resetting session completely by clearing all entries");
 
-        self.inbound_topic_aliases = [Default::default(); _];
-        self.outbound_topic_aliases = [Default::default(); _];
+        self.inbound_topic_aliases = [Default::default(); MAX_INCOMING_TOPIC_ALIASES];
+        self.outbound_topic_aliases = [Default::default(); MAX_OUTGOING_TOPIC_ALIASES];
         self.subs.clear();
         self.unsubs.clear();
         self.inbound_publishes.clear();
@@ -501,8 +501,8 @@ impl<
     }
 
     pub(crate) fn reconnect(&mut self) {
-        self.inbound_topic_aliases = [Default::default(); _];
-        self.outbound_topic_aliases = [Default::default(); _];
+        self.inbound_topic_aliases = [Default::default(); MAX_INCOMING_TOPIC_ALIASES];
+        self.outbound_topic_aliases = [Default::default(); MAX_OUTGOING_TOPIC_ALIASES];
 
         trace!("reconnection resets:");
 
