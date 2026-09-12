@@ -3,13 +3,14 @@
 use core::{matches, num::NonZero};
 
 use crate::{
+    auth::{AuthMechanism, AuthOptions, ReAuthState},
     buffer::BufferProvider,
     bytes::Bytes,
     client::{
-        event::{Connected, Event, Puback, Publish, Pubrej, Suback},
+        event::{Auth, Connected, Event, Puback, Publish, Pubrej, Suback},
         options::{
             AckMode, AckOptions, ConnectOptions, DisconnectOptions, PublicationOptions,
-            SubscriptionOptions, TopicReference, UnsubscriptionOptions,
+            ReAuthOptions, SubscriptionOptions, TopicReference, UnsubscriptionOptions,
         },
         raw::Raw,
     },
@@ -25,9 +26,9 @@ use crate::{
     },
     v5::{
         packet::{
-            ConnackPacket, ConnectPacket, DisconnectPacket, PingreqPacket, PingrespPacket,
-            PubackPacket, PubcompPacket, PublishPacket, PubrecPacket, PubrelPacket, SubackPacket,
-            SubscribePacket, UnsubackPacket, UnsubscribePacket,
+            AuthPacket, ConnackPacket, ConnectPacket, DisconnectPacket, PingreqPacket,
+            PingrespPacket, PubackPacket, PubcompPacket, PublishPacket, PubrecPacket, PubrelPacket,
+            SubackPacket, SubscribePacket, UnsubackPacket, UnsubscribePacket,
         },
         property::Property,
     },
@@ -148,6 +149,7 @@ pub use raw::AbortError;
 ///   packets with unused packet identifiers that require a responding packet are received (PUBREC and PUBREL), no session entry
 ///   is created and the responding packet (PUBREL and PUBCOMP) is sent automatically by the client.
 pub struct Client<
+    'a,
     'c,
     N: Transport,
     B: BufferProvider<'c>,
@@ -157,7 +159,7 @@ pub struct Client<
     const MAX_SUBSCRIPTION_IDENTIFIERS: usize,
     const MAX_USER_PROPERTIES: usize,
 > {
-    client_config: ClientConfig,
+    client_config: ClientConfig<'a>,
     shared_config: SharedConfig,
     server_config: ServerConfig,
     session: Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
@@ -166,6 +168,7 @@ pub struct Client<
 
     manual_ack_when:
         &'c dyn Fn(&Publish<'_, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>) -> bool,
+    reauth_state: ReAuthState,
 }
 
 impl<
@@ -179,6 +182,7 @@ impl<
     const MAX_USER_PROPERTIES: usize,
 > core::fmt::Debug
     for Client<
+        '_,
         'c,
         N,
         B,
@@ -196,6 +200,7 @@ impl<
             .field("server_config", &self.server_config)
             .field("session", &self.session)
             .field("raw", &self.raw)
+            .field("reauth_state", &self.reauth_state)
             .finish_non_exhaustive()
     }
 }
@@ -212,6 +217,7 @@ impl<
     const MAX_USER_PROPERTIES: usize,
 > defmt::Format
     for Client<
+        '_,
         'c,
         N,
         B,
@@ -225,17 +231,19 @@ impl<
     fn format(&self, fmt: defmt::Formatter) {
         defmt::write!(
             fmt,
-            "Client {{ client_config: {:?}, shared_config: {:?}, server_config: {:?}, session: {:?}, raw: {:?}, .. }}",
+            "Client {{ client_config: {:?}, shared_config: {:?}, server_config: {:?}, session: {:?}, raw: {:?}, reauth_state: {:?}, .. }}",
             self.client_config,
             self.shared_config,
             self.server_config,
             self.session,
             self.raw,
+            self.reauth_state,
         );
     }
 }
 
 impl<
+    'a,
     'c,
     N: Transport,
     B: BufferProvider<'c>,
@@ -246,6 +254,7 @@ impl<
     const MAX_USER_PROPERTIES: usize,
 >
     Client<
+        'a,
         'c,
         N,
         B,
@@ -290,6 +299,7 @@ impl<
             raw: Raw::new_disconnected(buffer),
 
             manual_ack_when: &|_| false,
+            reauth_state: ReAuthState::Inactive,
         }
     }
 
@@ -327,7 +337,7 @@ impl<
 
     /// Returns configuration for this client.
     #[inline]
-    pub fn client_config(&self) -> &ClientConfig {
+    pub fn client_config(&self) -> &ClientConfig<'a> {
         &self.client_config
     }
 
@@ -363,64 +373,11 @@ impl<
         self.raw.buffer_mut()
     }
 
-    /// Establishes a connection to an MQTT server over the provided [`Transport`].
-    ///
-    /// Sends a CONNECT packet and awaits the CONNACK response by the server. It initializes
-    /// the internal state of the client, including session information and negotiated server
-    /// capabilities.
-    ///
-    /// This function must only be called if:
-    /// - The client is newly constructed and has not yet been connected.
-    /// - A previous connection was closed gracefully via [`Client::disconnect`].
-    /// - An unrecoverable error occurred and the error handling was performed with
-    ///   [`Client::abort`].
-    ///
-    /// Configuration that was negotiated with the server is stored in the `client_config`,
-    /// `server_config`, `shared_config`, and `session` fields, which have getters
-    /// ([`Client::client_config`], [`Client::server_config`], [`Client::shared_config`],
-    /// [`Client::session`]).
-    ///
-    /// If the server indicates that no session is present (Session Present flag is 0), the
-    /// client's local session state is cleared. To persist state across connections,
-    /// call [`Client::session`] to clone the state before calling this method.
-    ///
-    /// # Returns
-    ///
-    /// - [`Ok(Connected)`]: Contains information from the CONNACK packet that is not persisted
-    ///   in the client's internal configuration fields.
-    /// - [`Err(MqttError)`]: If the connection attempt failed.
-    ///
-    /// # Errors
-    ///
-    /// * [`MqttError::Server`] if:
-    ///   * the server sends a malformed packet
-    ///   * the first received packet is something other than a CONNACK packet
-    ///   * `client_identifier` is [`None`] and the server did not assign a client identifier
-    ///   * the server causes a protocol error
-    ///   * the server sends Response Information despite `request_response_information` in [`ConnectOptions`]
-    ///     being 0
-    /// * [`MqttError::Disconnect`] if the CONNACK packet's reason code is not successful (>= 0x80)
-    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
-    /// * [`MqttError::Alloc`] if the underlying [`BufferProvider`] returned an error
-    ///
-    /// # Panics
-    ///
-    /// This function panics if the length of the `user_properties` slice in the [`ConnectOptions`]
-    /// or the length of the `user_properties` slice in the [`WillOptions`] in [`ConnectOptions`]
-    /// is greater than `MAX_USER_PROPERTIES`.
-    ///
-    /// [`Ok(Connected)`]: crate::client::event::Connected
-    /// [`Err(MqttError)`]: crate::client::MqttError
-    /// [`WillOptions`]: crate::client::options::WillOptions
-    pub async fn connect<'d>(
+    async fn start_connect<E>(
         &mut self,
-        net: N,
         options: &ConnectOptions<'_>,
-        client_identifier: Option<MqttString<'d>>,
-    ) -> Result<Connected<'d, MAX_USER_PROPERTIES>, MqttError<'c, MAX_USER_PROPERTIES>>
-    where
-        'c: 'd,
-    {
+        client_identifier: Option<MqttString<'_>>,
+    ) -> Result<(), MqttError<'c, 0, E>> {
         assert!(
             options.user_properties.len() <= MAX_USER_PROPERTIES,
             "attempted to send CONNECT with {} > {} (MAX_USER_PROPERTIES) properties",
@@ -436,7 +393,7 @@ impl<
             );
         }
 
-        self.raw.set_net(net);
+        self.reauth_state = ReAuthState::Inactive;
 
         // Set client session expiry interval because it is relevant to determine
         // which session expiry interval can be sent in DISCONNECT packet.
@@ -477,70 +434,67 @@ impl<
             self.client_config.maximum_accepted_remaining_length
         );
 
-        {
-            let packet_client_identifier = client_identifier
-                .as_ref()
-                .map(MqttString::as_borrowed)
-                .unwrap_or_default();
+        let packet_client_identifier = client_identifier
+            .as_ref()
+            .map(MqttString::as_borrowed)
+            .unwrap_or_default();
 
-            let mut packet = ConnectPacket::<MAX_USER_PROPERTIES>::new(
-                packet_client_identifier,
-                options.clean_start,
-                options.keep_alive,
-                options.maximum_packet_size,
-                options.session_expiry_interval,
-                // Safety: `Self::new` panics if `RECEIVE_MAXIMUM` is 0. Thus, this
-                // code is only reached when `RECEIVE_MAXIMUM` is greater than 0.
-                unsafe { NonZero::new_unchecked(RECEIVE_MAXIMUM as u16) },
-                options.request_response_information,
-                options.request_problem_information,
-                options
-                    .user_properties
-                    .iter()
-                    .map(MqttStringPair::as_borrowed)
-                    .map(Into::into)
-                    .collect(),
-            );
+        let mut packet = ConnectPacket::<MAX_USER_PROPERTIES>::new(
+            packet_client_identifier,
+            options.clean_start,
+            options.keep_alive,
+            options.maximum_packet_size,
+            options.session_expiry_interval,
+            // Safety: `Self::new` panics if `RECEIVE_MAXIMUM` is 0. Thus, this
+            // code is only reached when `RECEIVE_MAXIMUM` is greater than 0.
+            unsafe { NonZero::new_unchecked(RECEIVE_MAXIMUM as u16) },
+            options.request_response_information,
+            options.request_problem_information,
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+        );
 
-            if let Some(ref user_name) = options.user_name {
-                packet.add_user_name(user_name.as_borrowed());
-            }
-            if let Some(ref password) = options.password {
-                packet.add_password(password.as_borrowed());
-            }
-
-            if let Some(ref will) = options.will {
-                let will_qos = will.will_qos;
-                let will_retain = will.will_retain;
-
-                packet.add_will(will.as_borrowed_will(), will_qos, will_retain);
-            }
-
-            debug!("sending CONNECT packet");
-            self.raw.send(&packet).await?;
-            self.raw.flush().await?;
+        if let Some(ref authentication_method) = self.client_config.authentication_method {
+            packet.add_authentication_method(authentication_method.as_borrowed().into());
+        }
+        if let Some(ref authentication_data) = options.authentication_data {
+            packet.add_authentication_data(authentication_data.as_borrowed().into());
         }
 
-        let header = self.raw.recv_header().await?;
-
-        match header.packet_type() {
-            Ok(ConnackPacket::<MAX_USER_PROPERTIES>::PACKET_TYPE) => debug!(
-                "received CONNACK packet header (remaining length: {})",
-                header.remaining_len.value()
-            ),
-            Ok(t) => {
-                error!("received unexpected {:?} packet header", t);
-
-                self.raw.prepare_disconnect(ReasonCode::ProtocolError);
-                return Err(MqttError::Server);
-            }
-            Err(_) => {
-                error!("received invalid header {:?}", header);
-                self.raw.prepare_disconnect(ReasonCode::MalformedPacket);
-                return Err(MqttError::Server);
-            }
+        if let Some(ref user_name) = options.user_name {
+            packet.add_user_name(user_name.as_borrowed());
+        }
+        if let Some(ref password) = options.password {
+            packet.add_password(password.as_borrowed());
         }
 
+        if let Some(ref will) = options.will {
+            let will_qos = will.will_qos;
+            let will_retain = will.will_retain;
+
+            packet.add_will(will.as_borrowed_will(), will_qos, will_retain);
+        }
+
+        debug!("sending CONNECT packet");
+        self.raw.send(&packet).await?;
+        self.raw.flush().await?;
+
+        Ok(())
+    }
+
+    async fn complete_connect<'d, E>(
+        &mut self,
+        connack_header: FixedHeader,
+        options: &ConnectOptions<'_>,
+        client_identifier: Option<MqttString<'d>>,
+    ) -> Result<Connected<'d, MAX_USER_PROPERTIES>, MqttError<'c, MAX_USER_PROPERTIES, E>>
+    where
+        'c: 'd,
+    {
         let ConnackPacket::<MAX_USER_PROPERTIES> {
             session_present,
             reason_code,
@@ -559,10 +513,18 @@ impl<
             server_keep_alive,
             response_information,
             server_reference,
-        } = self.raw.recv_body(&header).await?;
+            authentication_method,
+            authentication_data,
+        } = self.raw.recv_body(&connack_header).await?;
 
         if !options.request_response_information && response_information.is_some() {
             error!("server sent response information when request response information was false");
+            self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+            return Err(MqttError::Server);
+        }
+
+        if self.client_config.authentication_method.is_none() && authentication_method.is_some() {
+            error!("server sent an authentication method when CONNECT didn't contain one");
             self.raw.prepare_disconnect(ReasonCode::ProtocolError);
             return Err(MqttError::Server);
         }
@@ -574,10 +536,30 @@ impl<
                 .map(Property::into_inner)
                 .or(client_identifier)
                 .ok_or_else(|| {
-                    error!("server did not assign a client identifier when it was required.");
+                    error!("server did not assign a client identifier when it was required");
                     self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                     MqttError::Server
                 })?;
+
+            if let Some(ref connect_authentication_method) =
+                self.client_config.authentication_method
+            {
+                let Some(connack_authentication_method) = authentication_method else {
+                    error!(
+                        "server didn't send an authentication method in successful CONNACK packet when it was required"
+                    );
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                    return Err(MqttError::Server);
+                };
+
+                if connect_authentication_method != &connack_authentication_method.into_inner() {
+                    error!(
+                        "server sent an authentication method different from the required value"
+                    );
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                    return Err(MqttError::Server);
+                }
+            }
 
             if session_present {
                 if options.clean_start {
@@ -585,16 +567,16 @@ impl<
                     self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                     return Err(MqttError::Server);
                 } else {
-                    info!("connected to server and reconnected to session");
+                    info!("continuing previous session");
                     self.session.reconnect();
                 }
             } else {
                 #[allow(clippy::if_same_then_else)]
                 if options.clean_start {
-                    info!("connected to server");
+                    info!("beginning new session");
                 } else {
                     info!(
-                        "connected to server but server does not have the requested session present"
+                        "beginning new session because server does not have the requested session present"
                     );
                 }
                 self.session.clear();
@@ -639,6 +621,7 @@ impl<
                     .collect(),
                 response_information: response_information.map(Property::into_inner),
                 server_reference: server_reference.map(Property::into_inner),
+                authentication_data: authentication_data.map(Property::into_inner),
             })
         } else {
             debug!("CONNACK packet indicates rejection");
@@ -658,6 +641,352 @@ impl<
                 server_reference: server_reference.map(Property::into_inner),
             })
         }
+    }
+
+    /// Establishes a connection to an MQTT server over the provided [`Transport`].
+    ///
+    /// Sends a CONNECT packet and awaits the CONNACK response by the server. Authentication
+    /// is only possible via the User Name and Password fields. For enhanced authentication,
+    /// use [`Client::connect_enhanced`].
+    ///
+    /// The internal state of the client, including session information and negotiated server
+    /// capabilities is initialized.
+    ///
+    /// This function must only be called if:
+    /// - The client is newly constructed and has not yet been connected.
+    /// - A previous connection was closed gracefully via [`Client::disconnect`].
+    /// - An unrecoverable error occurred and the error handling was performed with
+    ///   [`Client::abort`].
+    ///
+    /// Configuration that was negotiated with the server is stored in the `client_config`,
+    /// `server_config`, `shared_config`, and `session` fields, which have getters
+    /// ([`Client::client_config`], [`Client::server_config`], [`Client::shared_config`],
+    /// [`Client::session`]).
+    ///
+    /// If the server indicates that no session is present (Session Present flag is 0), the
+    /// client's local session state is cleared.
+    ///
+    /// # Returns
+    ///
+    /// - [`Ok(Connected)`]: Contains information from the CONNACK packet that is not persisted
+    ///   in the client's internal configuration fields.
+    /// - [`Err(MqttError)`]: If the connection attempt failed.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::Server`] if:
+    ///   * the server sends a malformed packet
+    ///   * the first received packet is something other than a CONNACK packet
+    ///   * `client_identifier` is [`None`] and the server did not assign a client identifier
+    ///   * the server causes a protocol error
+    ///   * the server sends Response Information despite `request_response_information` in [`ConnectOptions`]
+    ///     being 0
+    /// * [`MqttError::Disconnect`] if the CONNACK packet's reason code is not successful (>= 0x80)
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::Alloc`] if the underlying [`BufferProvider`] returned an error
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`ConnectOptions`]
+    /// or the length of the `user_properties` slice in the [`WillOptions`] in [`ConnectOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Ok(Connected)`]: crate::client::event::Connected
+    /// [`Err(MqttError)`]: crate::client::MqttError
+    /// [`WillOptions`]: crate::client::options::WillOptions
+    pub async fn connect<'d>(
+        &mut self,
+        net: N,
+        options: &ConnectOptions<'_>,
+        client_identifier: Option<MqttString<'d>>,
+    ) -> Result<Connected<'d, MAX_USER_PROPERTIES>, MqttError<'c, MAX_USER_PROPERTIES>>
+    where
+        'c: 'd,
+    {
+        self.raw.set_net(net);
+
+        // Reset authentication method so `Client::start_connect` sees that the connection
+        // attempt is not using enhanced authentication
+        self.client_config.authentication_method = None;
+
+        self.start_connect(
+            options,
+            client_identifier.as_ref().map(MqttString::as_borrowed),
+        )
+        .await
+        .map_err(MqttError::inflate)?;
+
+        let header = self.raw.recv_header().await?;
+
+        match header.packet_type() {
+            Ok(ConnackPacket::<MAX_USER_PROPERTIES>::PACKET_TYPE) => {
+                debug!(
+                    "received CONNACK packet header (remaining length: {})",
+                    header.remaining_len.value()
+                );
+            }
+            Ok(t) => {
+                error!("received unexpected {:?} packet header", t);
+
+                self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                return Err(MqttError::Server);
+            }
+            Err(_) => {
+                error!("received invalid header {:?}", header);
+                self.raw.prepare_disconnect(ReasonCode::MalformedPacket);
+                return Err(MqttError::Server);
+            }
+        }
+
+        let c = self
+            .complete_connect(header, options, client_identifier)
+            .await?;
+
+        info!("connected to server");
+
+        Ok(c)
+    }
+
+    /// Establishes a connection to an MQTT server over the provided [`Transport`] using
+    /// MQTTv5's enhanced authentication.
+    ///
+    /// Sends a CONNECT packet and executes an enhanced authentication exchange provided by
+    /// an [`AuthMechanism`] until a CONNACK response is sent by the server. For every AUTH
+    /// packet sent by the server, [`AuthMechanism::kontinue`] is called. For the final
+    /// CONNACK packet, [`AuthMechanism::success`] is called. The [`AuthMechanism`] may
+    /// detect an error in the authentication process or experience an internal error. In
+    /// this case, the exchange is interrupted, [`MqttError::EnhancedAuthFailed`] is returned
+    /// and depending on the returned [`ReasonCode`] by the [`AuthMechanism`], an optional
+    /// DISCONNECT packet is scheduled to be sent with [`Client::abort`].
+    ///
+    /// The internal state of the client, including session information and negotiated server
+    /// capabilities is initialized.
+    ///
+    /// This function must only be called if:
+    /// - The client is newly constructed and has not yet been connected.
+    /// - A previous connection was closed gracefully via [`Client::disconnect`].
+    /// - An unrecoverable error occurred and the error handling was performed with
+    ///   [`Client::abort`].
+    ///
+    /// Configuration that was negotiated with the server is stored in the `client_config`,
+    /// `server_config`, `shared_config`, and `session` fields, which have getters
+    /// ([`Client::client_config`], [`Client::server_config`], [`Client::shared_config`],
+    /// [`Client::session`]).
+    ///
+    /// If the server indicates that no session is present (Session Present flag is 0), the
+    /// client's local session state is cleared.
+    ///
+    /// # Returns
+    ///
+    /// - [`Ok(Connected)`]: Contains information from the CONNACK packet that is not persisted
+    ///   in the client's internal configuration fields.
+    /// - [`Err(MqttError)`]: If the connection attempt failed.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::Server`] if:
+    ///   * the server sends a malformed packet
+    ///   * the first received packet is something other than a CONNACK packet
+    ///   * `client_identifier` is [`None`] and the server did not assign a client identifier
+    ///   * the server causes a protocol error
+    ///   * the server sends Response Information despite `request_response_information` in [`ConnectOptions`]
+    ///     being 0
+    /// * [`MqttError::Disconnect`] if the CONNACK packet's reason code is not successful (>= 0x80)
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::Alloc`] if the underlying [`BufferProvider`] returned an error
+    /// * [`MqttError::EnhancedAuthFailed`] if the [`AuthMechanism`] detected or experienced an
+    ///   error.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the [`ConnectOptions`]
+    /// or the length of the `user_properties` slice in the [`WillOptions`] in [`ConnectOptions`]
+    /// is greater than `MAX_USER_PROPERTIES`.
+    ///
+    /// [`Ok(Connected)`]: crate::client::event::Connected
+    /// [`Err(MqttError)`]: crate::client::MqttError
+    /// [`WillOptions`]: crate::client::options::WillOptions
+    pub async fn connect_enhanced<'d, A>(
+        &mut self,
+        net: N,
+        options: &ConnectOptions<'_>,
+        client_identifier: Option<MqttString<'d>>,
+        authentication_method: MqttString<'a>,
+        mechanism: &mut A,
+    ) -> Result<Connected<'d, MAX_USER_PROPERTIES>, MqttError<'c, MAX_USER_PROPERTIES, A::Error>>
+    where
+        A: AuthMechanism<MAX_USER_PROPERTIES>,
+        'c: 'd,
+    {
+        self.raw.set_net(net);
+
+        // Set authentication method because it is required for future AUTH packets,
+        // and further checks for CONNACK and AUTH packets.
+        self.client_config.authentication_method = Some(authentication_method);
+
+        self.start_connect(
+            options,
+            client_identifier.as_ref().map(MqttString::as_borrowed),
+        )
+        .await
+        .map_err(MqttError::inflate)?;
+
+        let header = loop {
+            let header = self.raw.recv_header().await?;
+
+            match header.packet_type() {
+                Ok(ConnackPacket::<MAX_USER_PROPERTIES>::PACKET_TYPE) => {
+                    debug!(
+                        "received CONNACK packet header (remaining length: {})",
+                        header.remaining_len.value()
+                    );
+                    break header;
+                }
+                Ok(AuthPacket::<MAX_USER_PROPERTIES>::PACKET_TYPE) => debug!(
+                    "received AUTH packet header (remaining length: {})",
+                    header.remaining_len.value()
+                ),
+                Ok(t) => {
+                    error!("received unexpected {:?} packet header", t);
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                    return Err(MqttError::Server);
+                }
+                Err(_) => {
+                    error!("received invalid header {:?}", header);
+                    self.raw.prepare_disconnect(ReasonCode::MalformedPacket);
+                    return Err(MqttError::Server);
+                }
+            }
+
+            let AuthPacket::<MAX_USER_PROPERTIES> {
+                reason_code,
+                authentication_method,
+                authentication_data,
+                reason_string,
+                user_properties,
+            } = self.raw.recv_body(&header).await?;
+
+            if reason_code != ReasonCode::ContinueAuthentication {
+                error!("server sent invalid AUTH reason code");
+                self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                return Err(MqttError::Server);
+            }
+
+            if !self.client_config.request_problem_information
+                && (reason_string.is_some() || !user_properties.is_empty())
+            {
+                error!(
+                    "server sent reason string or user properties when request problem information was false"
+                );
+                self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                return Err(MqttError::Server);
+            }
+
+            if &authentication_method.into_inner()
+                != self.client_config.authentication_method.as_ref().unwrap()
+            {
+                error!("server sent an authentication method different from the required value");
+                self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                return Err(MqttError::Server);
+            }
+
+            let event = Auth::<MAX_USER_PROPERTIES> {
+                reason_code,
+                authentication_data: authentication_data.map(Property::into_inner),
+                reason_string: reason_string.map(Property::into_inner),
+                user_properties: user_properties
+                    .into_iter()
+                    .map(Property::into_inner)
+                    .collect(),
+            };
+
+            let AuthOptions::<MAX_USER_PROPERTIES> {
+                authentication_data,
+                reason_string,
+                user_properties,
+            } = match mechanism.kontinue(&event) {
+                Ok(a) => a,
+                Err((e, reason_code)) => {
+                    error!("authentication failed");
+
+                    match reason_code {
+                        Some(
+                            r @ (ReasonCode::Success
+                            | ReasonCode::DisconnectWithWillMessage
+                            | ReasonCode::UnspecifiedError
+                            | ReasonCode::MalformedPacket
+                            | ReasonCode::ProtocolError
+                            | ReasonCode::ImplementationSpecificError
+                            | ReasonCode::TopicNameInvalid
+                            | ReasonCode::ReceiveMaximumExceeded
+                            | ReasonCode::TopicAliasInvalid
+                            | ReasonCode::PacketTooLarge
+                            | ReasonCode::MessageRateTooHigh
+                            | ReasonCode::QuotaExceeded
+                            | ReasonCode::AdministrativeAction
+                            | ReasonCode::PayloadFormatInvalid),
+                        ) => {
+                            self.raw.prepare_disconnect(r);
+                        }
+                        Some(_) => {
+                            warn!("invalid DISCONNECT reason code returned by auth mechanism");
+
+                            self.raw.prepare_close();
+                        }
+                        None => self.raw.prepare_close(),
+                    }
+
+                    return Err(MqttError::EnhancedAuthFailed(e));
+                }
+            };
+
+            let packet = AuthPacket::<MAX_USER_PROPERTIES>::new(
+                ReasonCode::ContinueAuthentication,
+                self.client_config
+                    .authentication_method
+                    .as_ref()
+                    .unwrap()
+                    .as_borrowed()
+                    .into(),
+                authentication_data.map(Into::into),
+                reason_string.map(Into::into),
+                user_properties.into_iter().map(Into::into).collect(),
+            );
+
+            debug!("sending AUTH packet");
+
+            self.raw.send(&packet).await?;
+            self.raw.flush().await?;
+        };
+
+        let c = self
+            .complete_connect(header, options, client_identifier)
+            .await?;
+
+        if let Err((e, reason_code)) = mechanism.success(&Auth::<MAX_USER_PROPERTIES> {
+            reason_code: ReasonCode::Success,
+            authentication_data: c.authentication_data.as_ref().map(MqttBinary::as_borrowed),
+            reason_string: None,
+            user_properties: c
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .collect(),
+        }) {
+            error!("authentication failed");
+
+            if let Some(reason_code) = reason_code {
+                self.raw.prepare_disconnect(reason_code);
+            } else {
+                self.raw.prepare_close();
+            }
+
+            return Err(MqttError::EnhancedAuthFailed(e));
+        }
+
+        info!("connected to server");
+
+        Ok(c)
     }
 
     /// Start a ping handshake by sending a PINGRESP packet.
@@ -990,14 +1319,14 @@ impl<
         if let Some(handle) = handle {
             // Treat the packet as sent before successfully sending. In case of a network error,
             // we have tracked the packet as in flight and can republish it.
-            if let Err(e) = handle.outbound_publish(options.qos, options.ack_mode) {
-                match e {
-                    SmError::NoCapacity => return Err(MqttError::SessionBuffer),
+            handle
+                .outbound_publish(options.qos, options.ack_mode)
+                .map_err(|e| match e {
+                    SmError::NoCapacity => MqttError::SessionBuffer,
                     SmError::PacketIdentifierUnused
                     | SmError::QoSMismatched
                     | SmError::HandshakeStateMismatched => unreachable!(),
-                }
-            }
+                })?;
         }
 
         match identified_qos.packet_identifier() {
@@ -1137,22 +1466,16 @@ impl<
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
-        if let Err(e) = self.session.outbound_republish(identified_qos) {
-            match e {
+        self.session
+            .outbound_republish(identified_qos)
+            .map_err(|e| match e {
                 SmError::NoCapacity => {
                     unreachable!("a republish can not fail due to missing capacity")
                 }
-                SmError::PacketIdentifierUnused => {
-                    return Err(MqttError::PacketIdentifierNotInFlight);
-                }
-                SmError::QoSMismatched => {
-                    return Err(MqttError::QoSMismatched);
-                }
-                SmError::HandshakeStateMismatched => {
-                    return Err(MqttError::HandshakeStateMismatched);
-                }
-            }
-        }
+                SmError::PacketIdentifierUnused => MqttError::PacketIdentifierNotInFlight,
+                SmError::QoSMismatched => MqttError::QoSMismatched,
+                SmError::HandshakeStateMismatched => MqttError::HandshakeStateMismatched,
+            })?;
 
         debug!(
             "resending PUBLISH packet with packet identifier {}",
@@ -1552,6 +1875,91 @@ impl<
         Ok(())
     }
 
+    /// Initiates or continues a re-authentication by sending an AUTH packet.
+    ///
+    /// The client internally tracks the re-authentication state and determines the
+    /// [`ReasonCode`] to use. If no re-authentication is currently in progress
+    /// because none has been initialized since establishing the connection or the last
+    /// re-authentication exchange has been completed with an AUTH packet with
+    /// [`ReasonCode::Success`] sent by the server, [`ReasonCode::ReAuthenticate`] is
+    /// used. If a re-authentication is in progress and this method hasn't been called
+    /// since the last [`Event::Auth`], [`ReasonCode::ContinueAuthentication`] is used.
+    /// Otherwise, no AUTH packet may be sent.
+    ///
+    /// # Errors
+    ///
+    /// * [`MqttError::RecoveryRequired`] if an unrecoverable error occured previously
+    /// * [`MqttError::Network`] if the underlying [`Transport`] returned an error
+    /// * [`MqttError::ServerMaximumPacketSizeExceeded`] if the server's maximum packet
+    ///   size would be exceeded by sending this PUBCOMP packet
+    /// * [`MqttError::NoEnhancedAuthentication`] if enhanced authentication is not
+    ///   possible in this network connection because no authentication method has been
+    ///   specified in the CONNECT packet. [`Client::connect`] has been used to
+    ///   establish the connection instead of the required [`Client::connect_enhanced`].
+    /// * [`MqttError::ReauthenticationHandshakeStateMismatched`] if a re-authentication
+    ///   exchange is currently in progress, but the server has not yet sent an AUTH
+    ///   packet in response to the client's last AUTH packet.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the length of the `user_properties` slice in the
+    /// [`ReAuthOptions`] is greater than `MAX_USER_PROPERTIES`.
+    pub async fn reauthenticate(
+        &mut self,
+        options: &ReAuthOptions<'_>,
+    ) -> Result<(), MqttError<'c, 0>> {
+        let Some(authentication_method) = self
+            .client_config
+            .authentication_method
+            .as_ref()
+            .map(MqttString::as_borrowed)
+        else {
+            return Err(MqttError::NoEnhancedAuthentication);
+        };
+
+        let reason_code = match self.reauth_state {
+            ReAuthState::Inactive => ReasonCode::ReAuthenticate,
+            ReAuthState::AwaitAuth => {
+                return Err(MqttError::ReauthenticationHandshakeStateMismatched);
+            }
+            ReAuthState::DueAuth => ReasonCode::ContinueAuthentication,
+        };
+
+        let packet = AuthPacket::<MAX_USER_PROPERTIES>::new(
+            reason_code,
+            authentication_method.into(),
+            options
+                .authentication_data
+                .as_ref()
+                .map(MqttBinary::as_borrowed)
+                .map(Into::into),
+            options
+                .reason_string
+                .as_ref()
+                .map(MqttString::as_borrowed)
+                .map(Into::into),
+            options
+                .user_properties
+                .iter()
+                .map(MqttStringPair::as_borrowed)
+                .map(Into::into)
+                .collect(),
+        );
+
+        if self.server_config.maximum_packet_size.as_u32() < packet.encoded_len() as u32 {
+            return Err(MqttError::ServerMaximumPacketSizeExceeded);
+        }
+
+        self.reauth_state = ReAuthState::AwaitAuth;
+
+        debug!("sending AUTH packet");
+
+        self.raw.send(&packet).await?;
+        self.raw.flush().await?;
+
+        Ok(())
+    }
+
     /// Completes the disconnection from the server after an unrecoverable error in a
     /// situation-aware way.
     ///
@@ -1817,7 +2225,6 @@ impl<
     ///     the client expects for this packet identifier from its session state
     ///   * the fixed header has the packet type CONNECT/SUBSCRIBE/UNSUBSCRIBE/PINGREQ
     /// * [`MqttError::Disconnect`] if a DISCONNECT packet is received
-    /// * [`MqttError::AuthPacketReceived`] if the fixed header has the packet type AUTH
     pub async fn poll_body(
         &mut self,
         header: FixedHeader,
@@ -2017,7 +2424,8 @@ impl<
                 }
 
                 match event {
-                    SmEvent::Aborted
+                    SmEvent::Ignored
+                    | SmEvent::Aborted
                     | SmEvent::Rejected
                     | SmEvent::Acknowledged
                     | SmEvent::Received(_)
@@ -2032,7 +2440,6 @@ impl<
                         };
                         Event::Duplicate(publish)
                     }
-                    SmEvent::Ignored => Event::Ignored,
                     SmEvent::ServerError => return Err(MqttError::Server),
                 }
             }
@@ -2238,7 +2645,6 @@ impl<
                     SmEvent::Publish
                     | SmEvent::Duplicate(_)
                     | SmEvent::Aborted
-                    | SmEvent::Rejected
                     | SmEvent::Acknowledged
                     | SmEvent::Received(_)
                     | SmEvent::Released(_) => unreachable!(),
@@ -2247,6 +2653,7 @@ impl<
                     SmEvent::Completed => {
                         Event::PublishComplete(Puback::new(pubcomp, AckMode::default()))
                     }
+                    SmEvent::Rejected => Event::PublishRejected(Pubrej::from(pubcomp)),
                     SmEvent::ServerError => return Err(MqttError::Server),
                 }
             }
@@ -2290,13 +2697,44 @@ impl<
                 return Err(MqttError::Server);
             }
             PacketType::Auth => {
-                error!("received unexpected AUTH packet");
+                // We don't have to check whether we sent an authentication method because
+                // when no authentication method was set at the time of the connection,
+                // the re-authentication state remains `ReauthState::Inactive`
+                if self.reauth_state != ReAuthState::AwaitAuth {
+                    error!("received unexpected AUTH packet");
+                    self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                    return Err(MqttError::Server);
+                }
 
-                // Receiving a AUTH packet is currently always a protocol error because we never send
-                // an Authentication Method property in the CONNECT packet.
-                // <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901217>
-                self.raw.prepare_disconnect(ReasonCode::ProtocolError);
-                return Err(MqttError::AuthPacketReceived);
+                let auth = self
+                    .raw
+                    .recv_body::<AuthPacket<MAX_USER_PROPERTIES>>(&header)
+                    .await?;
+
+                // Must be a match statement instead of a match expression because
+                // attributes on expressions are experimental
+                #[expect(clippy::wildcard_in_or_patterns)]
+                #[expect(unreachable_patterns)]
+                match auth.reason_code {
+                    ReasonCode::Success => self.reauth_state = ReAuthState::Inactive,
+                    ReasonCode::ContinueAuthentication => self.reauth_state = ReAuthState::DueAuth,
+                    _ | ReasonCode::ReAuthenticate => {
+                        error!("server sent invalid AUTH reason code");
+                        self.raw.prepare_disconnect(ReasonCode::ProtocolError);
+                        return Err(MqttError::Server);
+                    }
+                }
+
+                Event::Auth(Auth {
+                    reason_code: auth.reason_code,
+                    authentication_data: auth.authentication_data.map(Property::into_inner),
+                    reason_string: auth.reason_string.map(Property::into_inner),
+                    user_properties: auth
+                        .user_properties
+                        .into_iter()
+                        .map(Property::into_inner)
+                        .collect(),
+                })
             }
         };
 

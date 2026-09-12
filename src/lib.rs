@@ -26,6 +26,7 @@ mod bytes;
 mod fmt;
 mod packet;
 
+pub mod auth;
 pub mod buffer;
 pub mod client;
 pub mod config;

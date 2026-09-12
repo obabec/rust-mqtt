@@ -3,7 +3,7 @@ use std::{num::NonZero, time::Duration};
 use rust_mqtt::{
     client::{
         Client,
-        event::{Event, Puback, Publish, Suback},
+        event::{Event, Puback, Publish, Pubrej, Suback},
         options::{AckMode, AckOptions, PublicationOptions, TopicReference},
     },
     config::SessionExpiryInterval,
@@ -66,7 +66,8 @@ async fn outgoing_automatic_qos1_retry() {
         connect_options.clean_start = false;
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-        let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
+        let mut tx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
+            Client::with_session(session, ALLOC.get());
         let info = assert_ok!(warn_inspect!(
             tx.connect(tcp, &connect_options, Some(tx_id.as_borrowed()))
                 .await,
@@ -101,7 +102,7 @@ async fn outgoing_automatic_qos1_retry() {
         let sub_options = DEFAULT_QOS0_SUB_OPTIONS.at_least_once();
         assert_subscribe!(rx, &sub_options, topic_filter.clone());
         let p = assert_ok!(assert_ok!(
-            timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
+            timeout(Duration::from_secs(5), receive_and_complete(&mut rx)).await
         ));
         assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
@@ -156,7 +157,8 @@ async fn outgoing_automatic_qos2_retry_publish() {
         connect_options.clean_start = false;
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-        let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
+        let mut tx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
+            Client::with_session(session, ALLOC.get());
         let info = assert_ok!(warn_inspect!(
             tx.connect(tcp, &connect_options, Some(tx_id.as_borrowed()))
                 .await,
@@ -191,7 +193,7 @@ async fn outgoing_automatic_qos2_retry_publish() {
         let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
         assert_subscribe!(rx, &sub_options, topic_filter.clone());
         let p = assert_ok!(assert_ok!(
-            timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
+            timeout(Duration::from_secs(5), receive_and_complete(&mut rx)).await
         ));
         assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
@@ -243,7 +245,8 @@ async fn outgoing_manual_qos2_retry_publish() {
         connect_options.clean_start = false;
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-        let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
+        let mut tx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
+            Client::with_session(session, ALLOC.get());
         let info = assert_ok!(warn_inspect!(
             tx.connect(tcp, &connect_options, Some(tx_id.as_borrowed()))
                 .await,
@@ -290,7 +293,7 @@ async fn outgoing_manual_qos2_retry_publish() {
         let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
         assert_subscribe!(rx, &sub_options, topic_filter.clone());
         let p = assert_ok!(assert_ok!(
-            timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
+            timeout(Duration::from_secs(5), receive_and_complete(&mut rx)).await
         ));
         assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
@@ -360,7 +363,8 @@ async fn outgoing_automatic_qos2_retry_pubrel() {
         connect_options.clean_start = false;
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-        let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
+        let mut tx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
+            Client::with_session(session, ALLOC.get());
         let info = assert_ok!(warn_inspect!(
             tx.connect(tcp, &connect_options, Some(tx_id.as_borrowed()))
                 .await,
@@ -381,6 +385,12 @@ async fn outgoing_automatic_qos2_retry_pubrel() {
                             reason_string: _,
                             user_properties: _,
                         }) if packet_identifier == pid => break,
+                        Event::PublishRejected(Pubrej {
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if packet_identifier == pid => break,
                         _ => {}
                     }
                 }
@@ -395,7 +405,7 @@ async fn outgoing_automatic_qos2_retry_pubrel() {
         let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
         assert_subscribe!(rx, &sub_options, topic_filter.clone());
         let p = assert_ok!(assert_ok!(
-            timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
+            timeout(Duration::from_secs(5), receive_and_complete(&mut rx)).await
         ));
         assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
@@ -472,7 +482,8 @@ async fn outgoing_manual_qos2_retry_pubrel() {
         connect_options.clean_start = false;
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-        let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
+        let mut tx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
+            Client::with_session(session, ALLOC.get());
         let info = assert_ok!(warn_inspect!(
             tx.connect(tcp, &connect_options, Some(tx_id.as_borrowed()))
                 .await,
@@ -493,6 +504,12 @@ async fn outgoing_manual_qos2_retry_pubrel() {
                             reason_string: _,
                             user_properties: _,
                         }) if packet_identifier == pid => break,
+                        Event::PublishRejected(Pubrej {
+                            packet_identifier,
+                            reason_code: _,
+                            reason_string: _,
+                            user_properties: _,
+                        }) if packet_identifier == pid => break,
                         _ => {}
                     }
                 }
@@ -507,7 +524,7 @@ async fn outgoing_manual_qos2_retry_pubrel() {
         let sub_options = DEFAULT_QOS0_SUB_OPTIONS.exactly_once();
         assert_subscribe!(rx, &sub_options, topic_filter.clone());
         let p = assert_ok!(assert_ok!(
-            timeout(Duration::from_secs(5), receive_publish(&mut rx)).await
+            timeout(Duration::from_secs(5), receive_and_complete(&mut rx)).await
         ));
         assert_eq!(p.topic, topic_name.as_borrowed());
         assert_eq!(p.message, msg.into());
@@ -577,7 +594,8 @@ async fn incoming_automatic_qos2_retry_pubcomp() {
         connect_options.clean_start = false;
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-        let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
+        let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
+            Client::with_session(session, ALLOC.get());
         let info = assert_ok!(warn_inspect!(
             rx.connect(tcp, &connect_options, Some(rx_id.as_borrowed()))
                 .await,
@@ -675,7 +693,8 @@ async fn incoming_manual_qos2_retry_pubcomp() {
         connect_options.clean_start = false;
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-        let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> = Client::with_session(session, ALLOC.get());
+        let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
+            Client::with_session(session, ALLOC.get());
         let info = assert_ok!(warn_inspect!(
             rx.connect(tcp, &connect_options, Some(rx_id.as_borrowed()))
                 .await,
@@ -788,7 +807,7 @@ async fn outgoing_automatic_qos1_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut tx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -916,7 +935,7 @@ async fn outgoing_automatic_qos1_read_fail_retry() {
 
                 let pid = session.outbound_publishes.first().unwrap().0;
 
-                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut tx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -949,9 +968,10 @@ async fn outgoing_automatic_qos1_read_fail_retry() {
     join!(rx, tx);
 }
 
+#[ignore = "enable this once emqx v6.2.4 is used, see https://github.com/emqx/emqx/issues/18441"]
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_automatic_qos2_write_fail_retry() {
+async fn outgoing_automatic_qos2_write_fail_retry_hive_only_mosquitto_only() {
     let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS2_WRITE_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
@@ -1039,7 +1059,7 @@ async fn outgoing_automatic_qos2_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut tx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -1126,9 +1146,10 @@ async fn outgoing_automatic_qos2_write_fail_retry() {
     join!(rx, tx);
 }
 
+#[ignore = "enable this once emqx v6.2.4 is used, see https://github.com/emqx/emqx/issues/18441"]
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_manual_qos2_write_fail_retry() {
+async fn outgoing_manual_qos2_write_fail_retry_hive_only_mosquitto_only() {
     let tx_id = MqttString::from_str("RETRY_OUTGOING_MANUAL_QOS2_WRITE_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
@@ -1218,7 +1239,7 @@ async fn outgoing_manual_qos2_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut tx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -1313,9 +1334,10 @@ async fn outgoing_manual_qos2_write_fail_retry() {
     join!(rx, tx);
 }
 
+#[ignore = "enable this once emqx v6.2.4 is used, see https://github.com/emqx/emqx/issues/18441"]
 #[tokio::test]
 #[test_log::test]
-async fn outgoing_automatic_qos2_read_fail_retry() {
+async fn outgoing_automatic_qos2_read_fail_retry_hive_only_mosquitto_only() {
     let tx_id = MqttString::from_str("RETRY_OUTGOING_AUTOMATIC_QOS2_READ_FAIL_CLIENT").unwrap();
 
     let (rx_subscribed, subscribed) = oneshot::channel();
@@ -1402,7 +1424,7 @@ async fn outgoing_automatic_qos2_read_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut tx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -1472,6 +1494,12 @@ async fn outgoing_automatic_qos2_read_fail_retry() {
                 match assert_ok!(tx.poll().await) {
                     Event::PublishComplete(Puback {
                         ack_mode: _,
+                        packet_identifier,
+                        reason_code: _,
+                        reason_string: _,
+                        user_properties: _,
+                    }) if pid == packet_identifier => {}
+                    Event::PublishRejected(Pubrej {
                         packet_identifier,
                         reason_code: _,
                         reason_string: _,
@@ -1584,7 +1612,7 @@ async fn outgoing_manual_qos2_read_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut tx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut tx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -1662,6 +1690,12 @@ async fn outgoing_manual_qos2_read_fail_retry() {
                 match assert_ok!(tx.poll().await) {
                     Event::PublishComplete(Puback {
                         ack_mode: _,
+                        packet_identifier,
+                        reason_code: _,
+                        reason_string: _,
+                        user_properties: _,
+                    }) if pid == packet_identifier => {}
+                    Event::PublishRejected(Pubrej {
                         packet_identifier,
                         reason_code: _,
                         reason_string: _,
@@ -1793,7 +1827,7 @@ async fn incoming_automatic_qos1_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -1914,7 +1948,7 @@ async fn incoming_manual_qos1_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -2035,7 +2069,7 @@ async fn incoming_automatic_qos1_read_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -2155,7 +2189,7 @@ async fn incoming_manual_qos1_read_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -2290,7 +2324,7 @@ async fn incoming_automatic_qos2_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -2440,7 +2474,7 @@ async fn incoming_manual_qos2_write_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -2603,7 +2637,7 @@ async fn incoming_automatic_qos2_read_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(
@@ -2777,7 +2811,7 @@ async fn incoming_manual_qos2_read_fail_retry() {
 
                 // Complete publish using infallible connection
 
-                let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> =
+                let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> =
                     Client::with_session(session, ALLOC.get());
                 let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
                 assert_ok!(

@@ -23,9 +23,10 @@ use crate::common::{
     utils::{ALLOC, connected_client, disconnect, tcp_connection, unique_topic},
 };
 
+#[ignore = "enable this once emqx v6.3.0 is used, see https://github.com/emqx/emqx/issues/18425"]
 #[tokio::test]
 #[test_log::test]
-async fn maximum_packet_size_not_exceeded() {
+async fn maximum_packet_size_not_exceeded_hive_only_mosquitto_only() {
     // Has to be a reasonable value not too close to 0, otherwise broker might not reply or something similar
     const MAX_PACKET_SIZE: u32 = 100;
     const PACKET_SIZE: usize = MAX_PACKET_SIZE as usize;
@@ -74,7 +75,7 @@ async fn maximum_packet_size_not_exceeded() {
 #[ignore = "enable this once mosquitto v2.1.3 is used, see https://github.com/eclipse-mosquitto/mosquitto/issues/3503"]
 #[tokio::test]
 #[test_log::test]
-async fn maximum_packet_size_barely_exceeded_hive_only() {
+async fn maximum_packet_size_barely_exceeded_emqx_only_hive_only() {
     // Has to be a reasonable value not too close to 0, otherwise broker might not reply or something similar
     const MAX_PACKET_SIZE: u32 = 100;
     const PACKET_SIZE: usize = MAX_PACKET_SIZE as usize + 1;
@@ -643,7 +644,7 @@ async fn keep_alive_not_kept_alive_incoming_qos0() {
         assert_subscribe!(rx, DEFAULT_QOS0_SUB_OPTIONS, topic_filter);
 
         assert_ok!(
-            timeout(Duration::from_secs(4), async {
+            timeout(Duration::from_secs(5), async {
                 while !matches!(
                     rx.poll().await,
                     Err(MqttError::Disconnect {
@@ -722,8 +723,10 @@ async fn keep_alive_not_kept_alive_will_timing() {
 #[test_log::test]
 async fn receive_maximum() {
     let (topic_name, topic_filter) = unique_topic();
-    let mut rx: Client<'_, _, _, 1, 2, 0, 0, 16> = Client::new(ALLOC.get());
-    let mut tx: Client<'_, _, _, 1, 1, 10, 0, 16> = Client::new(ALLOC.get());
+    let mut rx: Client<'_, '_, _, _, 1, 2, 0, 0, 16> = Client::new(ALLOC.get());
+    // EMQX calculates its server receive maximum as min(client_receive_maximum, emqx_max_inflight),
+    // so we need to go up to 10 on our RECEIVE_MAXIMUM
+    let mut tx: Client<'_, '_, _, _, 1, 10, 10, 0, 16> = Client::new(ALLOC.get());
 
     let tcp_rx = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
     let tcp_tx = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
@@ -788,7 +791,10 @@ async fn send_maximum_buffer_exceeded() {
     let topic = unique_topic().0;
     const SEND_MAXIMUM_BUFFER_SIZE: usize = 2;
 
-    let mut c: Client<'_, _, _, 1, 1, SEND_MAXIMUM_BUFFER_SIZE, 0, 16> = Client::new(ALLOC.get());
+    // EMQX calculates its server receive maximum as min(client_receive_maximum, emqx_max_inflight),
+    // so we need to go up to 3 on our RECEIVE_MAXIMUM
+    let mut c: Client<'_, '_, _, _, 1, 3, SEND_MAXIMUM_BUFFER_SIZE, 0, 16> =
+        Client::new(ALLOC.get());
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
 
@@ -825,7 +831,7 @@ async fn send_maximum_buffer_exceeded() {
 #[test_log::test]
 async fn server_receive_maximum_exceeded() {
     let topic_name = unique_topic().0;
-    let mut c: Client<'_, _, _, 1, 1, 256, 0, 16> = Client::new(ALLOC.get());
+    let mut c: Client<'_, '_, _, _, 1, 1, 256, 0, 16> = Client::new(ALLOC.get());
 
     let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
 

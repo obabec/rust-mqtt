@@ -96,7 +96,7 @@ async fn too_many_user_properties() {
 #[ignore = "mosquitto has no configurable DISCONNECT maximum packet size"]
 #[tokio::test]
 #[test_log::test]
-async fn server_maximum_packet_size_not_exceeded_by_disconnect_hive_only() {
+async fn server_maximum_packet_size_not_exceeded_by_disconnect_emqx_only_hive_only() {
     // fixed header, reason code, property length
     const OVERHEAD: u32 = 4 + 1 + 3;
 
@@ -136,7 +136,7 @@ async fn server_maximum_packet_size_not_exceeded_by_disconnect_hive_only() {
 #[ignore = "mosquitto has no configurable DISCONNECT maximum packet size"]
 #[tokio::test]
 #[test_log::test]
-async fn server_maximum_packet_size_exceeded_by_disconnect_hive_only() {
+async fn server_maximum_packet_size_exceeded_by_disconnect_emqx_only_hive_only() {
     // fixed header, reason code, property length
     const OVERHEAD: u32 = 4 + 1 + 3;
 

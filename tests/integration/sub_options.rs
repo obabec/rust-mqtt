@@ -297,7 +297,7 @@ async fn subscription_identifier() {
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let mut rx: Client<'_, _, _, 1, 1, 1, 1, 16> = {
+    let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> = {
         let mut client = Client::new(ALLOC.get());
 
         let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);

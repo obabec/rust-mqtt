@@ -17,6 +17,12 @@ use crate::{
 ///
 /// Does not include the [`ReasonCode`] as it is always [`ReasonCode::Success`]
 /// (0x00) if this event is returned.
+/// Does not include the authentication method, as it is always the same as the client's
+/// authentication method when enhanced authentication ([`Client::connect_enhanced`]) is used
+/// or not present otherwise ([`Client::connect`]).
+///
+/// [`Client::connect_enhanced`]: crate::client::Client::connect_enhanced
+/// [`Client::connect`]: crate::client::Client::connect
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Connected<'i, const MAX_USER_PROPERTIES: usize> {
@@ -37,6 +43,9 @@ pub struct Connected<'i, const MAX_USER_PROPERTIES: usize> {
 
     /// Another server which can be used.
     pub server_reference: Option<MqttString<'i>>,
+
+    /// The authentication data in the CONNACK packet.
+    pub authentication_data: Option<MqttBinary<'i>>,
 }
 
 /// Events emitted by the client when receiving an MQTT packet.
@@ -58,7 +67,6 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PRO
     /// - [`QoS::AtMostOnce`]: No action
     /// - [`QoS::AtLeastOnce`] and [`Publish::ack_mode`] is [`AckMode::Automatic`]: A PUBACK packet has been sent to the server.
     /// - [`QoS::AtLeastOnce`] and [`Publish::ack_mode`] is [`AckMode::Manual`]: No action, the PUBACK must be sent manually by the user with [`Client::manual_acknowledge`].
-    /// - [`QoS::ExactlyOnce`]: A PUBREC packet has been sent to the server.
     /// - [`QoS::ExactlyOnce`] and [`Publish::ack_mode`] is [`AckMode::Automatic`]: A PUBREC packet has been sent to the server.
     /// - [`QoS::ExactlyOnce`] and [`Publish::ack_mode`] is [`AckMode::Manual`]: No action, the PUBREC must be sent manually by the user with [`Client::manual_receive`].
     ///
@@ -191,6 +199,14 @@ pub enum Event<'e, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PRO
     /// [`QoS::ExactlyOnce`]: crate::types::QoS::ExactlyOnce
     /// [`Client::ack_manually_when`]: crate::client::Client::ack_manually_when
     Duplicate(Publish<'e, MAX_SUBSCRIPTION_IDENTIFIERS, MAX_USER_PROPERTIES>),
+
+    /// The server sent an AUTH packet. This event is only emitted if
+    /// [`Client::connect_enhanced`] was used for the current network connection. Consequently,
+    /// if the connection was established with [`Client::connect`], this event is never emitted.
+    ///
+    /// [`Client::connect_enhanced`]: crate::client::Client::connect_enhanced
+    /// [`Client::connect`]: crate::client::Client::connect
+    Auth(Auth<'e, MAX_USER_PROPERTIES>),
 }
 
 /// Content of [`Event::Suback`].
@@ -355,4 +371,24 @@ impl<'p, T, const MAX_USER_PROPERTIES: usize> From<GenericPubackPacket<'p, T, MA
                 .collect(),
         }
     }
+}
+
+/// Content of [`Event::Auth`]. The authentication method
+/// is not included as it is always the value that was
+/// configured when calling [`Client::connect_enhanced`].
+///
+/// [`Client::connect_enhanced`]: crate::client::Client::connect_enhanced
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct Auth<'a, const MAX_USER_PROPERTIES: usize> {
+    /// The reason code of the AUTH packet. When this is
+    /// [`ReasonCode::Success`], the authentication exchange is complete.
+    pub reason_code: ReasonCode,
+    /// The authentication data of the AUTH packet.
+    pub authentication_data: Option<MqttBinary<'a>>,
+    /// The reason string of the AUTH packet.
+    pub reason_string: Option<MqttString<'a>>,
+    /// The user property entries in the AUTH packet.
+    /// If the vector is full, this list might not be exhaustive.
+    pub user_properties: Vec<MqttStringPair<'a>, MAX_USER_PROPERTIES>,
 }
