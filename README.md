@@ -31,17 +31,16 @@ The design goal is a strict yet flexible and explicit API that leverages Rust's 
 - Subscription identifiers
 - Shared & wildcard subscriptions
 - Message expiry interval
-- Topic alias in outgoing publications
+- Topic alias
 - Request/Response
 - Request Problem Information
 - Reason String
 - User Property
 - Enhanced/Extended authentication and re-authentication
 
-### Currently unsupported MQTT features & limitations
+### Current limitation
 
-- Subscribing to multiple topics in a single packet
-- Topic alias in incoming publications
+- Subscribing to multiple topics in a single packet is not supported
 
 ### Extension plans (more or less by priority)
 
