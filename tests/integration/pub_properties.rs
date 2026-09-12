@@ -274,9 +274,10 @@ async fn outgoing_topic_alias_remap() {
     join!(receiver1, receiver2, publisher);
 }
 
+#[ignore = "hivemq does not assign topic aliases"]
 #[tokio::test]
 #[test_log::test]
-async fn incoming_topic_alias_basic() {
+async fn incoming_topic_alias_basic_emqx_only_mosquitto_only() {
     let (topic_name, topic_filter) = unique_topic();
     let msg = "Always code as if the person who ends up maintaining your code is a violent psychopath who knows where you live.";
 
@@ -334,9 +335,10 @@ async fn incoming_topic_alias_basic() {
     join!(receiver, publisher);
 }
 
+#[ignore = "hivemq does not assign topic aliases"]
 #[tokio::test]
 #[test_log::test]
-async fn topic_alias_maximum_not_exceeded() {
+async fn incoming_topic_alias_maximum_not_exceeded_emqx_only_mosquitto_only() {
     let (topic_name_1, topic_filter_1) = unique_topic();
     let (topic_name_2, topic_filter_2) = unique_topic();
     let (topic_name_3, topic_filter_3) = unique_topic();
