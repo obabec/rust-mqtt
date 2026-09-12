@@ -664,8 +664,7 @@ impl<
     /// [`Client::session`]).
     ///
     /// If the server indicates that no session is present (Session Present flag is 0), the
-    /// client's local session state is cleared. To persist state across connections,
-    /// call [`Client::session`] to clone the state before calling this method.
+    /// client's local session state is cleared.
     ///
     /// # Returns
     ///
@@ -757,8 +756,8 @@ impl<
     /// CONNACK packet, [`AuthMechanism::success`] is called. The [`AuthMechanism`] may
     /// detect an error in the authentication process or experience an internal error. In
     /// this case, the exchange is interrupted, [`MqttError::EnhancedAuthFailed`] is returned
-    /// an optional DISCONNECT packet is scheduled to be sent with [`Client::abort`],
-    /// depending on the returned [`ReasonCode`] by the [`AuthMechanism`].
+    /// and depending on the returned [`ReasonCode`] by the [`AuthMechanism`], an optional
+    /// DISCONNECT packet is scheduled to be sent with [`Client::abort`].
     ///
     /// The internal state of the client, including session information and negotiated server
     /// capabilities is initialized.
@@ -775,8 +774,7 @@ impl<
     /// [`Client::session`]).
     ///
     /// If the server indicates that no session is present (Session Present flag is 0), the
-    /// client's local session state is cleared. To persist state across connections,
-    /// call [`Client::session`] to clone the state before calling this method.
+    /// client's local session state is cleared.
     ///
     /// # Returns
     ///

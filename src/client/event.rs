@@ -17,6 +17,12 @@ use crate::{
 ///
 /// Does not include the [`ReasonCode`] as it is always [`ReasonCode::Success`]
 /// (0x00) if this event is returned.
+/// Does not include the authentication method, as it is always the same as the client's
+/// authentication method when enhanced authentication ([`Client::connect_enhanced`]) is used
+/// or not present otherwise ([`Client::connect`]).
+///
+/// [`Client::connect_enhanced`]: crate::client::Client::connect_enhanced
+/// [`Client::connect`]: crate::client::Client::connect
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Connected<'i, const MAX_USER_PROPERTIES: usize> {
@@ -368,15 +374,15 @@ impl<'p, T, const MAX_USER_PROPERTIES: usize> From<GenericPubackPacket<'p, T, MA
 }
 
 /// Content of [`Event::Auth`]. The authentication method
-/// is not included as it is always the value that configured
-/// when calling [`Client::connect_enhanced`].
+/// is not included as it is always the value that was
+/// configured when calling [`Client::connect_enhanced`].
 ///
 /// [`Client::connect_enhanced`]: crate::client::Client::connect_enhanced
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Auth<'a, const MAX_USER_PROPERTIES: usize> {
-    /// Reason code of the AUTH packet. When this is [`ReasonCode::Success`],
-    /// the authentication exchange is complete.
+    /// The reason code of the AUTH packet. When this is
+    /// [`ReasonCode::Success`], the authentication exchange is complete.
     pub reason_code: ReasonCode,
     /// The authentication data of the AUTH packet.
     pub authentication_data: Option<MqttBinary<'a>>,

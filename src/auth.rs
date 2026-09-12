@@ -33,7 +33,7 @@ pub struct AuthOptions<'a, const MAX_USER_PROPERTIES: usize> {
 /// An enhanced authentication mechanism for use in MQTTv5's extended/enhanced
 /// authentication. [`Client`] only requires this for enhanced authentication
 /// used in [`Client::connect_enhanced`], but typically this can be reused for
-/// enhanced re-authentication. Note that this trait only provides methods
+/// enhanced re-authentication. Note that this trait only provides methods for
 /// handling a received authentication exchange (received AUTH or CONNACK
 /// packet). If authentication data is required for the first step of the
 /// authentication exchange, which is always sent by the client (in the CONNECT
@@ -55,8 +55,8 @@ pub trait AuthMechanism<const MAX_USER_PROPERTIES: usize> {
     type Error;
 
     /// An AUTH packet with [`ReasonCode::ContinueAuthentication`] was received.
-    /// The [`AuthMechanism`] executes it checks and produces the next step
-    /// (which is an AUTH packet) of the authentication exchange.
+    /// The [`AuthMechanism`] executes its checks and produces the next step
+    /// (which in turn is an AUTH packet) of the authentication exchange.
     ///
     /// # Returns
     ///
