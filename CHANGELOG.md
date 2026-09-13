@@ -59,6 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add const generic parameter `MAX_OUTGOING_TOPIC_ALIASES` indicating the number of topic aliases that are supported in outbound direction respectively
 - Pass through the complete `TopicReference` instead of only the `TopicName` in incoming publications
 - Prevent publications by the client without a topic name to topic aliases that have not been mapped before
+- Detect protocol error on DISCONNECT packet by the server with client-only reason code
 
 ## 0.5.1 - 2026-04-10
 
