@@ -57,7 +57,6 @@ impl<'p, const MAX_USER_PROPERTIES: usize> RxPacket<'p>
         if !matches!(
             disconnect_reason_code,
             ReasonCode::Success
-                | ReasonCode::DisconnectWithWillMessage
                 | ReasonCode::UnspecifiedError
                 | ReasonCode::MalformedPacket
                 | ReasonCode::ProtocolError
@@ -380,7 +379,7 @@ mod unit {
         let packet = decode!(DisconnectPacket<16>, 50, [
             0xE0,
             0x32,
-            0x04, // Reason code
+            0x8E, // Reason code
             0x30, // Property length
 
             // Reason String
@@ -398,7 +397,7 @@ mod unit {
             0x1C, 0x00, 0x0B, b'g', b'o', b'-', b'h', b'e', b'r', b'e', b'.', b'c', b'o', b'm',
         ]);
 
-        assert_eq!(packet.reason_code, ReasonCode::DisconnectWithWillMessage);
+        assert_eq!(packet.reason_code, ReasonCode::SessionTakenOver);
         assert!(packet.session_expiry_interval.is_none());
         assert_eq!(
             packet.reason_string,

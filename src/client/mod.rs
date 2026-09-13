@@ -2832,11 +2832,7 @@ impl<
                 match auth.reason_code {
                     ReasonCode::Success => self.reauth_state = ReAuthState::Inactive,
                     ReasonCode::ContinueAuthentication => self.reauth_state = ReAuthState::DueAuth,
-                    _ | ReasonCode::ReAuthenticate => {
-                        error!("server sent invalid AUTH reason code");
-                        self.raw.prepare_disconnect(ReasonCode::ProtocolError);
-                        return Err(MqttError::Server);
-                    }
+                    _ | ReasonCode::ReAuthenticate => unreachable!(),
                 }
 
                 Event::Auth(Auth {

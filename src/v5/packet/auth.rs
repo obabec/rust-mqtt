@@ -58,7 +58,7 @@ impl<'p, const MAX_USER_PROPERTIES: usize> RxPacket<'p> for AuthPacket<'p, MAX_U
 
         if !matches!(
             authenticate_reason_code,
-            ReasonCode::Success | ReasonCode::ContinueAuthentication | ReasonCode::ReAuthenticate
+            ReasonCode::Success | ReasonCode::ContinueAuthentication
         ) {
             trace!("invalid AUTH reason code: {:?}", authenticate_reason_code);
             return Err(RxError::ProtocolError);
@@ -328,7 +328,7 @@ mod unit {
         let packet = decode!(AuthPacket<16>, 78, [
             0xF0,
             0x4E,
-            0x19, // Reason code
+            0x18, // Reason code
             0x4C, // Property length
 
             // User Property
@@ -354,7 +354,7 @@ mod unit {
             b't', b'o', b'_', b'w', b'i', b's', b'd', b'o', b'm', b'_', b'r', b'a', b't', b'i', b'o',
         ]);
 
-        assert_eq!(packet.reason_code, ReasonCode::ReAuthenticate);
+        assert_eq!(packet.reason_code, ReasonCode::ContinueAuthentication);
         assert_eq!(
             packet.authentication_method,
             MqttString::try_from("beard_length_to_wisdom_ratio")
