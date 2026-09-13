@@ -1157,7 +1157,7 @@ impl<
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
-        debug!("sending SUBSCRIBE packet");
+        debug!("sending SUBSCRIBE packet with packet identifier {}", pid);
 
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
@@ -1226,7 +1226,7 @@ impl<
             return Err(MqttError::ServerMaximumPacketSizeExceeded);
         }
 
-        debug!("sending UNSUBSCRIBE packet");
+        debug!("sending UNSUBSCRIBE packet with packet identifier {}", pid);
 
         self.raw.send(&packet).await?;
         self.raw.flush().await?;
@@ -2360,14 +2360,14 @@ impl<
                 let pid = suback.packet_identifier;
 
                 if let Some(h) = self.session.sub_handle(pid) {
-                    h.remove();
-
                     // We only send SUBSCRIBE packets with exactly 1 topic
                     let [r] = suback.reason_codes.as_slice() else {
                         error!("received mismatched SUBACK");
                         self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                         return Err(MqttError::Server);
                     };
+
+                    h.complete(*r);
 
                     Event::Suback(Suback {
                         packet_identifier: pid,
@@ -2406,14 +2406,14 @@ impl<
                 let pid = unsuback.packet_identifier;
 
                 if let Some(h) = self.session.unsub_handle(pid) {
-                    h.remove();
-
                     // We only send UNSUBSCRIBE packets with exactly 1 topic
                     let [r] = unsuback.reason_codes.as_slice() else {
                         error!("received mismatched UNSUBACK");
                         self.raw.prepare_disconnect(ReasonCode::ProtocolError);
                         return Err(MqttError::Server);
                     };
+
+                    h.complete(*r);
 
                     Event::Unsuback(Suback {
                         packet_identifier: pid,

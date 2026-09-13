@@ -47,7 +47,8 @@ impl<
                 trace!(
                     "initiating subscription {{ pid=#{} }}",
                     self.packet_identifier
-                )
+                );
+                trace!("#{}: Untracked -> AwaitSuback", self.packet_identifier);
             })
             .map_err(|_| {
                 trace!(
@@ -66,7 +67,8 @@ impl<
                 trace!(
                     "initiating unsubscription {{ pid=#{} }}",
                     self.packet_identifier
-                )
+                );
+                trace!("#{}: Untracked -> AwaitUnsuback", self.packet_identifier);
             })
             .map_err(|_| {
                 trace!(
@@ -146,7 +148,13 @@ impl<
         MAX_OUTGOING_TOPIC_ALIASES,
     >
 {
-    pub(crate) fn remove(self) {
+    pub(crate) fn complete(self, reason_code: ReasonCode) {
+        trace!(
+            "completing subscription with SUBACK {{ pid=#{}, reason_code={:?} }}",
+            self.packet_identifier(),
+            reason_code,
+        );
+
         trace!("#{}: AwaitSuback -> Untracked", self.packet_identifier());
 
         self.session.subs.swap_remove(self.i);
@@ -190,7 +198,13 @@ impl<
         MAX_OUTGOING_TOPIC_ALIASES,
     >
 {
-    pub(crate) fn remove(self) {
+    pub(crate) fn complete(self, reason_code: ReasonCode) {
+        trace!(
+            "completing unsubscription with UNSUBACK {{ pid=#{}, reason_code={:?} }}",
+            self.packet_identifier(),
+            reason_code,
+        );
+
         trace!("#{}: AwaitUnsuback -> Untracked", self.packet_identifier());
 
         self.session.unsubs.swap_remove(self.i);

@@ -2230,11 +2230,17 @@ mod unit {
             let h = no_out_pub.free_handle().unwrap();
             let pid = h.packet_identifier;
             assert_ok!(h.outbound_sub());
-            no_out_pub.sub_handle(pid).unwrap().remove();
+            no_out_pub
+                .sub_handle(pid)
+                .unwrap()
+                .complete(ReasonCode::Success);
             let h = no_out_pub.free_handle().unwrap();
             let pid = h.packet_identifier;
             assert_ok!(h.outbound_unsub());
-            no_out_pub.unsub_handle(pid).unwrap().remove();
+            no_out_pub
+                .unsub_handle(pid)
+                .unwrap()
+                .complete(ReasonCode::Success);
             assert_eq!(
                 no_out_pub.inbound_publish(
                     IdentifiedQoS::ExactlyOnce(PacketIdentifier::ONE),
@@ -2772,11 +2778,17 @@ mod unit {
             let h = no_in_pub.free_handle().unwrap();
             let pid = h.packet_identifier;
             assert_ok!(h.outbound_sub());
-            no_in_pub.sub_handle(pid).unwrap().remove();
+            no_in_pub
+                .sub_handle(pid)
+                .unwrap()
+                .complete(ReasonCode::Success);
             let h = no_in_pub.free_handle().unwrap();
             let pid = h.packet_identifier;
             assert_ok!(h.outbound_unsub());
-            no_in_pub.unsub_handle(pid).unwrap().remove();
+            no_in_pub
+                .unsub_handle(pid)
+                .unwrap()
+                .complete(ReasonCode::Success);
             assert_eq!(
                 no_in_pub.inbound_publish(
                     IdentifiedQoS::ExactlyOnce(PacketIdentifier::ONE),
