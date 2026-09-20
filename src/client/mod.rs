@@ -1653,8 +1653,8 @@ impl<
 
     /// Sends a PUBACK packet responding to an incoming [`QoS::AtLeastOnce`] PUBLISH packet, that
     /// was marked with [`AckMode::Manual`]. Note that for different packet identifiers, this
-    /// method must be called in an order that complies with [MQTT's ordered topic guarantees
-    /// (https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901240),
+    /// method must be called in an order that complies with
+    /// [MQTT's ordered topic guarantees](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901240),
     /// specifically \[MQTT-4.6.0-2\] which states that:
     ///
     /// > The Client MUST send PUBACK packets in the order in which the corresponding
@@ -1752,8 +1752,8 @@ impl<
 
     /// Sends a PUBREC packet responding to an incoming [`QoS::ExactlyOnce`] PUBLISH packet, that
     /// was marked with [`AckMode::Manual`]. Note that for different packet identifiers, this
-    /// method must be called in an order that complies with [MQTT's ordered topic guarantees]
-    /// (https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901240),
+    /// method must be called in an order that complies with
+    /// [MQTT's ordered topic guarantees](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901240),
     /// specifically \[MQTT-4.6.0-3\] which states that:
     ///
     /// > The Client MUST send PUBREC packets in the order in which the corresponding
