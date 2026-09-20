@@ -120,8 +120,8 @@ jobs:
             -p 18083:18083 \
             -v $PWD/.ci/emqx.conf:/opt/emqx/etc/emqx.conf \
             -v $PWD/.ci/emqx_users.csv:/opt/emqx/etc/auth-built-in-db-bootstrap.csv \
-            emqx/emqx:6.3.0
-          timeout 30s sh -c 'until docker logs emqx 2>&1 | grep "EMQX Enterprise 6.3.0 is running now!"; do sleep 0.1; done'
+            emqx/emqx:6.3.1
+          timeout 30s sh -c 'until docker logs emqx 2>&1 | grep "EMQX Enterprise 6.3.1 is running now!"; do sleep 0.1; done'
 
           API_JSON=$(docker exec emqx emqx ctl api_keys add --api-secret abcdefghijklmnopqrstuvwxyz0123456789 --name admin)
           API_KEY=$(echo $API_JSON | grep -o '"api_key" : "[^"]*"' | cut -d'"' -f4)
@@ -142,8 +142,8 @@ jobs:
             -p 18083:18083 \
             -v $PWD/.ci/emqx.conf:/opt/emqx/etc/emqx.conf \
             -v $PWD/.ci/emqx_users.csv:/opt/emqx/etc/auth-built-in-db-bootstrap.csv \
-            emqx/emqx:6.3.0
-          timeout 30s sh -c 'until docker logs emqx 2>&1 | grep "EMQX Enterprise 6.3.0 is running now!"; do sleep 0.1; done'
+            emqx/emqx:6.3.1
+          timeout 30s sh -c 'until docker logs emqx 2>&1 | grep "EMQX Enterprise 6.3.1 is running now!"; do sleep 0.1; done'
 
           API_JSON=$(docker exec emqx emqx ctl api_keys add --api-secret abcdefghijklmnopqrstuvwxyz0123456789 --name admin)
           API_KEY=$(echo $API_JSON | grep -o '"api_key" : "[^"]*"' | cut -d'"' -f4)
