@@ -1424,6 +1424,13 @@ impl<
     /// (Compare [Message delivery retry](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901238), \[MQTT-4.4.0-1\]).
     ///
     /// Note:
+    /// * For different packet identifiers, this method must be called in an order that complies with
+    ///   [MQTT's ordered topic guarantees](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901240),
+    ///   specifically \[MQTT-4.6.0-1\] which states that:
+    ///
+    ///   > When the Client re-sends any PUBLISH packets, it MUST re-send them in the order in which
+    ///   > the original PUBLISH packets were sent (this applies to QoS 1 and QoS 2 messages)
+    ///
     /// * Server-side constraints:
     ///   * The [`QoS`] should be less than or equal to the server's maximum [`QoS`].
     ///   * The retain flag should only be set if the server supports retain.
@@ -1589,7 +1596,7 @@ impl<
         Ok(())
     }
 
-    /// Resends all pending PUBREL packets that are belong to publication flows started  with the default
+    /// Resends all pending PUBREL packets that belong to publication flows started with the default
     /// [`AckMode::Automatic`]. PUBREL packets associated with [`AckMode::Manual`] flows must be resent
     /// manually on a per-packet basis with [`Client::manual_release`]. To include a reason string and/or
     /// user properties in such a retransmitted PUBREL packet, [`Client::manual_release`] can be used for
@@ -1601,6 +1608,13 @@ impl<
     ///
     /// This method assumes that the server's receive maximum after the reconnection is great enough
     /// to handle as many publication flows as dragged between the two connections.
+    ///
+    /// Note:
+    /// This method does not uphold MQTT's ordered topic guarantees when more than one [`QoS::ExactlyOnce`]
+    /// packet identifier is released by this method. While most servers still continue the protocol flow
+    /// regularly, this means, strictly speaking, that the client is not specification compliant in this
+    /// case! To guarantee specification compliance, it is recommended to use [`Client::manual_release`]
+    /// to release multiple packet identifiers.
     ///
     /// # Errors
     ///
@@ -1638,7 +1652,13 @@ impl<
     }
 
     /// Sends a PUBACK packet responding to an incoming [`QoS::AtLeastOnce`] PUBLISH packet, that
-    /// was marked with [`AckMode::Manual`].
+    /// was marked with [`AckMode::Manual`]. Note that for different packet identifiers, this
+    /// method must be called in an order that complies with [MQTT's ordered topic guarantees
+    /// (https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901240),
+    /// specifically \[MQTT-4.6.0-2\] which states that:
+    ///
+    /// > The Client MUST send PUBACK packets in the order in which the corresponding
+    /// > PUBLISH packets were received (QoS 1 messages)
     ///
     /// The reason code must be one of [`ReasonCode::Success`], [`ReasonCode::UnspecifiedError`],
     /// [`ReasonCode::ImplementationSpecificError`], [`ReasonCode::NotAuthorized`],
@@ -1731,7 +1751,13 @@ impl<
     }
 
     /// Sends a PUBREC packet responding to an incoming [`QoS::ExactlyOnce`] PUBLISH packet, that
-    /// was marked with [`AckMode::Manual`].
+    /// was marked with [`AckMode::Manual`]. Note that for different packet identifiers, this
+    /// method must be called in an order that complies with [MQTT's ordered topic guarantees]
+    /// (https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901240),
+    /// specifically \[MQTT-4.6.0-3\] which states that:
+    ///
+    /// > The Client MUST send PUBREC packets in the order in which the corresponding
+    /// > PUBLISH packets were received (QoS 2 messages)
     ///
     /// The reason code must be one of [`ReasonCode::Success`], [`ReasonCode::UnspecifiedError`],
     /// [`ReasonCode::ImplementationSpecificError`], [`ReasonCode::NotAuthorized`],
@@ -1826,7 +1852,18 @@ impl<
     }
 
     /// Sends a PUBREL packet responding to an incoming PUBREC packet belonging to an
-    /// outgoing publication flow configured with [`AckMode::Manual`].
+    /// outgoing publication flow configured with [`AckMode::Manual`]. Note that for
+    /// different packet identifiers, this method must be called in an order that
+    /// complies with [MQTT's ordered topic guarantees](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901240),
+    /// specifically \[MQTT-4.6.0-4\] which states that:
+    ///
+    /// > The Client MUST send PUBREL packets in the order in which the corresponding
+    /// > PUBREC packets were received (QoS 2 messages)
+    ///
+    /// This method can also be used to control the order of rereleases (including
+    /// publication flows configured with [`AckMode::Automatic`]) after a reconnection
+    /// as an alternative to [`Client::rerelease`] in order to precisely uphold the
+    /// ordered topic guarantees.
     ///
     /// The reason code is implicitely [`ReasonCode::Success`] as the only other allowed
     /// reason code is erroneous and packet identifier related, which is something the
