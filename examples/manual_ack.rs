@@ -162,7 +162,7 @@ async fn main() {
                 let h = assert_ok!(header);
                 match assert_ok!(client.poll_body(h).await) {
                     // Outgoing publications & their acknowledgement counterpart
-                    Event::PublishReceived(Puback { ack_mode: AckMode::Manual, packet_identifier, reason_code, reason_string, user_properties }) if reason_code.is_success() => {
+                    Event::PublishReceived(Puback { ack_mode: AckMode::Manual, packet_identifier, reason_code, .. }) if reason_code.is_success() => {
                         info!("Manually releasing packet identifier {packet_identifier}");
                         client.manual_release(packet_identifier, &AckOptions::new().reason_string(MqttString::from_str("s").unwrap())).await.unwrap();
                     }
