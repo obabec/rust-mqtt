@@ -40,7 +40,7 @@ The MQTT client is feature complete against the MQTTv5 specification.
 - User Property
 - Enhanced/Extended authentication and re-authentication
 
-### Current limitation
+### Current limitations
 
 - Subscribing to multiple topics in a single packet is not supported
 - [Ordered topic guarantees](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901240) are not built into the client, as implementing them introduces significant overhead and adds unnecessary complexity for simple use cases. The exact rules required for specification-compliant usage of `rust-mqtt` are documented in the [`Client` methods documentation](https://docs.rs/rust-mqtt/latest/rust_mqtt/client/struct.Client.html). However, if only a single packet identifier is in flight concurrently, these restrictions do not apply.
