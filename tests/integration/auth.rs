@@ -156,7 +156,7 @@ async fn reauthenticate_with_publish_traffic_emqx_only() {
             let pub_options =
                 PublicationOptions::new(TopicReference::Name(in_topic_name.as_borrowed())).retain();
 
-            sleep(Duration::from_millis(5)).await;
+            sleep(Duration::from_millis(25)).await;
             assert_published!(tx, pub_options, msg.into());
         }
 

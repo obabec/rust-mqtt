@@ -205,7 +205,7 @@ async fn publish_recv_multiple_qos0() {
                     messages
                         .iter()
                         .enumerate()
-                        .find(|(_, (t, m))| *t == p.topic && m == &msg)
+                        .find(|(_, (t, m))| t == p.topic.name().unwrap() && m == &msg)
                         .ok_or("Option is None")
                 );
 
@@ -274,7 +274,7 @@ async fn publish_recv_multiple_qos1() {
                     messages
                         .iter()
                         .enumerate()
-                        .find(|(_, (t, m))| *t == p.topic && m == &msg)
+                        .find(|(_, (t, m))| t == p.topic.name().unwrap() && m == &msg)
                         .ok_or("Option is None")
                 );
 
@@ -342,7 +342,7 @@ async fn publish_recv_multiple_qos2() {
                     messages
                         .iter()
                         .enumerate()
-                        .find(|(_, (t, m))| *t == p.topic && m == &msg)
+                        .find(|(_, (t, m))| t == p.topic.name().unwrap() && m == &msg)
                         .ok_or("Option is None")
                 );
 

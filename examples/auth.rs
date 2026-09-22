@@ -30,7 +30,7 @@ async fn main() {
 
     let mut buffer = AllocBuffer;
 
-    let mut client = Client::<'_, '_, _, _, 1, 1, 1, 1, 16>::new(&mut buffer);
+    let mut client = Client::<'_, '_, _, _, 1, 1, 1, 1, 16, 0, 0>::new(&mut buffer);
 
     let addr = SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 1883);
     let connection = TcpStream::connect(addr).await.unwrap();

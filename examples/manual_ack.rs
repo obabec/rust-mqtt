@@ -45,7 +45,7 @@ async fn main() {
     #[cfg(feature = "bump")]
     let mut buffer = BumpBuffer::new(&mut buffer);
 
-    let mut client = Client::<'_, '_, _, _, 1, 3, 3, 0, 16>::new(&mut buffer);
+    let mut client = Client::<'_, '_, _, _, 1, 3, 3, 0, 16, 0, 0>::new(&mut buffer);
 
     // Acknowledge all packets manually which have a payload format indicator property with a value of
     // true (claiming that the payload is UTF-8). We intentionally leave the check for actual UTF-8
@@ -162,7 +162,7 @@ async fn main() {
                 let h = assert_ok!(header);
                 match assert_ok!(client.poll_body(h).await) {
                     // Outgoing publications & their acknowledgement counterpart
-                    Event::PublishReceived(Puback { ack_mode: AckMode::Manual, packet_identifier, reason_code, reason_string, user_properties }) if reason_code.is_success() => {
+                    Event::PublishReceived(Puback { ack_mode: AckMode::Manual, packet_identifier, reason_code, .. }) if reason_code.is_success() => {
                         info!("Manually releasing packet identifier {packet_identifier}");
                         client.manual_release(packet_identifier, &AckOptions::new().reason_string(MqttString::from_str("s").unwrap())).await.unwrap();
                     }

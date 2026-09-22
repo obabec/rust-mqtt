@@ -10,13 +10,34 @@ pub struct FreeHandle<
     const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
-    pub session: &'a mut Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    pub session: &'a mut Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
     pub packet_identifier: PacketIdentifier,
 }
 
-impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
-    FreeHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+>
+    FreeHandle<
+        '_,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
     pub fn outbound_sub(self) -> Result<(), Error> {
         self.session
@@ -26,7 +47,8 @@ impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MA
                 trace!(
                     "initiating subscription {{ pid=#{} }}",
                     self.packet_identifier
-                )
+                );
+                trace!("#{}: Untracked -> AwaitSuback", self.packet_identifier);
             })
             .map_err(|_| {
                 trace!(
@@ -45,7 +67,8 @@ impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MA
                 trace!(
                     "initiating unsubscription {{ pid=#{} }}",
                     self.packet_identifier
-                )
+                );
+                trace!("#{}: Untracked -> AwaitUnsuback", self.packet_identifier);
             })
             .map_err(|_| {
                 trace!(
@@ -96,15 +119,42 @@ pub struct SubHandle<
     const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
-    pub session: &'a mut Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    pub session: &'a mut Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
     pub i: usize,
 }
 
-impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
-    SubHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+>
+    SubHandle<
+        '_,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
-    pub(crate) fn remove(self) {
+    pub(crate) fn complete(self, reason_code: ReasonCode) {
+        trace!(
+            "completing subscription with SUBACK {{ pid=#{}, reason_code={:?} }}",
+            self.packet_identifier(),
+            reason_code,
+        );
+
         trace!("#{}: AwaitSuback -> Untracked", self.packet_identifier());
 
         self.session.subs.swap_remove(self.i);
@@ -119,15 +169,42 @@ pub struct UnsubHandle<
     const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
-    pub session: &'a mut Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    pub session: &'a mut Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
     pub i: usize,
 }
 
-impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
-    UnsubHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+>
+    UnsubHandle<
+        '_,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
-    pub(crate) fn remove(self) {
+    pub(crate) fn complete(self, reason_code: ReasonCode) {
+        trace!(
+            "completing unsubscription with UNSUBACK {{ pid=#{}, reason_code={:?} }}",
+            self.packet_identifier(),
+            reason_code,
+        );
+
         trace!("#{}: AwaitUnsuback -> Untracked", self.packet_identifier());
 
         self.session.unsubs.swap_remove(self.i);
@@ -142,14 +219,35 @@ pub struct InboundHandle<
     const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
-    pub session: &'a mut Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    pub session: &'a mut Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
     pub i: usize,
     pub state: PeerPublishState,
 }
 
-impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
-    InboundHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+>
+    InboundHandle<
+        '_,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
     fn set(&mut self, state: PeerPublishState) {
         trace!(
@@ -655,14 +753,35 @@ pub struct OutboundHandle<
     const SUBSCRIBE_MAXIMUM: usize,
     const RECEIVE_MAXIMUM: usize,
     const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
 > {
-    pub session: &'a mut Session<SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>,
+    pub session: &'a mut Session<
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >,
     pub i: usize,
     pub state: LocalPublishState,
 }
 
-impl<const SUBSCRIBE_MAXIMUM: usize, const RECEIVE_MAXIMUM: usize, const SEND_MAXIMUM: usize>
-    OutboundHandle<'_, SUBSCRIBE_MAXIMUM, RECEIVE_MAXIMUM, SEND_MAXIMUM>
+impl<
+    const SUBSCRIBE_MAXIMUM: usize,
+    const RECEIVE_MAXIMUM: usize,
+    const SEND_MAXIMUM: usize,
+    const MAX_INCOMING_TOPIC_ALIASES: usize,
+    const MAX_OUTGOING_TOPIC_ALIASES: usize,
+>
+    OutboundHandle<
+        '_,
+        SUBSCRIBE_MAXIMUM,
+        RECEIVE_MAXIMUM,
+        SEND_MAXIMUM,
+        MAX_INCOMING_TOPIC_ALIASES,
+        MAX_OUTGOING_TOPIC_ALIASES,
+    >
 {
     fn set(&mut self, state: LocalPublishState) {
         trace!(

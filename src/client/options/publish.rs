@@ -205,14 +205,19 @@ pub enum TopicReference<'t> {
 }
 
 impl<'t> TopicReference<'t> {
-    pub(crate) fn alias(&self) -> Option<NonZero<u16>> {
+    /// If present in the variant, returns the topic alias value of the [`TopicReference`].
+    /// This is the case for [`TopicReference::Mapping`] and [`TopicReference::Alias`].
+    pub fn alias(&self) -> Option<NonZero<u16>> {
         match self {
             Self::Name(_) => None,
             Self::Alias(alias) => Some(*alias),
             Self::Mapping(_, alias) => Some(*alias),
         }
     }
-    pub(crate) fn topic_name(&self) -> Option<&TopicName<'t>> {
+
+    /// If present in the variant, returns the topic name value of the [`TopicReference`].
+    /// This is the case for [`TopicReference::Name`] and [`TopicReference::Mapping`].
+    pub fn name(&self) -> Option<&TopicName<'t>> {
         match self {
             Self::Name(topic_name) => Some(topic_name),
             Self::Alias(_) => None,

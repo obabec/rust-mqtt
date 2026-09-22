@@ -207,6 +207,14 @@ pub enum Error<'e, const MAX_USER_PROPERTIES: usize, A = Infallible> {
     /// [`Event::PublishComplete`]: crate::client::event::Event::PublishComplete
     SendQuotaExceeded,
 
+    /// A publish without a topic name was attempted to a topic alias that has not been mapped previously.
+    /// This can only occur when [`TopicReference::Alias`] is used.
+    ///
+    /// Recoverable error. No action has been taken by the client.
+    ///
+    /// [`TopicReference::Alias`]: crate::client::options::TopicReference::Alias
+    TopicAliasNotMapped,
+
     /// An operation was attempted which the server stated it does not support. If the requested operation
     /// were executed as is, a protocol error would be caused.
     ///
@@ -289,6 +297,7 @@ impl<const MAX_USER_PROPERTIES: usize, A> Error<'_, MAX_USER_PROPERTIES, A> {
                 | Self::ServerMaximumPacketSizeExceeded
                 | Self::SessionBuffer
                 | Self::SendQuotaExceeded
+                | Self::TopicAliasNotMapped
                 | Self::UnsupportedByServer
                 | Self::IllegalNoLocalSharedSubscription
                 | Self::NoEnhancedAuthentication
@@ -332,6 +341,7 @@ impl<'e, A> Error<'e, 0, A> {
             Self::ServerMaximumPacketSizeExceeded => Error::ServerMaximumPacketSizeExceeded,
             Self::SessionBuffer => Error::SessionBuffer,
             Self::SendQuotaExceeded => Error::SendQuotaExceeded,
+            Self::TopicAliasNotMapped => Error::TopicAliasNotMapped,
             Self::UnsupportedByServer => Error::UnsupportedByServer,
             Self::IllegalNoLocalSharedSubscription => Error::IllegalNoLocalSharedSubscription,
             Self::NoEnhancedAuthentication => Error::NoEnhancedAuthentication,
@@ -376,6 +386,7 @@ impl<'e, const MAX_USER_PROPERTIES: usize> Error<'e, MAX_USER_PROPERTIES> {
             Self::ServerMaximumPacketSizeExceeded => Error::ServerMaximumPacketSizeExceeded,
             Self::SessionBuffer => Error::SessionBuffer,
             Self::SendQuotaExceeded => Error::SendQuotaExceeded,
+            Self::TopicAliasNotMapped => Error::TopicAliasNotMapped,
             Self::UnsupportedByServer => Error::UnsupportedByServer,
             Self::IllegalNoLocalSharedSubscription => Error::IllegalNoLocalSharedSubscription,
             Self::NoEnhancedAuthentication => Error::NoEnhancedAuthentication,

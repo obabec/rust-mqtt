@@ -19,7 +19,7 @@ pub mod failing;
 pub mod fmt;
 pub mod utils;
 
-type DefaultClient<'a, T> = Client<'static, 'a, T, AllocBuffer, 1, 1, 1, 1, 16>;
+type DefaultClient<'a, T> = Client<'static, 'a, T, AllocBuffer, 1, 1, 1, 1, 16, 0, 0>;
 
 pub type TestClient<'a> = DefaultClient<'a, FromTokio<TcpStream>>;
 pub type FailingClient<'a> = DefaultClient<'a, FromTokio<FailingTcp>>;

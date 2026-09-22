@@ -4,7 +4,7 @@ use heapless::Vec;
 
 use crate::{
     bytes::Bytes,
-    client::AckMode,
+    client::{AckMode, options::TopicReference},
     types::{
         IdentifiedQoS, MqttBinary, MqttString, MqttStringPair, PacketIdentifier, ReasonCode,
         TopicName, VarByteInt,
@@ -255,8 +255,11 @@ pub struct Publish<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER
     /// the retain as published flag of the matching subscription.
     pub retain: bool,
 
-    /// The exact topic of this publication.
-    pub topic: TopicName<'p>,
+    /// The topic of this publication. In the case of [`TopicReference::Mapping`], a new topic alias
+    /// mapping is created or an existing mapping is overwritten. In the case of
+    /// [`TopicReference::Alias`], an existing mapping is used and the mapped topic name is the referred
+    /// topic.
+    pub topic: TopicReference<'p>,
 
     /// If present, indicates whether the payload is UTF-8. This value is set by the publisher and is
     /// NOT verified by the client library.

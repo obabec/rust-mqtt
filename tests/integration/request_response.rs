@@ -52,7 +52,7 @@ async fn simple_request_response() {
             timeout(Duration::from_secs(5), receive_and_complete(&mut requester)).await
         ));
 
-        assert_eq!(topic, response_topic_name);
+        assert_eq!(topic.name().unwrap(), &response_topic_name);
         assert_eq!(&*message, response_msg.as_bytes());
         assert!(response_topic.is_none());
         assert!(correlation_data.is_none());
@@ -71,7 +71,7 @@ async fn simple_request_response() {
             ..
         } = assert_recv_excl!(responder, topic_name);
 
-        assert_eq!(topic, topic_name);
+        assert_eq!(topic.name().unwrap(), &topic_name);
         assert_eq!(&*message, request_msg.as_bytes());
         assert!(response_topic.is_some());
         assert_eq!(response_topic.as_ref().unwrap(), &response_topic_name);
@@ -124,7 +124,7 @@ async fn simple_correlation_data() {
             timeout(Duration::from_secs(5), receive_and_complete(&mut requester)).await
         ));
 
-        assert_eq!(topic, response_topic_name);
+        assert_eq!(topic.name().unwrap(), &response_topic_name);
         assert_eq!(&*message, response_msg.as_bytes());
         assert!(response_topic.is_none());
         assert!(correlation_data.is_some());
@@ -144,7 +144,7 @@ async fn simple_correlation_data() {
             ..
         } = assert_recv_excl!(responder, topic_name);
 
-        assert_eq!(topic, topic_name);
+        assert_eq!(topic.name().unwrap(), &topic_name);
         assert_eq!(&*message, request_msg.as_bytes());
         assert!(response_topic.is_some());
         assert_eq!(response_topic.as_ref().unwrap(), &response_topic_name);
@@ -208,7 +208,7 @@ async fn multiple_correlation_data() {
                 timeout(Duration::from_secs(5), receive_and_complete(&mut requester)).await
             ));
 
-            assert_eq!(topic, response_topic_name);
+            assert_eq!(topic.name().unwrap(), &response_topic_name);
             assert!(response_topic.is_none());
 
             let correlation = correlation_data.expect("Expected correlation data");
@@ -235,7 +235,7 @@ async fn multiple_correlation_data() {
                 ..
             } = assert_recv_excl!(responder, topic_name);
 
-            assert_eq!(topic, topic_name);
+            assert_eq!(topic.name().unwrap(), &topic_name);
             assert!(response_topic.is_some());
             assert_eq!(response_topic.as_ref().unwrap(), &response_topic_name);
 

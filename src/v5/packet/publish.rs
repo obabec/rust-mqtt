@@ -238,7 +238,7 @@ impl<const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PROPERTIES: usize
             .await?;
 
         self.topic
-            .topic_name()
+            .name()
             .map(TopicName::as_borrowed)
             .map_or(Self::EMPTY_TOPIC, Into::into)
             .write(write)
@@ -310,7 +310,7 @@ impl<'p, const MAX_SUBSCRIPTION_IDENTIFIERS: usize, const MAX_USER_PROPERTIES: u
     fn remaining_len_raw(&self) -> Result<VarByteInt, TooLargeToEncode> {
         let topic_name_length = self
             .topic
-            .topic_name()
+            .name()
             .map(TopicName::as_borrowed)
             .map_or(Self::EMPTY_TOPIC, Into::into)
             .written_len();
@@ -493,8 +493,8 @@ mod unit {
 
             0x08, // Response Topic
             0x00, 0x17,
-            b'u', b'n', b'o', b',', b' ', b'd', b'o', b's', b',', b' ', b't', b'r', b'e', b's', b',', b' ', b'c', b'a', b't', b'o', b'r', b'c', b'e', 
-            
+            b'u', b'n', b'o', b',', b' ', b'd', b'o', b's', b',', b' ', b't', b'r', b'e', b's', b',', b' ', b'c', b'a', b't', b'o', b'r', b'c', b'e',
+
             0x09, // Correlation Data
             0x00, 0x08,
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
@@ -505,11 +505,11 @@ mod unit {
 
             0x26, // User property
             0x00, 0x04, b'G', b'y', b'r', b'o',
-            0x00, 0x09, b'G', b'e', b'a', b'r', b'l', b'o', b'o', b's', b'e', 
+            0x00, 0x09, b'G', b'e', b'a', b'r', b'l', b'o', b'o', b's', b'e',
 
             0x03, // Content type
             0x00, 0x16,
-            b'a', b'p', b'p', b'l', b'i', b'c', b'a', b't', b'i', b'o', b'n', b'/', b'j', b'a', b'v', b'a', b's', b'c', b'r', b'i', b'p', b't', 
+            b'a', b'p', b'p', b'l', b'i', b'c', b'a', b't', b'i', b'o', b'n', b'/', b'j', b'a', b'v', b'a', b's', b'c', b'r', b'i', b'p', b't',
 
             b'h', // Payload
             b'e', //

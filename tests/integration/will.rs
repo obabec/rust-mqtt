@@ -686,7 +686,7 @@ async fn session_expires_right_after_disconnect_emqx_only_hive_only() {
             timeout(Duration::from_secs(2), receive_and_complete(&mut rx)).await
         ));
 
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
         assert_eq!(&*message, will_msg.as_bytes());
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
@@ -736,7 +736,7 @@ async fn session_expires_before_will_delay_interval() {
             timeout(Duration::from_secs(4), receive_and_complete(&mut rx)).await
         ));
 
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
         assert_eq!(&*message, will_msg.as_bytes());
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
@@ -845,7 +845,7 @@ async fn clean_start_override_before_will_scheduled_emqx_only_hive_only() {
             timeout(Duration::from_secs(3), receive_and_complete(&mut rx)).await
         ));
 
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -909,7 +909,7 @@ async fn will_existing_session_taken_over_with_session_expiry() {
         let Publish { topic, .. } = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(10), receive_and_complete(&mut rx)).await
         ));
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -917,12 +917,10 @@ async fn will_existing_session_taken_over_with_session_expiry() {
     join!(receiver, publisher, publisher_takeover);
 }
 
-#[expect(unused_attributes)]
-#[ignore = "enable this test once emqx v6.2.4 is used, see https://github.com/emqx/emqx/issues/18565"]
 #[ignore = "enable this test once mosquitto v2.1.3 is used"]
 #[tokio::test]
 #[test_log::test]
-async fn will_existing_session_taken_over_with_will_delay_hive_only() {
+async fn will_existing_session_taken_over_with_will_delay_emqx_only_hive_only() {
     let id = MqttString::from_str("WILL_EXISTING_SESSION_TAKEN_OVER_WITH_WILL_DELAY").unwrap();
 
     let (will_topic_name, will_topic_filter) = unique_topic();
@@ -977,7 +975,7 @@ async fn will_existing_session_taken_over_with_will_delay_hive_only() {
         let Publish { topic, .. } = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(10), receive_and_complete(&mut rx)).await
         ));
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };
@@ -1040,7 +1038,7 @@ async fn will_existing_session_taken_over_with_clean_start_emqx_only_hive_only()
         let Publish { topic, .. } = assert_ok!(assert_ok!(
             timeout(Duration::from_secs(10), receive_and_complete(&mut rx)).await
         ));
-        assert_eq!(topic, will_topic_name);
+        assert_eq!(topic.name().unwrap(), &will_topic_name);
 
         disconnect(&mut rx, DEFAULT_DC_OPTIONS).await;
     };

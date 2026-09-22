@@ -16,8 +16,7 @@ use tokio_test::assert_err;
 use crate::common::{
     BROKER_ADDRESS, DEFAULT_DC_OPTIONS, DEFAULT_QOS0_SUB_OPTIONS, NO_SESSION_CONNECT_OPTIONS,
     assert::{assert_ok, assert_published, assert_recv, assert_subscribe},
-    fmt::warn_inspect,
-    utils::{ALLOC, connected_client, disconnect, tcp_connection, unique_topic},
+    utils::{connected_client, disconnect, tcp_connection, unique_topic},
 };
 
 #[tokio::test]
@@ -297,19 +296,8 @@ async fn subscription_identifier() {
     let mut tx =
         assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
-    let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16> = {
-        let mut client = Client::new(ALLOC.get());
-
-        let tcp = assert_ok!(tcp_connection(BROKER_ADDRESS).await);
-
-        assert_ok!(
-            warn_inspect!(
-                client.connect(tcp, NO_SESSION_CONNECT_OPTIONS, None).await,
-                "Client::connect() failed"
-            )
-            .map(|_| client)
-        )
-    };
+    let mut rx: Client<'_, '_, _, _, 1, 1, 1, 1, 16, 0, 0> =
+        assert_ok!(connected_client(BROKER_ADDRESS, NO_SESSION_CONNECT_OPTIONS, None).await);
 
     let options = DEFAULT_QOS0_SUB_OPTIONS
         .at_least_once()
